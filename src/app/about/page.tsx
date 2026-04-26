@@ -1,8 +1,22 @@
+// /about — brand story page in LP design language. Structure:
+//   PageHero  → ScarcityBar  → Brand-story column  → ThreePromises
+//   → 5-pillar listing grid (LP shadow-card style)
+//   → FoundersLetter  → SustainabilityBlock  → GuaranteeBlock
+//   → FaqAccordion  → bottom CTA
+// Article JSON-LD preserved for SEO.
+
 import type { Metadata } from "next";
 import Link from "next/link";
-import Image from "next/image";
+
+import { PageHero } from "@/components/lp/PageHero";
+import { ScarcityBar } from "@/components/lp/ScarcityBar";
+import { ThreePromises } from "@/components/lp/ThreePromises";
+import { FoundersLetter } from "@/components/lp/FoundersLetter";
+import { SustainabilityBlock } from "@/components/lp/SustainabilityBlock";
+import { GuaranteeBlock } from "@/components/lp/GuaranteeBlock";
+import { FaqAccordion } from "@/components/lp/FaqAccordion";
+
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
-import { FREE_SHIPPING_PHRASE, pricingForQty } from "@/lib/bundles/pricing";
 import { BRAND_STORY_HEADLINE, BRAND_STORY_PARAGRAPHS } from "@/data/brandStory";
 
 function resolveSiteUrl() {
@@ -24,34 +38,31 @@ const PAGE_DESCRIPTION =
   "Meet the team behind USA Gummies and our mission to make dye-free gummies with no artificial dyes, proudly made in the USA.";
 const OG_IMAGE = "/opengraph-image";
 
-const LISTING_TITLE =
-  "USA Gummies – All American Gummy Bears, 7.5 oz, Made in USA, No Artificial Dyes, All Natural Flavors";
-
 const LISTING_BULLETS = [
   {
-    title: "MADE IN THE USA",
+    title: "Made in the U.S.A.",
     body:
-      "Proudly sourced, manufactured, and packed entirely in America. Supporting local jobs while delivering a better-quality gummy you can trust.",
+      "Sourced, manufactured, and packed entirely in America. Backing American jobs and delivering a better gummy you can trust.",
   },
   {
-    title: "NO ARTIFICIAL DYES OR SYNTHETIC COLORS",
+    title: "No Artificial Dyes",
     body:
-      "Colored naturally using real fruit and vegetable extracts. No fake brightness, no artificial dyes.",
+      "Colored naturally from real fruit and vegetable extracts. No synthetic colors. No fake brightness.",
   },
   {
-    title: "CLASSIC GUMMY BEAR FLAVOR — DONE RIGHT",
+    title: "Classic Gummy Bear Flavor.",
     body:
-      "All the chewy, fruity flavor you expect from a gummy bear, just without artificial ingredients or harsh aftertaste.",
+      "All the chewy, fruity flavor you expect — without artificial ingredients or harsh aftertaste.",
   },
   {
-    title: "PERFECT FOR EVERYDAY SNACKING",
+    title: "Built for Everyday.",
     body:
-      "Great for lunchboxes, desk drawers, road trips, care packages, and guilt-free sweet cravings.",
+      "Lunchboxes, desk drawers, road trips, care packages, and guilt-free sweet cravings.",
   },
   {
-    title: "7.5 OZ BAG WITH 5 FRUIT FLAVORS",
+    title: "Five Natural Flavors.",
     body:
-      "Cherry, Watermelon, Orange, Green Apple, and Lemon. Clearly labeled, honestly made, and easy to share.",
+      "Cherry, Watermelon, Orange, Green Apple, and Lemon. Clearly labeled, honestly made, and easy to share in a 7.5 oz bag.",
   },
 ];
 
@@ -98,249 +109,106 @@ export const metadata: Metadata = {
   },
 };
 
-function formatMoney(amount: string | number, currency = "USD") {
-  const n = typeof amount === "string" ? Number(amount) : amount;
-  if (!Number.isFinite(n)) return `$${amount}`;
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 2,
-  }).format(n);
-}
-
-function Pill({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="candy-pill">
-      {children}
-    </span>
-  );
-}
-
 export default function AboutPage() {
-  const starterPricing = pricingForQty(1);
-  const bestValuePricing = pricingForQty(8);
-  const starterPerBag = formatMoney(starterPricing.perBag);
-  const bestValuePerBag = formatMoney(bestValuePricing.perBag);
-  const bestValueSavingsPct =
-    starterPricing.perBag > 0
-      ? Math.max(
-          0,
-          Math.round(
-            ((starterPricing.perBag - bestValuePricing.perBag) / starterPricing.perBag) * 100
-          )
-        )
-      : 0;
-  const bundleSavingsLine =
-    bestValueSavingsPct > 0
-      ? `Savings pricing lowers the per-bag cost from ${starterPerBag} to ${bestValuePerBag} when you choose 8 bags (${bestValueSavingsPct}% less per bag).`
-      : "Savings pricing lowers the per-bag cost as you add more bags.";
-
   return (
-    <main className="relative overflow-hidden text-[var(--text)] min-h-screen home-candy">
-      <div className="relative w-full h-[280px] sm:h-[340px] lg:h-[400px] overflow-hidden">
-        <Image
-          src="/brand/americana/founding-fathers-fireside.jpg"
-          alt="Founding fathers sharing USA Gummies by the fireside"
-          fill
-          sizes="100vw"
-          className="object-cover"
-          priority
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#1B2A4A]/50 to-[#1B2A4A]/75" />
-        <div className="relative z-10 flex flex-col items-center justify-center h-full text-center px-4">
-          <div className="relative w-44 h-20 sm:w-52 sm:h-24 mb-3">
-            <Image src="/brand/logo-full.png" alt="USA Gummies" fill sizes="208px" className="object-contain drop-shadow-[0_6px_24px_rgba(0,0,0,0.5)]" />
-          </div>
-          <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold uppercase tracking-wide text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.4)]">
-            About USA Gummies
-          </h1>
-          <p className="mt-2 text-sm text-white/85 max-w-md drop-shadow-sm">
-            Meet the team behind America&rsquo;s favorite dye-free gummy bear.
-          </p>
-        </div>
-      </div>
-
-      <section className="relative overflow-hidden">
-        <div
-          className="absolute inset-0 pointer-events-none"
-          aria-hidden="true"
-          style={{
-            backgroundImage:
-              "radial-gradient(circle at 12% 18%, rgba(255,77,79,0.14), transparent 48%), radial-gradient(circle at 85% 5%, rgba(255,199,44,0.14), transparent 38%)",
-            opacity: 0.5,
-          }}
-        />
-        <div className="relative mx-auto max-w-6xl px-4 py-10">
-          <BreadcrumbJsonLd
-            items={[
-              { name: "Home", href: "/" },
-              { name: "About", href: "/about" },
-            ]}
-          />
-
-          <div className="flex justify-center py-6">
-            <div className="relative w-40 h-20">
-              <Image src="/brand/logo-full.png" alt="USA Gummies" fill sizes="160px" className="object-contain" />
-            </div>
-          </div>
-
-          <div className="candy-panel rounded-[36px] border border-[var(--border)] p-6 sm:p-8">
-            <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
-              <div className="space-y-4">
-                <div className="flex flex-wrap items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.32em] text-[var(--muted)] sm:text-xs">
-                  <span className="rounded-full border border-[var(--border)] bg-[var(--surface-strong)] px-3 py-1 text-[var(--text)]">
-                    Made in the USA
-                  </span>
-                  <span className="text-[var(--red)]">No artificial dyes</span>
-                </div>
-
-                <h1 className="text-3xl font-black leading-[1.12] tracking-tight text-[var(--text)] sm:text-4xl lg:text-5xl">
-                  {LISTING_TITLE}
-                </h1>
-
-                <p className="text-sm text-[var(--muted)] sm:text-base max-w-prose">
-                  {LISTING_BULLETS[0].body}
-                </p>
-                <p className="text-sm text-[var(--muted)] sm:text-base max-w-prose">
-                  {LISTING_BULLETS[1].body}
-                </p>
-
-                <div className="flex flex-wrap gap-2">
-                  <Pill>Made in the USA</Pill>
-                  <Pill>No artificial dyes or synthetic colors</Pill>
-                  <Pill>7.5 oz bag with 5 fruit flavors</Pill>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-3">
-                  <Link href="/shop" className="btn btn-candy">
-                    Shop now
-                  </Link>
-                  <span className="text-xs text-[var(--muted)]">{FREE_SHIPPING_PHRASE}</span>
-                </div>
-              </div>
-
-              <div className="relative">
-                <div className="relative rounded-3xl border border-[var(--border)] bg-white p-2 text-[var(--text)] shadow-[0_20px_48px_rgba(15,27,45,0.12)]">
-                  <div className="relative aspect-[5/4] overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-3">
-                    <Image
-                      src="/brand/usa-gummies-family.webp"
-                      alt="Assorted USA Gummies gummy bear bags"
-                      fill
-                      sizes="(max-width: 768px) 90vw, 460px"
-                      className="object-contain"
-                    />
-                  </div>
-                  <div className="mt-2 space-y-1">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
-                      {LISTING_BULLETS[4].title}
-                    </div>
-                    <div className="text-sm text-[var(--muted)]">
-                      {LISTING_BULLETS[4].body}
-                    </div>
-                    <div className="flex flex-wrap gap-2 pt-2">
-                      <span className="badge badge--navy">Made in USA</span>
-                      <span className="badge badge--navy">No artificial dyes</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {LISTING_BULLETS.map((bullet) => (
-                <div
-                  key={bullet.title}
-                  className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-4"
-                >
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
-                    {bullet.title}
-                  </div>
-                  <div className="mt-2 text-sm text-[var(--muted)]">{bullet.body}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="mt-6 candy-panel rounded-[32px] border border-[var(--border)] p-5 sm:p-6">
-            <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
-              <div>
-                <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-                  Our story
-                </div>
-                <h2 className="mt-2 text-2xl font-black text-[var(--text)]">
-                  {BRAND_STORY_HEADLINE}
-                </h2>
-                <div className="mt-4 space-y-3 text-sm text-[var(--muted)]">
-                  {BRAND_STORY_PARAGRAPHS.map((paragraph) => (
-                    <p key={paragraph}>{paragraph}</p>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-                  Savings by bag count
-                </div>
-                <h2 className="mt-2 text-2xl font-black text-[var(--text)]">
-                  Bag-count pricing saves you money.
-                </h2>
-                <p className="mt-2 text-sm text-[var(--muted)]">{bundleSavingsLine}</p>
-                <div className="mt-3 text-sm text-[var(--muted)]">{FREE_SHIPPING_PHRASE}.</div>
-
-                <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-3">
-                    <div className="text-[10px] uppercase tracking-[0.24em] text-[var(--muted)]">
-                      Single bag
-                    </div>
-                    <div className="text-base font-black text-[var(--text)]">{starterPerBag} per bag</div>
-                  </div>
-                  <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-3">
-                    <div className="text-[10px] uppercase tracking-[0.24em] text-[var(--muted)]">
-                      Most popular
-                    </div>
-                    <div className="text-base font-black text-[var(--text)]">{bestValuePerBag} per bag</div>
-                    <div className="text-[11px] text-[var(--muted)]">8-bag total</div>
-                    <div className="text-[11px] text-[var(--red)]">
-                      Best balance of value + convenience
-                    </div>
-                  </div>
-                  <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-3">
-                    <div className="text-[10px] uppercase tracking-[0.24em] text-[var(--muted)]">
-                      Free shipping
-                    </div>
-                    <div className="text-base font-black text-[var(--text)]">5+ bags</div>
-                    <div className="text-[11px] text-[var(--muted)]">Orders ship free</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-6 candy-panel rounded-[32px] border border-[var(--border)] p-5 sm:p-6">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-                  Ready to order
-                </div>
-                <h2 className="mt-2 text-2xl font-black text-[var(--text)]">
-                  Shop the best value bundles.
-                </h2>
-                <p className="mt-2 text-sm text-[var(--muted)]">
-                  Save more per bag when you add 4+ bags. {FREE_SHIPPING_PHRASE}.
-                </p>
-              </div>
-              <Link href="/shop" className="btn btn-candy">
-                Shop best value
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
-
+    <main>
+      <BreadcrumbJsonLd
+        items={[
+          { name: "Home", href: "/" },
+          { name: "About", href: "/about" },
+        ]}
+      />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd) }}
       />
+
+      <PageHero
+        eyebrow="Our Story"
+        headline="The brand"
+        scriptAccent="behind the bag."
+        sub="USA Gummies is a one-product brand obsessed with getting one thing right: a real gummy bear, made in the U.S.A., with no artificial dyes."
+        ctas={[
+          { href: "/shop", label: "Shop now", variant: "primary" },
+        ]}
+      />
+
+      <ScarcityBar />
+
+      {/* Brand story — pulled from /data/brandStory. Preserves the long-form
+       * narrative structure but in LP type rhythm. */}
+      <section className="bg-[var(--lp-cream-soft)] border-y-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[900px] px-5 py-14 sm:px-8 sm:py-20">
+          <div className="mb-8 text-center">
+            <p className="lp-label mb-2 text-[var(--lp-red)]">★ Why We Started ★</p>
+            <h2 className="lp-display text-[clamp(2rem,5vw,3.2rem)] text-[var(--lp-ink)]">
+              {BRAND_STORY_HEADLINE}
+            </h2>
+          </div>
+          <div className="lp-sans space-y-4 text-[1.05rem] leading-[1.75] text-[var(--lp-ink)]/88">
+            {BRAND_STORY_PARAGRAPHS.map((p, i) => (
+              <p key={i}>{p}</p>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <ThreePromises />
+
+      {/* Five-pillar listing — LP shadow-card grid. */}
+      <section className="bg-[var(--lp-cream)]">
+        <div className="mx-auto max-w-[1200px] px-5 py-14 sm:px-8 sm:py-20">
+          <div className="mb-10 text-center">
+            <p className="lp-label mb-2 text-[var(--lp-red)]">★ The Five Pillars ★</p>
+            <h2 className="lp-display text-[clamp(2rem,5vw,3.2rem)] text-[var(--lp-ink)]">
+              What we stand
+              <br />
+              <span className="lp-script text-[var(--lp-red)]">behind.</span>
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {LISTING_BULLETS.map((b, i) => (
+              <div
+                key={b.title}
+                className="border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-6 sm:p-7"
+                style={{ boxShadow: i === 0 ? "5px 5px 0 var(--lp-red)" : "5px 5px 0 var(--lp-ink)" }}
+              >
+                <h3 className="lp-display text-[1.5rem] leading-tight text-[var(--lp-ink)] sm:text-[1.7rem]">
+                  {b.title}
+                </h3>
+                <p className="lp-sans mt-3 text-[0.98rem] leading-[1.55] text-[var(--lp-ink)]/82">
+                  {b.body}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <FoundersLetter />
+      <SustainabilityBlock />
+      <GuaranteeBlock />
+      <FaqAccordion />
+
+      {/* Bottom CTA */}
+      <section className="bg-[var(--lp-cream-soft)] border-t-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[900px] px-5 py-14 text-center sm:px-8 sm:py-16">
+          <p className="lp-label mb-3 text-[var(--lp-red)]">★ Ready When You Are ★</p>
+          <h2 className="lp-display text-[clamp(2rem,5vw,3.2rem)] text-[var(--lp-ink)]">
+            Try the bag
+            <br />
+            <span className="lp-script text-[var(--lp-red)]">that started it all.</span>
+          </h2>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+            <Link href="/shop" className="lp-cta">
+              Shop USA Gummies
+            </Link>
+            <Link href="/ingredients" className="lp-cta lp-cta-light">
+              See ingredients
+            </Link>
+          </div>
+        </div>
+      </section>
     </main>
   );
 }

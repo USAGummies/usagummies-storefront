@@ -1,7 +1,18 @@
-// src/app/dye-free-movement/page.tsx
-import Link from "next/link";
-import Image from "next/image";
+// /dye-free-movement — long-form historical timeline page in LP design
+// language. Structure: PageHero → ScarcityBar → Key stats grid → Timeline
+// (15-entry vertical narrative, preserved fully) → "Who Led, Who Followed"
+// brand list → SustainabilityBlock → LeadCapture (preserved client component)
+// → GuaranteeBlock → bottom CTA.
+// Article + Breadcrumb JSON-LD preserved for SEO.
+
 import type { Metadata } from "next";
+import Link from "next/link";
+
+import { PageHero } from "@/components/lp/PageHero";
+import { ScarcityBar } from "@/components/lp/ScarcityBar";
+import { SustainabilityBlock } from "@/components/lp/SustainabilityBlock";
+import { GuaranteeBlock } from "@/components/lp/GuaranteeBlock";
+
 import { LeadCapture } from "@/components/marketing/LeadCapture.client";
 
 const SITE_URL = "https://www.usagummies.com";
@@ -41,11 +52,13 @@ export const metadata: Metadata = {
   },
 };
 
+type TimelineCategory = "regulation" | "industry" | "usa-gummies" | "science";
+
 const TIMELINE: {
   year: string;
   title: string;
   description: string;
-  category: "regulation" | "industry" | "usa-gummies" | "science";
+  category: TimelineCategory;
 }[] = [
   {
     year: "2007",
@@ -154,15 +167,19 @@ const TIMELINE: {
   },
 ];
 
-const CATEGORY_STYLES: Record<
-  string,
-  { bg: string; text: string; label: string }
-> = {
-  regulation: { bg: "rgba(27,42,74,0.08)", text: "#1B2A4A", label: "Regulation" },
-  industry: { bg: "rgba(199,54,44,0.08)", text: "#c7362c", label: "Industry" },
-  "usa-gummies": { bg: "rgba(45,122,58,0.08)", text: "#2D7A3A", label: "USA Gummies" },
-  science: { bg: "rgba(95,91,86,0.08)", text: "#5f5b56", label: "Research" },
+const CATEGORY_LABELS: Record<TimelineCategory, string> = {
+  regulation: "Regulation",
+  industry: "Industry",
+  "usa-gummies": "USA Gummies",
+  science: "Research",
 };
+
+const KEY_STATS = [
+  { stat: "2007", label: "First major study on dyes & hyperactivity" },
+  { stat: "2010", label: "EU requires warning labels" },
+  { stat: "2025", label: "FDA bans Red No. 3" },
+  { stat: "8+", label: "Major US brands now removing dyes" },
+];
 
 const BRANDS_TIMELINE = [
   { name: "Nestlé USA", year: 2015, note: "Removed from chocolate candy" },
@@ -207,7 +224,7 @@ const jsonLdBreadcrumb = {
 
 export default function DyeFreeMovementPage() {
   return (
-    <div className="vs-root">
+    <main>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdArticle) }}
@@ -216,439 +233,165 @@ export default function DyeFreeMovementPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdBreadcrumb) }}
       />
-      <style>{`
-        .vs-root {
-          min-height: 100vh;
-          background: #f8f5ef !important;
-          color: #1B2A4A;
-          font-family: var(--font-sans), 'Space Grotesk', system-ui, sans-serif;
-          -webkit-font-smoothing: antialiased;
-        }
-        .vs-root * { box-sizing: border-box; }
-        .vs-display {
-          font-family: var(--font-display), 'Oswald', sans-serif;
-        }
-        @keyframes vs-fadeUp {
-          from { opacity: 0; transform: translateY(20px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-        .vs-animate { animation: vs-fadeUp 0.8s ease-out both; }
-        .vs-animate-d1 { animation: vs-fadeUp 0.8s 0.1s ease-out both; }
-        .vs-animate-d2 { animation: vs-fadeUp 0.8s 0.2s ease-out both; }
-        .vs-animate-d3 { animation: vs-fadeUp 0.8s 0.3s ease-out both; }
-        .timeline-line {
-          position: absolute;
-          left: 20px;
-          top: 0;
-          bottom: 0;
-          width: 2px;
-          background: linear-gradient(to bottom, #e0dcd6, #c7362c, #2D7A3A);
-        }
-        @media (min-width: 640px) {
-          .timeline-line { left: 28px; }
-        }
-        .timeline-dot {
-          position: absolute;
-          left: 14px;
-          width: 14px;
-          height: 14px;
-          border-radius: 50%;
-          border: 3px solid #f8f5ef;
-          top: 6px;
-        }
-        @media (min-width: 640px) {
-          .timeline-dot { left: 22px; }
-        }
-        .timeline-entry:hover .timeline-card {
-          border-color: #c7362c !important;
-          box-shadow: 0 4px 16px rgba(27,42,74,0.06) !important;
-        }
-      `}</style>
 
-      {/* Header */}
-      <header
-        style={{
-          background: "rgba(255,255,255,0.96)",
-          borderBottom: "1px solid rgba(15,27,45,0.12)",
-          backdropFilter: "blur(8px)",
-        }}
-      >
-        <div
-          style={{
-            maxWidth: 960,
-            margin: "0 auto",
-            padding: "12px 20px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
-        >
-          <Link
-            href="/"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              textDecoration: "none",
-            }}
-          >
-            <Image
-              src="/brand/logo.png"
-              alt="USA Gummies logo"
-              width={120}
-              height={40}
-              style={{ height: 36, width: "auto", objectFit: "contain" }}
-              priority
-            />
-            <span
-              style={{
-                fontSize: 11,
-                fontWeight: 900,
-                letterSpacing: "0.18em",
-                textTransform: "uppercase",
-                color: "#1B2A4A",
-              }}
-            >
-              Made in the USA
-            </span>
-          </Link>
-          <Link
-            href="/go"
-            className="vs-display"
-            style={{
-              background: "#c7362c",
-              color: "#fff",
-              padding: "8px 20px",
-              borderRadius: 8,
-              fontSize: 14,
-              letterSpacing: "1px",
-              textDecoration: "none",
-              fontWeight: 700,
-            }}
-          >
-            SHOP NOW
-          </Link>
-        </div>
-      </header>
+      <PageHero
+        eyebrow="The Dye-Free Movement"
+        headline="From neon"
+        scriptAccent="to natural."
+        sub="The timeline of artificial dye removal from candy — from the first European warning labels to the biggest US brands announcing reformulations. See who led and who followed."
+        ctas={[
+          { href: "/shop", label: "Shop USA Gummies", variant: "primary" },
+          { href: "/vs", label: "Brand comparisons", variant: "light" },
+        ]}
+      />
 
-      {/* Hero */}
-      <section
-        className="vs-animate"
-        style={{
-          maxWidth: 800,
-          margin: "0 auto",
-          padding: "48px 20px 16px",
-          textAlign: "center",
-        }}
-      >
-        <div style={{ display: "flex", justifyContent: "center", gap: 6, marginBottom: 16 }}>
-          <span
-            className="vs-display"
-            style={{
-              background: "#1B2A4A",
-              color: "#fff",
-              padding: "5px 14px",
-              borderRadius: 8,
-              fontSize: 12,
-              fontWeight: 700,
-              letterSpacing: "1px",
-            }}
-          >
-            THE DYE-FREE MOVEMENT
-          </span>
-        </div>
-        <h1
-          className="vs-display"
-          style={{
-            fontSize: "clamp(28px, 5vw, 44px)",
-            lineHeight: 1.1,
-            color: "#1B2A4A",
-            margin: 0,
-          }}
-        >
-          How Candy Went From Neon to Natural
-        </h1>
-        <p
-          style={{
-            fontSize: 16,
-            lineHeight: 1.6,
-            color: "#5f5b56",
-            maxWidth: 600,
-            margin: "16px auto 0",
-          }}
-        >
-          The timeline of artificial dye removal from candy — from the first European
-          warning labels to the biggest US brands announcing reformulations. See who
-          led and who followed.
-        </p>
-      </section>
+      <ScarcityBar />
 
-      {/* Key Stats Bar */}
-      <section className="vs-animate-d1" style={{ maxWidth: 800, margin: "0 auto", padding: "0 20px 32px" }}>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-            gap: 12,
-          }}
-        >
-          {[
-            { stat: "2007", label: "First major study on dyes & hyperactivity" },
-            { stat: "2010", label: "EU requires warning labels" },
-            { stat: "2025", label: "FDA bans Red No. 3" },
-            { stat: "8+", label: "Major US brands now removing dyes" },
-          ].map((item) => (
-            <div
-              key={item.label}
-              style={{
-                background: "#ffffff",
-                border: "2px solid #e0dcd6",
-                borderRadius: 16,
-                padding: "16px",
-                textAlign: "center",
-              }}
-            >
+      {/* Key stats */}
+      <section className="bg-[var(--lp-cream-soft)] border-y-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[1100px] px-5 py-14 sm:px-8 sm:py-20">
+          <div className="mb-10 text-center">
+            <p className="lp-label mb-2 text-[var(--lp-red)]">★ At a Glance ★</p>
+            <h2 className="lp-display text-[clamp(2rem,5vw,3.2rem)] text-[var(--lp-ink)]">
+              Eighteen years
+              <br />
+              <span className="lp-script text-[var(--lp-red)]">in numbers.</span>
+            </h2>
+          </div>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            {KEY_STATS.map((item, i) => (
               <div
-                className="vs-display"
-                style={{ fontSize: 28, color: "#c7362c", fontWeight: 700 }}
+                key={item.label}
+                className="border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-5 text-center"
+                style={{ boxShadow: i === 0 ? "5px 5px 0 var(--lp-red)" : "5px 5px 0 var(--lp-ink)" }}
               >
-                {item.stat}
+                <div className="lp-display text-[2rem] leading-none text-[var(--lp-red)] sm:text-[2.4rem]">
+                  {item.stat}
+                </div>
+                <p className="lp-sans mt-3 text-[0.85rem] leading-[1.4] text-[var(--lp-ink)]/82">
+                  {item.label}
+                </p>
               </div>
-              <div style={{ fontSize: 12, color: "#5f5b56", marginTop: 4, lineHeight: 1.4 }}>
-                {item.label}
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </section>
 
       {/* Timeline */}
-      <section className="vs-animate-d2" style={{ maxWidth: 800, margin: "0 auto", padding: "0 20px 48px" }}>
-        <div style={{ position: "relative", paddingLeft: 48 }}>
-          <div className="timeline-line" />
+      <section className="bg-[var(--lp-cream)]">
+        <div className="mx-auto max-w-[900px] px-5 py-14 sm:px-8 sm:py-20">
+          <div className="mb-10 text-center">
+            <p className="lp-label mb-2 text-[var(--lp-red)]">★ The Timeline ★</p>
+            <h2 className="lp-display text-[clamp(2rem,5vw,3.2rem)] text-[var(--lp-ink)]">
+              The shift,
+              <br />
+              <span className="lp-script text-[var(--lp-red)]">step by step.</span>
+            </h2>
+          </div>
 
-          {TIMELINE.map((entry, i) => {
-            const style = CATEGORY_STYLES[entry.category];
-            return (
-              <div
-                key={`${entry.year}-${i}`}
-                className="timeline-entry"
-                style={{
-                  position: "relative",
-                  marginBottom: 20,
-                }}
-              >
+          <div className="grid gap-5">
+            {TIMELINE.map((entry, i) => {
+              const isUg = entry.category === "usa-gummies";
+              return (
                 <div
-                  className="timeline-dot"
-                  style={{
-                    background:
-                      entry.category === "usa-gummies"
-                        ? "#2D7A3A"
-                        : entry.category === "regulation"
-                          ? "#1B2A4A"
-                          : entry.category === "industry"
-                            ? "#c7362c"
-                            : "#5f5b56",
-                  }}
-                />
-                <div
-                  className="timeline-card"
-                  style={{
-                    background: "#ffffff",
-                    border: entry.category === "usa-gummies" ? "2px solid #2D7A3A" : "2px solid #e0dcd6",
-                    borderRadius: 16,
-                    padding: "20px",
-                    transition: "border-color 0.2s, box-shadow 0.2s",
-                  }}
+                  key={`${entry.year}-${i}`}
+                  className="border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-5 sm:p-6"
+                  style={{ boxShadow: isUg ? "5px 5px 0 var(--lp-red)" : "4px 4px 0 var(--lp-ink)" }}
                 >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      marginBottom: 8,
-                    }}
-                  >
-                    <span
-                      className="vs-display"
-                      style={{
-                        fontSize: 20,
-                        fontWeight: 700,
-                        color: "#1B2A4A",
-                      }}
-                    >
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="lp-display text-[1.6rem] leading-none text-[var(--lp-red)]">
                       {entry.year}
                     </span>
                     <span
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 700,
-                        color: style.text,
-                        background: style.bg,
-                        padding: "3px 10px",
-                        borderRadius: 20,
-                      }}
+                      className="lp-label border-2 border-[var(--lp-ink)] bg-[var(--lp-cream-soft)] px-3 py-1 text-[var(--lp-ink)]"
                     >
-                      {style.label}
+                      {CATEGORY_LABELS[entry.category]}
                     </span>
                   </div>
-                  <h3
-                    style={{
-                      fontSize: 16,
-                      fontWeight: 700,
-                      color: "#1B2A4A",
-                      margin: "0 0 6px",
-                      lineHeight: 1.3,
-                    }}
-                  >
+                  <h3 className="lp-display mt-3 text-[1.25rem] leading-tight text-[var(--lp-ink)] sm:text-[1.4rem]">
                     {entry.title}
                   </h3>
-                  <p
-                    style={{
-                      fontSize: 14,
-                      lineHeight: 1.6,
-                      color: "#5f5b56",
-                      margin: 0,
-                    }}
-                  >
+                  <p className="lp-sans mt-3 text-[0.98rem] leading-[1.6] text-[var(--lp-ink)]/82">
                     {entry.description}
                   </p>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       </section>
 
-      {/* Who Led, Who Followed */}
-      <section
-        className="vs-animate-d3"
-        style={{
-          maxWidth: 800,
-          margin: "0 auto",
-          padding: "0 20px 48px",
-        }}
-      >
-        <div style={{ textAlign: "center", marginBottom: 24 }}>
-          <h2
-            className="vs-display"
-            style={{ fontSize: 28, color: "#1B2A4A", margin: 0 }}
-          >
-            Who Led. Who Followed.
-          </h2>
-          <p style={{ fontSize: 14, color: "#5f5b56", marginTop: 8 }}>
-            When each brand acted on removing artificial dyes from candy.
-          </p>
-        </div>
-        <div style={{ display: "grid", gap: 8 }}>
-          {BRANDS_TIMELINE.map((brand) => (
-            <div
-              key={`${brand.name}-${brand.year}`}
-              style={{
-                background: brand.highlight ? "rgba(45,122,58,0.06)" : "#ffffff",
-                border: brand.highlight
-                  ? "2px solid #2D7A3A"
-                  : "2px solid #e0dcd6",
-                borderRadius: 12,
-                padding: "14px 20px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 12,
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <span
-                  className="vs-display"
-                  style={{
-                    fontSize: 20,
-                    fontWeight: 700,
-                    color: brand.highlight ? "#2D7A3A" : "#1B2A4A",
-                    minWidth: 48,
-                  }}
-                >
-                  {brand.year}
-                </span>
-                <div>
-                  <div
-                    style={{
-                      fontSize: 15,
-                      fontWeight: 700,
-                      color: brand.highlight ? "#2D7A3A" : "#1B2A4A",
-                    }}
-                  >
-                    {brand.name}
-                  </div>
-                  <div style={{ fontSize: 13, color: "#5f5b56" }}>
-                    {brand.note}
+      {/* Who led, who followed */}
+      <section className="bg-[var(--lp-cream-soft)] border-y-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[900px] px-5 py-14 sm:px-8 sm:py-20">
+          <div className="mb-10 text-center">
+            <p className="lp-label mb-2 text-[var(--lp-red)]">★ The Roll Call ★</p>
+            <h2 className="lp-display text-[clamp(2rem,5vw,3.2rem)] text-[var(--lp-ink)]">
+              Who led.
+              <br />
+              <span className="lp-script text-[var(--lp-red)]">Who followed.</span>
+            </h2>
+            <p className="lp-sans mx-auto mt-6 max-w-[52ch] text-[1.05rem] leading-[1.6] text-[var(--lp-ink)]/85">
+              When each brand acted on removing artificial dyes from candy.
+            </p>
+          </div>
+
+          <div className="grid gap-3">
+            {BRANDS_TIMELINE.map((brand) => (
+              <div
+                key={`${brand.name}-${brand.year}`}
+                className="flex flex-wrap items-center justify-between gap-4 border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] px-5 py-4"
+                style={{ boxShadow: brand.highlight ? "5px 5px 0 var(--lp-red)" : "3px 3px 0 var(--lp-ink)" }}
+              >
+                <div className="flex items-center gap-4">
+                  <span className="lp-display min-w-[3.5rem] text-[1.6rem] leading-none text-[var(--lp-red)]">
+                    {brand.year}
+                  </span>
+                  <div>
+                    <div className="lp-display text-[1.1rem] text-[var(--lp-ink)]">{brand.name}</div>
+                    <div className="lp-sans text-[0.9rem] leading-[1.4] text-[var(--lp-ink)]/75">
+                      {brand.note}
+                    </div>
                   </div>
                 </div>
+                {brand.highlight ? (
+                  <span
+                    className="lp-label border-2 border-[var(--lp-red)] bg-[var(--lp-cream-soft)] px-3 py-1 text-[var(--lp-red)]"
+                  >
+                    ★ Day One
+                  </span>
+                ) : null}
               </div>
-              {brand.highlight && (
-                <span
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: "#2D7A3A",
-                    background: "rgba(45,122,58,0.1)",
-                    padding: "4px 12px",
-                    borderRadius: 20,
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  ✓ Day One
-                </span>
-              )}
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </section>
 
-      {/* Email Capture */}
-      <section
-        style={{
-          maxWidth: 800,
-          margin: "0 auto",
-          padding: "0 20px 48px",
-        }}
-      >
-        <div
-          style={{
-            background: "#1B2A4A",
-            borderRadius: 20,
-            padding: "32px 24px",
-            textAlign: "center",
-          }}
-        >
-          <h2
-            className="vs-display"
-            style={{
-              fontSize: 24,
-              color: "#ffffff",
-              margin: "0 0 8px",
-            }}
-          >
-            Stay Ahead of the Dye-Free Movement
+      <SustainabilityBlock />
+
+      {/* Email capture — preserves LeadCapture client component */}
+      <section className="bg-[var(--lp-cream)]">
+        <div className="mx-auto max-w-[900px] px-5 py-14 text-center sm:px-8 sm:py-20">
+          <p className="lp-label mb-3 text-[var(--lp-red)]">★ Stay in the Loop ★</p>
+          <h2 className="lp-display text-[clamp(2rem,5vw,3.2rem)] text-[var(--lp-ink)]">
+            Stay ahead of
+            <br />
+            <span className="lp-script text-[var(--lp-red)]">the movement.</span>
           </h2>
-          <p
-            style={{
-              fontSize: 14,
-              color: "rgba(255,255,255,0.7)",
-              margin: "0 auto 20px",
-              maxWidth: 440,
-              lineHeight: 1.5,
-            }}
-          >
-            Get ingredient news, label-reading tips, and first access to new
-            USA Gummies flavors. No spam — just the stuff that matters.
+          <p className="lp-sans mx-auto mt-6 max-w-[52ch] text-[1.05rem] leading-[1.6] text-[var(--lp-ink)]/85">
+            Get ingredient news, label-reading tips, and first access to new USA Gummies flavors.
+            No spam — just the stuff that matters.
           </p>
-          <div style={{ maxWidth: 400, margin: "0 auto" }}>
+          <div
+            className="mx-auto mt-8 max-w-[480px] border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-6"
+            style={{ boxShadow: "5px 5px 0 var(--lp-red)" }}
+          >
             <LeadCapture
               source="dye-free-movement"
               intent="newsletter"
               title=""
               ctaLabel="Join the movement"
-              variant="dark"
+              variant="light"
               emphasis="quiet"
               showSms={false}
             />
@@ -656,119 +399,35 @@ export default function DyeFreeMovementPage() {
         </div>
       </section>
 
+      <GuaranteeBlock />
+
       {/* Bottom CTA */}
-      <section
-        style={{
-          background: "#ffffff",
-          borderTop: "1px solid #e0dcd6",
-          padding: "40px 20px",
-          textAlign: "center",
-        }}
-      >
-        <h2
-          className="vs-display"
-          style={{ fontSize: 28, color: "#1B2A4A", margin: 0 }}
-        >
-          Don&apos;t Wait for 2027
-        </h2>
-        <p
-          style={{
-            fontSize: 15,
-            lineHeight: 1.6,
-            color: "#5f5b56",
-            maxWidth: 480,
-            margin: "10px auto 20px",
-          }}
-        >
-          While the big brands are still announcing plans, USA Gummies has been
-          dye-free since launch. All natural flavors, no artificial dyes, made in
-          the USA.
-        </p>
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 10,
-            maxWidth: 360,
-            margin: "0 auto",
-          }}
-        >
-          <Link
-            href="/go"
-            className="vs-display"
-            style={{
-              display: "block",
-              width: "100%",
-              padding: "16px",
-              background: "#c7362c",
-              color: "#ffffff",
-              fontSize: 20,
-              letterSpacing: "1.5px",
-              textAlign: "center",
-              border: "none",
-              borderRadius: 12,
-              cursor: "pointer",
-              textDecoration: "none",
-              transition: "background 0.2s",
-            }}
-          >
-            SHOP USA GUMMIES
-          </Link>
-          <Link
-            href="/vs"
-            className="vs-display"
-            style={{
-              display: "block",
-              width: "100%",
-              padding: "14px",
-              background: "transparent",
-              color: "#1B2A4A",
-              fontSize: 14,
-              letterSpacing: "1px",
-              textAlign: "center",
-              border: "2px solid #e0dcd6",
-              borderRadius: 12,
-              cursor: "pointer",
-              textDecoration: "none",
-            }}
-          >
-            VIEW BRAND COMPARISONS →
-          </Link>
+      <section className="bg-[var(--lp-cream-soft)] border-t-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[900px] px-5 py-14 text-center sm:px-8 sm:py-16">
+          <p className="lp-label mb-3 text-[var(--lp-red)]">★ Don&rsquo;t Wait for 2027 ★</p>
+          <h2 className="lp-display text-[clamp(2rem,5vw,3.2rem)] text-[var(--lp-ink)]">
+            Already
+            <br />
+            <span className="lp-script text-[var(--lp-red)]">dye-free.</span>
+          </h2>
+          <p className="lp-sans mx-auto mt-6 max-w-[52ch] text-[1.05rem] leading-[1.6] text-[var(--lp-ink)]/85">
+            While the big brands are still announcing plans, USA Gummies has been dye-free since
+            launch. All natural flavors, no artificial dyes, made in the USA.
+          </p>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+            <Link href="/shop" className="lp-cta">
+              Shop USA Gummies
+            </Link>
+            <Link href="/vs" className="lp-cta lp-cta-light">
+              View brand comparisons
+            </Link>
+          </div>
+          <p className="lp-sans mx-auto mt-8 max-w-[60ch] text-[0.85rem] leading-[1.5] text-[var(--lp-ink)]/65">
+            Timeline events sourced from FDA announcements, news reports, and company press releases.
+            All dates and facts are from publicly available information.
+          </p>
         </div>
       </section>
-
-      {/* Footer */}
-      <footer
-        style={{
-          background: "#1B2A4A",
-          color: "rgba(255,255,255,0.6)",
-          textAlign: "center",
-          padding: "24px 20px",
-          fontSize: 12,
-        }}
-      >
-        <p style={{ margin: 0 }}>
-          &copy; 2026 USA Gummies &middot;{" "}
-          <a
-            href="https://www.usagummies.com"
-            style={{ color: "rgba(255,255,255,0.8)", textDecoration: "none" }}
-          >
-            usagummies.com
-          </a>
-          {" "}&middot; Made with 🇺🇸 in America
-        </p>
-        <p
-          style={{
-            margin: "8px 0 0",
-            fontSize: 11,
-            color: "rgba(255,255,255,0.4)",
-          }}
-        >
-          Timeline events sourced from FDA announcements, news reports, and
-          company press releases. All dates and facts are from publicly available
-          information.
-        </p>
-      </footer>
-    </div>
+    </main>
   );
 }

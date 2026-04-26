@@ -1,6 +1,14 @@
+// /gummies-101 — quick-reference brand primer in LP design language.
+// Structure: PageHero → ScarcityBar → Quick Facts grid → Flavor Lineup
+// → FAQ accordion → bottom CTA. Article + FAQ JSON-LD preserved for SEO.
+
 import type { Metadata } from "next";
 import Link from "next/link";
-import Image from "next/image";
+
+import { PageHero } from "@/components/lp/PageHero";
+import { ScarcityBar } from "@/components/lp/ScarcityBar";
+import { GuaranteeBlock } from "@/components/lp/GuaranteeBlock";
+
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 import { LatestFromBlog } from "@/components/blog/LatestFromBlog";
@@ -43,6 +51,16 @@ export const metadata: Metadata = {
     images: [OG_IMAGE],
   },
 };
+
+const QUICK_FACTS = [
+  "Made in the USA",
+  "No artificial dyes",
+  "All natural flavors",
+  "7.5 oz bag",
+  "Ships within 24 hours",
+  FREE_SHIPPING_PHRASE,
+  "Bundles start at 5 bags",
+];
 
 const FAQS = [
   {
@@ -92,141 +110,145 @@ const faqJsonLd = {
 
 export default function Gummies101Page() {
   return (
-    <main className="min-h-screen text-[var(--text)]">
-      <div className="mx-auto max-w-5xl px-4 py-12">
-        <BreadcrumbJsonLd
-          items={[
-            { name: "Home", href: "/" },
-            { name: "Gummies 101", href: "/gummies-101" },
-          ]}
-        />
-
-        <div className="candy-panel rounded-[36px] border border-[var(--border)] p-6 sm:p-8">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-            USA Gummies facts
-          </div>
-          <h1 className="mt-2 text-3xl font-black text-[var(--text)] sm:text-4xl">
-            Gummies 101
-          </h1>
-          <p className="mt-3 text-sm text-[var(--muted)] max-w-prose">
-            The quick reference for buyers, gift planners, and America 250 supporters.
-          </p>
-
-          <div className="mt-6 grid gap-3 sm:grid-cols-2">
-            <div className="rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white p-4">
-              <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
-                Quick facts
-              </div>
-              <ul className="mt-3 space-y-2 text-sm text-[var(--text)]">
-                <li>Made in the USA</li>
-                <li>No artificial dyes</li>
-                <li>All natural flavors</li>
-                <li>7.5 oz bag</li>
-                <li>Ships within 24 hours</li>
-                <li>{FREE_SHIPPING_PHRASE}</li>
-                <li>Bundles start at 5 bags</li>
-              </ul>
-            </div>
-            <div className="rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white p-4">
-              <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
-                Best places to start
-              </div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <Link href="/shop" className="btn btn-candy">
-                  Shop bundles
-                </Link>
-                <Link href="/gummy-gift-bundles" className="btn btn-outline">
-                  Gift bundles
-                </Link>
-                <Link href="/america-250" className="btn btn-outline">
-                  America 250
-                </Link>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-6 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white p-4">
-            <div className="grid gap-4 sm:grid-cols-[0.9fr_1.1fr] sm:items-center">
-              <div className="relative aspect-[5/4] overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-3">
-                <Image
-                  src="/brand/usa-gummies-family.webp"
-                  alt="Assorted USA Gummies gummy bear bags"
-                  fill
-                  sizes="(max-width: 768px) 90vw, 360px"
-                  className="object-contain"
-                />
-              </div>
-              <div>
-                <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
-                  What you are getting
-                </div>
-                <p className="mt-2 text-sm text-[var(--muted)]">
-                  Classic gummy bear flavor with a clean ingredient list, made in the USA and packed
-                  for gifting or bulk orders.
-                </p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <span className="badge badge--navy">All natural flavors</span>
-                  <span className="badge badge--navy">No artificial dyes</span>
-                  <span className="badge badge--navy">7.5 oz bag</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-6 rounded-2xl border border-[rgba(15,27,45,0.12)] bg-[var(--surface-strong)] p-4">
-            <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
-              Flavor lineup
-            </div>
-            <p className="mt-2 text-sm text-[var(--muted)]">
-              Cherry, watermelon, orange, green apple, and lemon - classic gummy bear flavor without
-              artificial dyes.
-            </p>
-            <Link
-              href="/ingredients"
-              className="mt-3 inline-flex text-xs font-semibold text-[var(--navy)] link-underline"
-            >
-              See ingredients
-            </Link>
-            <Link
-              href="/no-artificial-dyes-gummy-bears"
-              className="mt-2 inline-flex text-xs font-semibold text-[var(--navy)] link-underline"
-            >
-              Red 40 Free Gummies
-            </Link>
-          </div>
-
-          <div className="mt-6 grid gap-3">
-            <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
-              Frequently asked
-            </div>
-            <div className="space-y-2">
-              {FAQS.map((item) => (
-                <details
-                  key={item.question}
-                  className="group rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white px-4 py-3"
-                >
-                  <summary className="flex cursor-pointer items-center justify-between gap-3 text-sm font-semibold text-[var(--text)]">
-                    <span>{item.question}</span>
-                    <span className="text-[var(--muted)] transition-transform group-open:rotate-45">+</span>
-                  </summary>
-                  <div className="mt-2 text-sm text-[var(--muted)]">{item.answer}</div>
-                </details>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <section className="bg-transparent">
-        <div className="mx-auto max-w-6xl px-4 pb-10">
-          <LatestFromBlog />
-        </div>
-      </section>
-
+    <main>
+      <BreadcrumbJsonLd
+        items={[
+          { name: "Home", href: "/" },
+          { name: "Gummies 101", href: "/gummies-101" },
+        ]}
+      />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
       />
+
+      <PageHero
+        eyebrow="USA Gummies Facts"
+        headline="Gummies"
+        scriptAccent="101."
+        sub="The quick reference for buyers, gift planners, and America 250 supporters."
+        ctas={[
+          { href: "/shop", label: "Shop bundles", variant: "primary" },
+          { href: "/ingredients", label: "See ingredients", variant: "light" },
+        ]}
+      />
+
+      <ScarcityBar />
+
+      {/* Quick Facts grid */}
+      <section className="bg-[var(--lp-cream-soft)] border-y-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[1100px] px-5 py-14 sm:px-8 sm:py-20">
+          <div className="mb-10 text-center">
+            <p className="lp-label mb-2 text-[var(--lp-red)]">★ Quick Facts ★</p>
+            <h2 className="lp-display text-[clamp(2rem,5vw,3.2rem)] text-[var(--lp-ink)]">
+              Everything you need
+              <br />
+              <span className="lp-script text-[var(--lp-red)]">in one glance.</span>
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {QUICK_FACTS.map((fact, i) => (
+              <div
+                key={fact}
+                className="border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] px-5 py-4 text-center"
+                style={{ boxShadow: i === 0 ? "5px 5px 0 var(--lp-red)" : "5px 5px 0 var(--lp-ink)" }}
+              >
+                <span className="lp-display text-[1.15rem] text-[var(--lp-ink)]">{fact}</span>
+              </div>
+            ))}
+          </div>
+          <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
+            <Link href="/shop" className="lp-cta">
+              Shop bundles
+            </Link>
+            <Link href="/gummy-gift-bundles" className="lp-cta lp-cta-light">
+              Gift bundles
+            </Link>
+            <Link href="/america-250" className="lp-cta lp-cta-light">
+              America 250
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Flavor Lineup */}
+      <section className="bg-[var(--lp-cream)]">
+        <div className="mx-auto max-w-[1000px] px-5 py-14 sm:px-8 sm:py-20">
+          <div className="mb-8 text-center">
+            <p className="lp-label mb-2 text-[var(--lp-red)]">★ Flavor Lineup ★</p>
+            <h2 className="lp-display text-[clamp(2rem,5vw,3.2rem)] text-[var(--lp-ink)]">
+              What you&rsquo;re
+              <br />
+              <span className="lp-script text-[var(--lp-red)]">getting.</span>
+            </h2>
+          </div>
+          <div className="lp-sans text-center text-[1.05rem] leading-[1.7] text-[var(--lp-ink)]/88">
+            <p className="mx-auto max-w-[60ch]">
+              Cherry, watermelon, orange, green apple, and lemon — classic gummy bear flavor without
+              artificial dyes. Clean ingredient list, made in the USA, packed for gifting or bulk
+              orders.
+            </p>
+          </div>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+            <Link href="/ingredients" className="lp-cta lp-cta-light">
+              See ingredients
+            </Link>
+            <Link href="/no-artificial-dyes-gummy-bears" className="lp-cta lp-cta-light">
+              Red 40 Free Gummies
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ */}
+      <section className="bg-[var(--lp-cream-soft)] border-y-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[820px] px-5 py-14 sm:px-8 sm:py-20">
+          <div className="mb-8 text-center">
+            <p className="lp-label mb-2 text-[var(--lp-red)]">★ Frequently Asked ★</p>
+            <h2 className="lp-display text-[clamp(2rem,5vw,3.2rem)] text-[var(--lp-ink)]">
+              The short
+              <br />
+              <span className="lp-script text-[var(--lp-red)]">answers.</span>
+            </h2>
+          </div>
+          <div className="mt-4">
+            {FAQS.map((item) => (
+              <details key={item.question} className="lp-faq">
+                <summary>{item.question}</summary>
+                <div>{item.answer}</div>
+              </details>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <GuaranteeBlock />
+
+      <section className="bg-transparent">
+        <div className="mx-auto max-w-6xl px-4 py-10">
+          <LatestFromBlog />
+        </div>
+      </section>
+
+      {/* Bottom CTA */}
+      <section className="bg-[var(--lp-cream-soft)] border-t-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[900px] px-5 py-14 text-center sm:px-8 sm:py-16">
+          <p className="lp-label mb-3 text-[var(--lp-red)]">★ Ready When You Are ★</p>
+          <h2 className="lp-display text-[clamp(2rem,5vw,3.2rem)] text-[var(--lp-ink)]">
+            Pick your
+            <br />
+            <span className="lp-script text-[var(--lp-red)]">bundle.</span>
+          </h2>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+            <Link href="/shop" className="lp-cta">
+              Shop best value
+            </Link>
+            <Link href="/ingredients" className="lp-cta lp-cta-light">
+              See ingredients
+            </Link>
+          </div>
+        </div>
+      </section>
     </main>
   );
 }

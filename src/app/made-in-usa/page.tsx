@@ -1,6 +1,17 @@
+// /made-in-usa — Made in USA brand page in LP design language. Structure:
+// PageHero → ScarcityBar → Brand story column → Three values grid →
+// FoundersLetter → SustainabilityBlock → FAQ → GuaranteeBlock → bottom CTA.
+// Article + FAQ JSON-LD preserved for SEO.
+
 import type { Metadata } from "next";
 import Link from "next/link";
-import Image from "next/image";
+
+import { PageHero } from "@/components/lp/PageHero";
+import { ScarcityBar } from "@/components/lp/ScarcityBar";
+import { FoundersLetter } from "@/components/lp/FoundersLetter";
+import { SustainabilityBlock } from "@/components/lp/SustainabilityBlock";
+import { GuaranteeBlock } from "@/components/lp/GuaranteeBlock";
+
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 import { BRAND_STORY_HEADLINE, BRAND_STORY_MEDIUM } from "@/data/brandStory";
@@ -116,229 +127,13 @@ const articleJsonLd = {
 
 export default function MadeInUsaPage() {
   return (
-    <main className="relative overflow-hidden text-[var(--text)] min-h-screen home-candy">
-      <div className="relative w-full h-[280px] sm:h-[340px] lg:h-[380px] overflow-hidden">
-        <Image
-          src="/brand/americana/declaration-freedom.jpg"
-          alt="Declaration of Independence with USA Gummies"
-          fill
-          sizes="100vw"
-          className="object-cover object-top"
-          priority
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#1B2A4A]/50 to-[#1B2A4A]/75" />
-        <div className="relative z-10 flex flex-col items-center justify-center h-full text-center px-4">
-          <div className="relative w-52 h-24 mb-3">
-            <Image src="/brand/logo-full.png" alt="USA Gummies" fill sizes="208px" className="object-contain drop-shadow-[0_6px_24px_rgba(0,0,0,0.5)]" />
-          </div>
-          <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold uppercase tracking-wide text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.5)]">
-            Made in the USA
-          </h1>
-          <p className="mt-2 text-sm text-white/90 max-w-md drop-shadow-[0_1px_4px_rgba(0,0,0,0.3)]">
-            Sourced, crafted, and packed right here in America.
-          </p>
-        </div>
-      </div>
-
-      <section className="relative overflow-hidden">
-        <div
-          className="absolute inset-0 pointer-events-none"
-          aria-hidden="true"
-          style={{
-            backgroundImage:
-              "radial-gradient(circle at 12% 18%, rgba(255,77,79,0.14), transparent 48%), radial-gradient(circle at 85% 5%, rgba(255,199,44,0.14), transparent 38%)",
-            opacity: 0.5,
-          }}
-        />
-        <div className="relative mx-auto max-w-6xl px-4 py-10">
-          <BreadcrumbJsonLd
-            items={[
-              { name: "Home", href: "/" },
-              { name: "Made in USA", href: "/made-in-usa" },
-            ]}
-          />
-
-          <div className="flex justify-center py-6">
-            <div className="relative w-40 h-20">
-              <Image src="/brand/logo-full.png" alt="USA Gummies" fill sizes="160px" className="object-contain" />
-            </div>
-          </div>
-
-          <div className="candy-panel rounded-[36px] border border-[var(--border)] p-6 sm:p-8">
-            <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
-              <div className="space-y-4">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.32em] text-[var(--muted)]">
-                  Made in the USA
-                </div>
-                <h2 className="text-3xl font-black leading-[1.1] tracking-tight text-[var(--text)] sm:text-4xl lg:text-5xl">
-                  All American gummy bears, made right here.
-                </h2>
-                <p className="text-sm text-[var(--muted)] sm:text-base max-w-prose">
-                  USA Gummies are built on American manufacturing and American pride. From sourcing
-                  to packing, our gummy bears stay in the USA so every bag reflects the quality and
-                  consistency you expect from a premium American candy brand.
-                </p>
-                <div className="flex flex-wrap items-center gap-3">
-                  <Link href="/shop" className="btn btn-candy">
-                    Shop now
-                  </Link>
-                  <span className="text-xs text-[var(--muted)]">{FREE_SHIPPING_PHRASE}</span>
-                </div>
-                <div className="text-xs text-[var(--muted)]">
-                  Guide:{" "}
-                  <Link href="/no-artificial-dyes-gummy-bears" className="text-[var(--navy)] link-underline">
-                    Dye-Free Gummy Bears
-                  </Link>
-                  .
-                </div>
-              </div>
-
-              <div className="relative">
-                <div className="relative rounded-3xl border border-[var(--border)] bg-white p-2 text-[var(--text)] shadow-[0_20px_48px_rgba(15,27,45,0.12)]">
-                  <div className="relative aspect-[5/4] overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-3">
-                    <Image
-                      src="/brand/usa-gummies-family.webp"
-                      alt="USA Gummies gummy bear bags made in the USA"
-                      fill
-                      sizes="(max-width: 768px) 90vw, 460px"
-                      className="object-contain"
-                    />
-                  </div>
-                  <div className="mt-2 space-y-1">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
-                      All American gummy bears
-                    </div>
-                    <div className="text-sm text-[var(--muted)]">
-                      Made in the USA with all natural flavors and no artificial dyes.
-                    </div>
-                    <div className="flex flex-wrap gap-2 pt-2">
-                      <span className="badge badge--navy">Made in USA</span>
-                      <span className="badge badge--navy">All natural flavors</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-6 grid gap-3 sm:grid-cols-3">
-              {VALUES.map((value) => (
-                <div key={value.title} className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-4">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
-                    {value.title}
-                  </div>
-                  <div className="mt-2 text-sm text-[var(--muted)]">{value.body}</div>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-6 grid gap-3 sm:grid-cols-3">
-              <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-[var(--border)]">
-                <Image
-                  src="/brand/gallery/bag-flag-hero.jpg"
-                  alt="USA Gummies bag with American flag and gummy bears"
-                  fill
-                  sizes="(max-width: 640px) 90vw, 33vw"
-                  className="object-cover"
-                />
-              </div>
-              <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-[var(--border)]">
-                <Image
-                  src="/brand/lifestyle/hand-tractor.jpg"
-                  alt="USA Gummies bag by a tractor on an American farm"
-                  fill
-                  sizes="(max-width: 640px) 90vw, 33vw"
-                  className="object-cover"
-                />
-              </div>
-              <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-[var(--border)]">
-                <Image
-                  src="/brand/gallery/bag-old-glory.jpg"
-                  alt="USA Gummies bag with American flag at sunset"
-                  fill
-                  sizes="(max-width: 640px) 90vw, 33vw"
-                  className="object-cover"
-                />
-              </div>
-            </div>
-
-            <div className="mt-6 border-t border-[var(--border)] pt-5">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-                Our story
-              </div>
-              <h2 className="mt-2 text-2xl font-black text-[var(--text)]">
-                {BRAND_STORY_HEADLINE}
-              </h2>
-              <div className="mt-3 space-y-3 text-sm text-[var(--muted)]">
-                {BRAND_STORY_MEDIUM.map((paragraph) => (
-                  <p key={paragraph}>{paragraph}</p>
-                ))}
-              </div>
-              <div className="mt-4 flex flex-wrap gap-3">
-                <Link href="/about" className="btn btn-outline">
-                  Read our story
-                </Link>
-                <Link href="/shop" className="btn btn-candy">
-                  Shop now
-                </Link>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-6 candy-panel rounded-[32px] border border-[var(--border)] p-5 sm:p-6">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-              Made in USA FAQs
-            </div>
-            <h2 className="mt-2 text-2xl font-black text-[var(--text)]">
-              Quick answers before you buy.
-            </h2>
-            <div className="mt-4 space-y-2">
-              {FAQS.map((item) => (
-                <details
-                  key={item.question}
-                  className="group rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-3"
-                >
-                  <summary className="flex cursor-pointer items-center justify-between gap-3 text-sm font-semibold text-[var(--text)]">
-                    <span>{item.question}</span>
-                    <span className="text-[var(--muted)] transition-transform group-open:rotate-45">+</span>
-                  </summary>
-                  <div className="mt-2 text-sm text-[var(--muted)]">{item.answer}</div>
-                </details>
-              ))}
-            </div>
-          </div>
-
-          <div className="mt-6 candy-panel rounded-[32px] border border-[var(--border)] p-5 sm:p-6">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-              Built for real life
-            </div>
-            <h2 className="mt-2 text-2xl font-black text-[var(--text)]">
-              Support American jobs and snack with confidence.
-            </h2>
-            <p className="mt-2 text-sm text-[var(--muted)]">
-              Every bag of USA Gummies is a vote for the America you believe in and the American
-              Dream you are still chasing.
-            </p>
-            <div className="mt-3 flex flex-wrap gap-3">
-              <Link href="/about" className="btn btn-outline">
-                Read our story
-              </Link>
-              <Link href="/ingredients" className="btn btn-candy">
-                Ingredients and flavors
-              </Link>
-              <Link href="/made-in-usa-candy" className="btn btn-outline">
-                American-Made Candy
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="bg-transparent">
-        <div className="mx-auto max-w-6xl px-4 pb-10">
-          <LatestFromBlog />
-        </div>
-      </section>
-
+    <main>
+      <BreadcrumbJsonLd
+        items={[
+          { name: "Home", href: "/" },
+          { name: "Made in USA", href: "/made-in-usa" },
+        ]}
+      />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd) }}
@@ -347,6 +142,137 @@ export default function MadeInUsaPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
       />
+
+      <PageHero
+        eyebrow="Made in the USA"
+        headline="All American"
+        scriptAccent="gummy bears."
+        sub="USA Gummies are built on American manufacturing and American pride. From sourcing to packing, every bag stays in the USA."
+        ctas={[
+          { href: "/shop", label: "Shop now", variant: "primary" },
+          { href: "/no-artificial-dyes-gummy-bears", label: "Dye-free guide", variant: "light" },
+        ]}
+      />
+
+      <ScarcityBar />
+
+      {/* Brand story */}
+      <section className="bg-[var(--lp-cream-soft)] border-y-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[900px] px-5 py-14 sm:px-8 sm:py-20">
+          <div className="mb-8 text-center">
+            <p className="lp-label mb-2 text-[var(--lp-red)]">★ Our Story ★</p>
+            <h2 className="lp-display text-[clamp(2rem,5vw,3.2rem)] text-[var(--lp-ink)]">
+              {BRAND_STORY_HEADLINE}
+            </h2>
+          </div>
+          <div className="lp-sans space-y-4 text-[1.05rem] leading-[1.75] text-[var(--lp-ink)]/88">
+            {BRAND_STORY_MEDIUM.map((paragraph) => (
+              <p key={paragraph}>{paragraph}</p>
+            ))}
+          </div>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+            <Link href="/about" className="lp-cta lp-cta-light">
+              Read our story
+            </Link>
+            <Link href="/shop" className="lp-cta">
+              Shop now
+            </Link>
+          </div>
+          <p className="lp-label mt-6 text-center text-[var(--lp-ink)]/65">
+            {FREE_SHIPPING_PHRASE}
+          </p>
+        </div>
+      </section>
+
+      {/* Three values grid */}
+      <section className="bg-[var(--lp-cream)]">
+        <div className="mx-auto max-w-[1200px] px-5 py-14 sm:px-8 sm:py-20">
+          <div className="mb-10 text-center">
+            <p className="lp-label mb-2 text-[var(--lp-red)]">★ What Made in USA Means ★</p>
+            <h2 className="lp-display text-[clamp(2rem,5vw,3.2rem)] text-[var(--lp-ink)]">
+              American quality
+              <br />
+              <span className="lp-script text-[var(--lp-red)]">in every bag.</span>
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+            {VALUES.map((value, i) => (
+              <div
+                key={value.title}
+                className="border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-6 sm:p-7"
+                style={{ boxShadow: i === 0 ? "5px 5px 0 var(--lp-red)" : "5px 5px 0 var(--lp-ink)" }}
+              >
+                <h3 className="lp-display text-[1.4rem] leading-tight text-[var(--lp-ink)] sm:text-[1.55rem]">
+                  {value.title}
+                </h3>
+                <p className="lp-sans mt-3 text-[0.98rem] leading-[1.55] text-[var(--lp-ink)]/82">
+                  {value.body}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <FoundersLetter />
+      <SustainabilityBlock />
+
+      {/* FAQ */}
+      <section className="bg-[var(--lp-cream-soft)] border-y-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[820px] px-5 py-14 sm:px-8 sm:py-20">
+          <div className="mb-8 text-center">
+            <p className="lp-label mb-2 text-[var(--lp-red)]">★ Made in USA FAQs ★</p>
+            <h2 className="lp-display text-[clamp(2rem,5vw,3.2rem)] text-[var(--lp-ink)]">
+              Quick answers
+              <br />
+              <span className="lp-script text-[var(--lp-red)]">before you buy.</span>
+            </h2>
+          </div>
+          <div className="mt-6">
+            {FAQS.map((item) => (
+              <details key={item.question} className="lp-faq">
+                <summary>{item.question}</summary>
+                <div>{item.answer}</div>
+              </details>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <GuaranteeBlock />
+
+      <section className="bg-transparent">
+        <div className="mx-auto max-w-6xl px-4 py-10">
+          <LatestFromBlog />
+        </div>
+      </section>
+
+      {/* Bottom CTA */}
+      <section className="bg-[var(--lp-cream-soft)] border-t-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[900px] px-5 py-14 text-center sm:px-8 sm:py-16">
+          <p className="lp-label mb-3 text-[var(--lp-red)]">★ Built for Real Life ★</p>
+          <h2 className="lp-display text-[clamp(2rem,5vw,3.2rem)] text-[var(--lp-ink)]">
+            Support American jobs.
+            <br />
+            <span className="lp-script text-[var(--lp-red)]">Snack with confidence.</span>
+          </h2>
+          <p className="lp-sans mx-auto mt-6 max-w-[52ch] text-[1.05rem] leading-[1.6] text-[var(--lp-ink)]/85">
+            Every bag of USA Gummies is a vote for the America you believe in and the American
+            Dream you are still chasing.
+          </p>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+            <Link href="/shop" className="lp-cta">
+              Shop now
+            </Link>
+            <Link href="/ingredients" className="lp-cta lp-cta-light">
+              Ingredients
+            </Link>
+            <Link href="/made-in-usa-candy" className="lp-cta lp-cta-light">
+              American-Made Candy
+            </Link>
+          </div>
+        </div>
+      </section>
     </main>
   );
 }

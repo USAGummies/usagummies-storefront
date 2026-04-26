@@ -1,7 +1,16 @@
+// /faq — frequently asked questions in LP design language. Structure:
+// PageHero → ScarcityBar → custom FAQ accordion (preserves rich answer
+// nodes with internal links) → GuaranteeBlock → bottom CTA.
+// FAQPage JSON-LD preserved for SEO.
+
 import type { Metadata } from "next";
 import Link from "next/link";
-import Image from "next/image";
 import type { ReactNode } from "react";
+
+import { PageHero } from "@/components/lp/PageHero";
+import { ScarcityBar } from "@/components/lp/ScarcityBar";
+import { GuaranteeBlock } from "@/components/lp/GuaranteeBlock";
+
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 import { FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 import { BRAND_STORY_SHORT } from "@/data/brandStory";
@@ -76,7 +85,7 @@ const FAQS: FaqItem[] = [
         {BRAND_STORY_SHORT.map((paragraph) => (
           <p key={paragraph}>{paragraph}</p>
         ))}
-        <Link href="/about" className="link-underline font-semibold text-[var(--navy)]">
+        <Link href="/about" className="font-semibold text-[var(--lp-red)] underline">
           Read the full story
         </Link>
       </div>
@@ -111,18 +120,18 @@ const FAQS: FaqItem[] = [
     answerNode: (
       <>
         Use our bag count guides to match the right size for{" "}
-        <Link href="/gummy-gift-bundles" className="link-underline font-semibold text-[var(--navy)]">
+        <Link href="/gummy-gift-bundles" className="font-semibold text-[var(--lp-red)] underline">
           gifts
         </Link>
         ,{" "}
         <Link
           href="/patriotic-party-snacks"
-          className="link-underline font-semibold text-[var(--navy)]"
+          className="font-semibold text-[var(--lp-red)] underline"
         >
           patriotic parties
         </Link>
         , or{" "}
-        <Link href="/bulk-gummy-bears" className="link-underline font-semibold text-[var(--navy)]">
+        <Link href="/bulk-gummy-bears" className="font-semibold text-[var(--lp-red)] underline">
           bulk orders
         </Link>
         .
@@ -146,134 +155,98 @@ const faqJsonLd = {
 
 export default function FaqPage() {
   return (
-    <main className="relative overflow-hidden text-[var(--text)] min-h-screen home-candy">
-      <div className="relative w-full h-[280px] sm:h-[340px] lg:h-[400px] overflow-hidden">
-        <Image
-          src="/brand/americana/crossing-freedom.jpg"
-          alt="Patriotic American scene"
-          fill
-          sizes="100vw"
-          className="object-cover object-top"
-          priority
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#1B2A4A]/55 to-[#1B2A4A]/75" />
-        <div className="relative z-10 flex flex-col items-center justify-center h-full text-center px-4">
-          <div className="relative w-44 h-20 sm:w-52 sm:h-24 mb-3">
-            <Image src="/brand/logo-full.png" alt="USA Gummies" fill sizes="208px" className="object-contain drop-shadow-[0_6px_24px_rgba(0,0,0,0.5)]" />
-          </div>
-          <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold uppercase tracking-wide text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.4)]">
-            Frequently Asked Questions
-          </h1>
-          <p className="mt-2 text-sm text-white/85 max-w-md drop-shadow-sm">
-            Everything you need to know about our all-natural gummy bears.
-          </p>
-        </div>
-      </div>
-
-      <section className="relative overflow-hidden">
-        <div
-          className="absolute inset-0 pointer-events-none"
-          aria-hidden="true"
-          style={{
-            backgroundImage:
-              "radial-gradient(circle at 12% 18%, rgba(255,77,79,0.14), transparent 48%), radial-gradient(circle at 85% 5%, rgba(255,199,44,0.14), transparent 38%)",
-            opacity: 0.5,
-          }}
-        />
-        <div className="relative mx-auto max-w-6xl px-4 py-10">
-          <BreadcrumbJsonLd
-            items={[
-              { name: "Home", href: "/" },
-              { name: "FAQ", href: "/faq" },
-            ]}
-          />
-
-          <div className="flex justify-center py-6">
-            <div className="relative w-40 h-20">
-              <Image src="/brand/logo-full.png" alt="USA Gummies" fill sizes="160px" className="object-contain" />
-            </div>
-          </div>
-
-          <div className="candy-panel rounded-[36px] border border-[var(--border)] p-6 sm:p-8">
-            <div className="space-y-4">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.32em] text-[var(--muted)]">
-                FAQ
-              </div>
-              <h2 className="text-3xl font-black leading-[1.1] tracking-tight text-[var(--text)] sm:text-4xl lg:text-5xl">
-                USA Gummies FAQ
-              </h2>
-              <p className="text-sm text-[var(--muted)] sm:text-base max-w-prose">
-                Quick answers about our All American gummy bears, ingredients, flavor notes, bag count
-                savings, and where to buy.
-              </p>
-              <div className="flex flex-wrap items-center gap-3">
-                <Link href="/shop" className="btn btn-candy">
-                  Shop USA Gummies
-                </Link>
-                <span className="text-xs text-[var(--muted)]">{FREE_SHIPPING_PHRASE}</span>
-              </div>
-            </div>
-
-            <div className="mt-6 space-y-2">
-              {FAQS.map((item) => (
-                <details
-                  key={item.question}
-                  className="group rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-3"
-                >
-                  <summary className="flex cursor-pointer items-center justify-between gap-3 text-sm font-semibold text-[var(--text)]">
-                    <span>{item.question}</span>
-                    <span className="text-[var(--muted)] transition-transform group-open:rotate-45">+</span>
-                  </summary>
-                  <div className="mt-2 text-sm text-[var(--muted)]">
-                    {item.answerNode ?? item.answer}
-                  </div>
-                </details>
-              ))}
-            </div>
-
-            <div className="mt-6 border-t border-[var(--border)] pt-5">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-                Still have questions?
-              </div>
-              <h2 className="mt-2 text-2xl font-black text-[var(--text)]">We are here to help.</h2>
-              <p className="mt-2 text-sm text-[var(--muted)]">
-                Need ingredient details or order help? Send a note and we will respond within one
-                business day.
-              </p>
-              <div className="mt-3 flex flex-wrap gap-3">
-                <Link href="/contact" className="btn btn-outline">
-                  Contact support
-                </Link>
-                <Link href="/about" className="btn btn-candy">
-                  Learn our story
-                </Link>
-              </div>
-            </div>
-
-            <div className="mt-6 border-t border-[var(--border)] pt-5">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-                Ready to order
-              </div>
-              <h2 className="mt-2 text-2xl font-black text-[var(--text)]">
-                Shop the best value bundles.
-              </h2>
-              <p className="mt-2 text-sm text-[var(--muted)]">
-                Save more per bag when you add 4+ bags. {FREE_SHIPPING_PHRASE}.
-              </p>
-              <div className="mt-3">
-                <Link href="/shop" className="btn btn-candy">
-                  Shop best value
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
+    <main>
+      <BreadcrumbJsonLd
+        items={[
+          { name: "Home", href: "/" },
+          { name: "FAQ", href: "/faq" },
+        ]}
+      />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
       />
+
+      <PageHero
+        eyebrow="Frequently Asked Questions"
+        headline="USA Gummies"
+        scriptAccent="FAQ."
+        sub="Quick answers about our All American gummy bears, ingredients, flavor notes, bag count savings, and where to buy."
+        ctas={[
+          { href: "/shop", label: "Shop USA Gummies", variant: "primary" },
+          { href: "/contact", label: "Contact support", variant: "light" },
+        ]}
+      />
+
+      <ScarcityBar />
+
+      {/* FAQ accordion — preserves rich answerNode (with internal links). */}
+      <section className="bg-[var(--lp-cream-soft)] border-y-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[820px] px-5 py-14 sm:px-8 sm:py-20">
+          <div className="mb-8 text-center">
+            <p className="lp-label mb-2 text-[var(--lp-red)]">★ Questions We Get ★</p>
+            <h2 className="lp-display text-[clamp(2rem,5vw,3.4rem)] text-[var(--lp-ink)]">
+              The short
+              <br />
+              <span className="lp-script text-[var(--lp-red)]">answers.</span>
+            </h2>
+          </div>
+          <div className="mt-6">
+            {FAQS.map((item) => (
+              <details key={item.question} className="lp-faq">
+                <summary>{item.question}</summary>
+                <div>{item.answerNode ?? item.answer}</div>
+              </details>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Still have questions */}
+      <section className="bg-[var(--lp-cream)]">
+        <div className="mx-auto max-w-[900px] px-5 py-14 text-center sm:px-8 sm:py-16">
+          <p className="lp-label mb-3 text-[var(--lp-red)]">★ Still Have Questions? ★</p>
+          <h2 className="lp-display text-[clamp(2rem,5vw,3.2rem)] text-[var(--lp-ink)]">
+            We are
+            <br />
+            <span className="lp-script text-[var(--lp-red)]">here to help.</span>
+          </h2>
+          <p className="lp-sans mx-auto mt-6 max-w-[52ch] text-[1.05rem] leading-[1.6] text-[var(--lp-ink)]/85">
+            Need ingredient details or order help? Send a note and we will respond within one
+            business day.
+          </p>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+            <Link href="/contact" className="lp-cta">
+              Contact support
+            </Link>
+            <Link href="/about" className="lp-cta lp-cta-light">
+              Learn our story
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <GuaranteeBlock />
+
+      {/* Bottom CTA */}
+      <section className="bg-[var(--lp-cream-soft)] border-t-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[900px] px-5 py-14 text-center sm:px-8 sm:py-16">
+          <p className="lp-label mb-3 text-[var(--lp-red)]">★ Ready to Order ★</p>
+          <h2 className="lp-display text-[clamp(2rem,5vw,3.2rem)] text-[var(--lp-ink)]">
+            Shop the best
+            <br />
+            <span className="lp-script text-[var(--lp-red)]">value bundles.</span>
+          </h2>
+          <p className="lp-sans mx-auto mt-6 max-w-[52ch] text-[1.05rem] leading-[1.6] text-[var(--lp-ink)]/85">
+            Save more per bag when you add 4+ bags. {FREE_SHIPPING_PHRASE}.
+          </p>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+            <Link href="/shop" className="lp-cta">
+              Shop best value
+            </Link>
+          </div>
+        </div>
+      </section>
     </main>
   );
 }
