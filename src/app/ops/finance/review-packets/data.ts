@@ -819,3 +819,157 @@ export function formatLookupFreshness(
   if (ageSec < 60) return `as of ${ageSec}s ago`;
   return `as of ${Math.round(ageSec / 60)}m ago`;
 }
+
+// ---------------------------------------------------------------------------
+// Phase 25 — audit feed projection (server-safe, pure)
+// ---------------------------------------------------------------------------
+//
+// Projects a Phase 10 closer audit entry into the feed row shape
+// the dashboard's "Recent activity" sub-card renders. Pure: same
+// input → same output. NEVER fabricates — entries with a missing
+// `after.packetId` or `after.newStatus` (defensive: a malformed KV
+// write or a non-closer entry that slipped past the byAction
+// filter) return `null` and are SKIPPED by the route.
+//
+// Hard rules locked by tests:
+//   - `entry.action !== "receipt-review-promote.closer"` → null
+//     (defense-in-depth; the route already filters by action).
+//   - `result: "ok"` requires `after.packetId` (string) AND
+//     `after.newStatus` (`"rene-approved"` | `"rejected"`); otherwise
+//     null.
+//   - `result: "error"` requires `error.message` (string); otherwise
+//     null. `after.newStatus` is allowed to be missing on error rows
+//     (the closer logs an error before any transition).
+//   - `result` values OTHER than "ok" / "error" → null.
+//   - `packetIdShort` is the last 12 chars of the packetId, prefixed
+//     with `…` if the original is longer; falls back to the full id
+//     if shorter than 12 chars.
+//   - Pure: no Date.now(), no random, no I/O. Same entry → same row
+//     across calls.
+
+export interface AuditFeedRow {
+  /** Audit entry id (from `AuditLogEntry.id`). */
+  id: string;
+  /** ISO timestamp from `AuditLogEntry.createdAt`. Client renders
+   *  relative time via its own clock; this stays absolute so the
+   *  projection is pure. */
+  createdAt: string;
+  /** Closer result. `"ok"` is a successful transition; `"error"` is
+   *  a failed transition where the packet did NOT change. Skipped:
+   *  any other value. */
+  result: "ok" | "error";
+  /** Full packet id when known. May be `null` ONLY on `result: "error"`
+   *  rows (the error fired before the closer derived a packetId,
+   *  e.g. malformed targetEntity.id). */
+  packetId: string | null;
+  /** Display-friendly packet id (`…<last 12 chars>`). Same null
+   *  semantics as `packetId`. */
+  packetIdShort: string | null;
+  /** Terminal status the packet transitioned TO. Only present on
+   *  `result: "ok"` rows (error rows never transitioned). */
+  newStatus: "rene-approved" | "rejected" | null;
+  /** Approval id from the closing approval. May be present on both
+   *  ok + error rows; null when the closer couldn't extract it. */
+  approvalId: string | null;
+  /** `error.message` verbatim on error rows; null on ok rows.
+   *  NEVER fabricated as empty string on ok rows. */
+  errorMessage: string | null;
+}
+
+/** Internal — ALL entries the closer might emit. Keeps the action
+ *  string as a constant so a typo in the route can't silently break
+ *  the projection. */
+export const RECEIPT_REVIEW_CLOSER_ACTION = "receipt-review-promote.closer";
+
+interface MinimalAuditEntry {
+  id: string;
+  action: string;
+  result: string;
+  after?: unknown;
+  approvalId?: string;
+  error?: { message?: string; code?: string } | undefined;
+  createdAt: string;
+  entityId?: string;
+}
+
+function shortenPacketId(packetId: string): string {
+  if (packetId.length <= 12) return packetId;
+  return `…${packetId.slice(-12)}`;
+}
+
+export function projectAuditEntryToFeedRow(
+  entry: MinimalAuditEntry,
+): AuditFeedRow | null {
+  if (entry.action !== RECEIPT_REVIEW_CLOSER_ACTION) return null;
+
+  const after =
+    entry.after !== null && typeof entry.after === "object"
+      ? (entry.after as Record<string, unknown>)
+      : null;
+
+  const afterPacketId =
+    after && typeof after.packetId === "string" && after.packetId.length > 0
+      ? after.packetId
+      : null;
+  const afterNewStatus =
+    after && typeof after.newStatus === "string"
+      ? after.newStatus
+      : null;
+
+  // Fall back to entityId when after.packetId is missing — the
+  // closer audit envelope always sets one of the two for a real
+  // transition.
+  const packetId =
+    afterPacketId ??
+    (typeof entry.entityId === "string" && entry.entityId.length > 0
+      ? entry.entityId
+      : null);
+
+  const approvalId =
+    typeof entry.approvalId === "string" && entry.approvalId.length > 0
+      ? entry.approvalId
+      : null;
+
+  if (entry.result === "ok") {
+    if (packetId === null) return null;
+    if (
+      afterNewStatus !== "rene-approved" &&
+      afterNewStatus !== "rejected"
+    ) {
+      return null;
+    }
+    return {
+      id: entry.id,
+      createdAt: entry.createdAt,
+      result: "ok",
+      packetId,
+      packetIdShort: shortenPacketId(packetId),
+      newStatus: afterNewStatus,
+      approvalId,
+      errorMessage: null,
+    };
+  }
+
+  if (entry.result === "error") {
+    const errorMessage =
+      entry.error && typeof entry.error === "object" &&
+      typeof entry.error.message === "string" &&
+      entry.error.message.length > 0
+        ? entry.error.message
+        : null;
+    if (errorMessage === null) return null; // defensive — no fabrication
+    return {
+      id: entry.id,
+      createdAt: entry.createdAt,
+      result: "error",
+      packetId,
+      packetIdShort: packetId !== null ? shortenPacketId(packetId) : null,
+      newStatus: null,
+      approvalId,
+      errorMessage,
+    };
+  }
+
+  // Any other result value (skipped / stood-down / unknown) → null.
+  return null;
+}

@@ -19,6 +19,7 @@ import {
   formatLookupFreshness,
   formatVendorCell,
   reviewPacketsFilterSpecToQuery,
+  type AuditFeedRow,
   type ReviewPacketRowStatus,
   type ReviewPacketStatusColor,
   type ReviewPacketsApprovalStatusFilter,
@@ -151,6 +152,50 @@ async function fetchPackets(
 // `data.ts` module so it can be unit-tested without React baggage
 // and shared with any future server-rendered surface. Imported above.
 
+// Phase 25 — fetch the recent-activity audit feed. Read-only on
+// `auditStore.byAction`; defensive on every error path (returns
+// `{ entries: [], err }` instead of throwing).
+interface AuditFeedResponse {
+  ok?: boolean;
+  count?: number;
+  entries?: AuditFeedRow[];
+  error?: string;
+  reason?: string;
+}
+
+async function fetchAuditFeed(
+  limit = 10,
+): Promise<{ entries: AuditFeedRow[]; err: string | null }> {
+  try {
+    const res = await fetch(
+      `/api/ops/docs/receipt-review-packets/audit-feed?limit=${encodeURIComponent(String(limit))}`,
+      { method: "GET", cache: "no-store" },
+    );
+    let body: AuditFeedResponse | null = null;
+    try {
+      body = (await res.json()) as AuditFeedResponse;
+    } catch {
+      body = null;
+    }
+    if (!res.ok || !body || body.ok !== true) {
+      return {
+        entries: [],
+        err:
+          body?.error ?? body?.reason ?? `HTTP ${res.status} ${res.statusText}`,
+      };
+    }
+    return {
+      entries: Array.isArray(body.entries) ? body.entries : [],
+      err: null,
+    };
+  } catch (err) {
+    return {
+      entries: [],
+      err: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
 async function repromoteReceipt(
   receiptId: string,
 ): Promise<{ ok: boolean; reason?: string }> {
@@ -211,6 +256,25 @@ export function ReviewPacketsView() {
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, []);
+
+  // Phase 25 — recent activity audit feed. Read-only fetch from
+  // /api/ops/docs/receipt-review-packets/audit-feed. Fetched once
+  // on mount + on every refresh tick (refreshKey). Default 10
+  // entries shown to keep the strip compact; expand toggle could
+  // surface up to 100 (the route's cap) — deferred for now.
+  const [auditFeed, setAuditFeed] = useState<AuditFeedRow[]>([]);
+  const [auditFeedErr, setAuditFeedErr] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void fetchAuditFeed(10).then((r) => {
+      if (cancelled) return;
+      setAuditFeed(r.entries);
+      setAuditFeedErr(r.err);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshKey]);
   // pageCount: 1 = first page only; >1 = user clicked Load more.
   // Phase 15's bounded passive poll skips when pageCount > 1 to
   // avoid yanking the operator's accumulated rows mid-scroll.
@@ -658,6 +722,110 @@ export function ReviewPacketsView() {
             >
               Approvals: {formatLookupFreshness(approvalsLookupCachedAt, now)}
             </span>
+          </div>
+        )}
+
+        {/* ---- Recent activity (Phase 25) ---- */}
+        {(auditFeed.length > 0 || auditFeedErr) && (
+          <div
+            style={{
+              marginTop: 12,
+              padding: "8px 12px",
+              border: `1px solid ${BORDER}`,
+              borderRadius: 6,
+              background: "#fff",
+            }}
+          >
+            <div
+              style={{
+                fontSize: 11,
+                color: DIM,
+                marginBottom: 6,
+                textTransform: "uppercase",
+                letterSpacing: 0.5,
+              }}
+            >
+              Recent activity
+              {auditFeed.length > 0 && (
+                <span style={{ color: DIM, marginLeft: 6 }}>
+                  (last {auditFeed.length} closer transitions)
+                </span>
+              )}
+            </div>
+            {auditFeedErr && (
+              <p style={{ color: RED, fontSize: 11, margin: 0 }}>
+                Audit feed unavailable: {auditFeedErr}
+              </p>
+            )}
+            {auditFeed.length > 0 && (
+              <ul
+                style={{
+                  listStyle: "none",
+                  padding: 0,
+                  margin: 0,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 4,
+                }}
+              >
+                {auditFeed.map((entry) => {
+                  const ageMs = now - Date.parse(entry.createdAt);
+                  const relative = !Number.isFinite(ageMs)
+                    ? entry.createdAt
+                    : ageMs < 0
+                      ? "just now"
+                      : ageMs < 60_000
+                        ? `${Math.round(ageMs / 1000)}s ago`
+                        : ageMs < 3_600_000
+                          ? `${Math.round(ageMs / 60_000)}m ago`
+                          : `${Math.round(ageMs / 3_600_000)}h ago`;
+                  const icon =
+                    entry.result === "ok"
+                      ? entry.newStatus === "rene-approved"
+                        ? "✅"
+                        : "❌"
+                      : "⚠️";
+                  const verb =
+                    entry.result === "ok"
+                      ? entry.newStatus === "rene-approved"
+                        ? "approved"
+                        : "rejected"
+                      : "closer error";
+                  return (
+                    <li
+                      key={entry.id}
+                      style={{
+                        fontSize: 12,
+                        color: NAVY,
+                        display: "flex",
+                        gap: 8,
+                        alignItems: "baseline",
+                      }}
+                    >
+                      <span style={{ width: 18 }}>{icon}</span>
+                      <span style={{ fontFamily: "monospace", color: DIM }}>
+                        {entry.packetIdShort ?? "(no packet id)"}
+                      </span>
+                      <span>{verb}</span>
+                      {entry.result === "error" && entry.errorMessage && (
+                        <span style={{ color: RED, fontSize: 11 }}>
+                          — {entry.errorMessage}
+                        </span>
+                      )}
+                      <span
+                        style={{
+                          marginLeft: "auto",
+                          color: DIM,
+                          fontSize: 11,
+                        }}
+                      >
+                        {relative}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </div>
         )}
 

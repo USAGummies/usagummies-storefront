@@ -162,10 +162,24 @@ Potential code only if smoke fails:
 
 ### Lane B — Receipt-to-Rene approval promotion
 
-Phases 7-24 done. Phase 24 adds a cache freshness indicator to
-the dashboard — operators see "Approvals: as of 5s ago" / "fresh"
-on the right edge of the counts strip, so they can answer the
-"is this view stale?" question without clicking Refresh. New
+Phases 7-25 done. Phase 25 adds a "Recent activity" sub-card
+between the counts strip and the table — operators see the
+last 10 closer transitions (`✅ pkt-belma… approved · 5m ago`,
+`❌ pkt-uline… rejected · 12m ago`, `⚠️ pkt-bad… closer error
+— packet not found · 47m ago`) without scrolling the table or
+opening Slack threads. New auth-gated read-only route
+`/api/ops/docs/receipt-review-packets/audit-feed` reads
+`auditStore.byAction("receipt-review-promote.closer", N)` (limit
+clamped 1-100, default 20) and projects through the new pure
+helper `projectAuditEntryToFeedRow` in `data.ts`. Defensive on
+malformed entries (skipped, never fabricated). Read-only on
+auditStore; degrades gracefully if offline (inline banner inside
+the card; rest of dashboard stays live).
+
+Phase 24 adds a cache freshness indicator to the dashboard —
+operators see "Approvals: as of 5s ago" / "fresh" on the right
+edge of the counts strip, so they can answer the "is this view
+stale?" question without clicking Refresh. New
 `getCachedApprovalLookupWithMeta` variant returns `{ map,
 cachedAt }`; the plain `getCachedApprovalLookup` becomes a thin
 wrapper preserving backward-compat for the CSV export + Phase
@@ -222,6 +236,7 @@ Boundary:
 - Promote-review cache-invalidation hook. ✅ Done (Phase 22).
 - ID-substring search on dashboard. ✅ Done (Phase 23).
 - Cache freshness indicator on dashboard. ✅ Done (Phase 24).
+- Recent activity audit feed sub-card. ✅ Done (Phase 25).
 - **PARKED:** `qbo.bill.create` entry — STOP-AND-ASK on the
   QBO-write boundary. Blocked on Rene's chart-of-accounts mapping
   (per-category vs per-vendor account-default scheme). Slack draft

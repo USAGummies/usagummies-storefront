@@ -27,6 +27,8 @@ import {
   formatVendorCell,
   paginateReviewPackets,
   parseReviewPacketsFilterSpec,
+  projectAuditEntryToFeedRow,
+  RECEIPT_REVIEW_CLOSER_ACTION,
   renderReviewPacketsCsv,
   reviewPacketsCsvFilename,
   reviewPacketsFilterSpecToQuery,
@@ -1795,5 +1797,217 @@ describe("Phase 24 — formatLookupFreshness", () => {
       expect(out).not.toBe("NaN");
       expect(out).not.toBe("0");
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 25 — projectAuditEntryToFeedRow (audit feed projection)
+// ---------------------------------------------------------------------------
+
+describe("Phase 25 — projectAuditEntryToFeedRow", () => {
+  function mkOkEntry(
+    overrides: Partial<{
+      id: string;
+      packetId: string;
+      newStatus: "rene-approved" | "rejected";
+      approvalId: string;
+      createdAt: string;
+      entityId: string;
+    }> = {},
+  ) {
+    return {
+      id: overrides.id ?? "audit-1",
+      action: RECEIPT_REVIEW_CLOSER_ACTION,
+      result: "ok",
+      after: {
+        packetId: overrides.packetId ?? "pkt-v1-receipt-belmark-001",
+        newStatus: overrides.newStatus ?? "rene-approved",
+      },
+      approvalId: overrides.approvalId ?? "appr-uuid-aaa",
+      createdAt: overrides.createdAt ?? "2026-04-26T12:00:00Z",
+      entityId:
+        overrides.entityId ?? overrides.packetId ?? "pkt-v1-receipt-belmark-001",
+    };
+  }
+
+  it("RECEIPT_REVIEW_CLOSER_ACTION constant is locked (typo guard)", () => {
+    expect(RECEIPT_REVIEW_CLOSER_ACTION).toBe("receipt-review-promote.closer");
+  });
+
+  it("ok approve transition projects to a complete row", () => {
+    const row = projectAuditEntryToFeedRow(mkOkEntry());
+    expect(row).not.toBeNull();
+    // packetIdShort is `…<last 12 chars>` (ellipsis + 12 chars = 13 chars total).
+    expect(row).toEqual({
+      id: "audit-1",
+      createdAt: "2026-04-26T12:00:00Z",
+      result: "ok",
+      packetId: "pkt-v1-receipt-belmark-001",
+      packetIdShort: `…${"pkt-v1-receipt-belmark-001".slice(-12)}`,
+      newStatus: "rene-approved",
+      approvalId: "appr-uuid-aaa",
+      errorMessage: null,
+    });
+  });
+
+  it("ok reject transition uses newStatus: rejected", () => {
+    const row = projectAuditEntryToFeedRow(
+      mkOkEntry({ newStatus: "rejected" }),
+    );
+    expect(row?.newStatus).toBe("rejected");
+    expect(row?.result).toBe("ok");
+    expect(row?.errorMessage).toBeNull();
+  });
+
+  it("packetIdShort is `…<last 12 chars>` when packetId longer than 12", () => {
+    const id = "pkt-v1-abcdefghijklmnopqrstuvwxyz";
+    const row = projectAuditEntryToFeedRow(
+      mkOkEntry({ packetId: id }),
+    );
+    expect(row?.packetIdShort?.startsWith("…")).toBe(true);
+    expect(row?.packetIdShort?.length).toBe(13); // ellipsis + 12 chars
+    expect(row?.packetIdShort?.slice(1)).toBe(id.slice(-12));
+  });
+
+  it("packetIdShort returns full id when shorter than 12 chars", () => {
+    const row = projectAuditEntryToFeedRow(
+      mkOkEntry({ packetId: "short", entityId: "short" }),
+    );
+    expect(row?.packetIdShort).toBe("short");
+  });
+
+  it("non-closer action → null (defense-in-depth)", () => {
+    const entry = { ...mkOkEntry(), action: "some-other-action" };
+    expect(projectAuditEntryToFeedRow(entry)).toBeNull();
+  });
+
+  it("ok result with missing after.packetId AND missing entityId → null (no fabrication)", () => {
+    const entry = {
+      ...mkOkEntry(),
+      after: { newStatus: "rene-approved" }, // no packetId
+      entityId: undefined,
+    };
+    expect(projectAuditEntryToFeedRow(entry)).toBeNull();
+  });
+
+  it("ok result falls back to entityId when after.packetId is missing", () => {
+    const entry = {
+      ...mkOkEntry(),
+      after: { newStatus: "rene-approved" }, // no packetId
+      entityId: "pkt-v1-fallback",
+    };
+    const row = projectAuditEntryToFeedRow(entry);
+    expect(row?.packetId).toBe("pkt-v1-fallback");
+  });
+
+  it("ok result with newStatus other than 'rene-approved' / 'rejected' → null", () => {
+    const entry = {
+      ...mkOkEntry(),
+      after: { packetId: "pkt-v1-foo", newStatus: "weird-status" },
+    };
+    expect(projectAuditEntryToFeedRow(entry)).toBeNull();
+  });
+
+  it("ok result with NO newStatus → null", () => {
+    const entry = {
+      ...mkOkEntry(),
+      after: { packetId: "pkt-v1-foo" },
+    };
+    expect(projectAuditEntryToFeedRow(entry)).toBeNull();
+  });
+
+  it("error result with error.message projects to error row (newStatus null)", () => {
+    const entry = {
+      id: "audit-err-1",
+      action: RECEIPT_REVIEW_CLOSER_ACTION,
+      result: "error",
+      after: { packetId: "pkt-v1-bad" },
+      approvalId: "appr-bad",
+      error: { message: "packet pkt-v1-bad not found in KV" },
+      createdAt: "2026-04-26T12:00:00Z",
+      entityId: "pkt-v1-bad",
+    };
+    const row = projectAuditEntryToFeedRow(entry);
+    expect(row).not.toBeNull();
+    expect(row?.result).toBe("error");
+    expect(row?.newStatus).toBeNull();
+    expect(row?.errorMessage).toBe("packet pkt-v1-bad not found in KV");
+    expect(row?.packetId).toBe("pkt-v1-bad");
+  });
+
+  it("error result with NO error.message → null (no fabrication)", () => {
+    const entry = {
+      id: "audit-err-2",
+      action: RECEIPT_REVIEW_CLOSER_ACTION,
+      result: "error",
+      after: {},
+      createdAt: "2026-04-26T12:00:00Z",
+    };
+    expect(projectAuditEntryToFeedRow(entry)).toBeNull();
+  });
+
+  it("error row with no packetId at all → packetId / packetIdShort null", () => {
+    const entry = {
+      id: "audit-err-3",
+      action: RECEIPT_REVIEW_CLOSER_ACTION,
+      result: "error",
+      after: {},
+      error: { message: "missing valid targetEntity.id" },
+      createdAt: "2026-04-26T12:00:00Z",
+      entityId: undefined,
+    };
+    const row = projectAuditEntryToFeedRow(entry);
+    expect(row).not.toBeNull();
+    expect(row?.packetId).toBeNull();
+    expect(row?.packetIdShort).toBeNull();
+    expect(row?.errorMessage).toBe("missing valid targetEntity.id");
+  });
+
+  it("result other than ok/error (e.g. 'skipped') → null", () => {
+    const entry = { ...mkOkEntry(), result: "skipped" };
+    expect(projectAuditEntryToFeedRow(entry)).toBeNull();
+  });
+
+  it("approvalId null when missing on either ok or error row", () => {
+    const okNoApproval = projectAuditEntryToFeedRow({
+      ...mkOkEntry(),
+      approvalId: undefined,
+    });
+    expect(okNoApproval?.approvalId).toBeNull();
+    const errNoApproval = projectAuditEntryToFeedRow({
+      id: "audit-err-4",
+      action: RECEIPT_REVIEW_CLOSER_ACTION,
+      result: "error",
+      after: {},
+      error: { message: "x" },
+      createdAt: "2026-04-26T12:00:00Z",
+      approvalId: undefined,
+    });
+    expect(errNoApproval?.approvalId).toBeNull();
+  });
+
+  it("malformed `after` (string instead of object) → falls back to entityId for packetId", () => {
+    const entry = {
+      ...mkOkEntry(),
+      after: "garbage-not-an-object",
+      entityId: "pkt-v1-recover",
+    };
+    // result: "ok" but after.newStatus is null (because after is a string)
+    // → null per the contract.
+    expect(projectAuditEntryToFeedRow(entry)).toBeNull();
+  });
+
+  it("pure: same entry → same projection across calls", () => {
+    const entry = mkOkEntry();
+    const a = projectAuditEntryToFeedRow(entry);
+    const b = projectAuditEntryToFeedRow(entry);
+    expect(a).toEqual(b);
+  });
+
+  it("does NOT mutate the input entry", () => {
+    const entry = mkOkEntry();
+    const before = JSON.stringify(entry);
+    projectAuditEntryToFeedRow(entry);
+    expect(JSON.stringify(entry)).toBe(before);
   });
 });
