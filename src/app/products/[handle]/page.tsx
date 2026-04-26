@@ -18,6 +18,7 @@ import { GuaranteeBlock } from "@/components/lp/GuaranteeBlock";
 import { FaqAccordion } from "@/components/lp/FaqAccordion";
 import { StickyBuyBar } from "@/components/lp/StickyBuyBar";
 
+import Image from "next/image";
 import BagSlider from "@/components/purchase/BagSlider.client";
 import { ProductGallery } from "@/components/product/ProductGallery.client";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
@@ -202,6 +203,46 @@ export default async function ProductPage({ params }: PageProps) {
       </section>
 
       <ThreePromises />
+
+      {/* "In your hands" lifestyle shot — bridges from the abstract
+       * promises section into the social-proof reviews wall. Real
+       * hands tearing open the bag conveys "this is the actual bag
+       * you'll get". Round-2 ad asset. */}
+      <section className="bg-[var(--lp-cream)]">
+        <div className="mx-auto max-w-[1200px] px-5 py-14 sm:px-8 sm:py-20">
+          <div className="grid items-center gap-10 lg:grid-cols-[1.05fr_0.95fr]">
+            <figure
+              className="relative overflow-hidden border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)]"
+              style={{ boxShadow: "8px 8px 0 var(--lp-red)" }}
+            >
+              <div className="relative aspect-square w-full">
+                <Image
+                  src="/brand/ad-assets-round2/photo-the-reveal.png"
+                  alt="Hands tearing open a bag of USA Gummies on a rustic wooden table"
+                  fill
+                  sizes="(max-width: 1024px) 88vw, 600px"
+                  className="object-cover"
+                />
+              </div>
+            </figure>
+
+            <div>
+              <p className="lp-label mb-3 text-[var(--lp-red)]">★ In Your Hands ★</p>
+              <h2 className="lp-display text-[clamp(2rem,5vw,3.4rem)] leading-[1] text-[var(--lp-ink)]">
+                A bag built
+                <br />
+                <span className="lp-script text-[var(--lp-red)]">to be opened.</span>
+              </h2>
+              <p className="lp-sans mt-5 text-[1.1rem] leading-[1.6] text-[var(--lp-ink)]/85">
+                7.5 oz of dye-free gummy bears in a single tear-top bag.
+                Made in the U.S.A. and sized to share — though we
+                won&rsquo;t tell anyone if you don&rsquo;t.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <GuaranteeBlock />
 
       {/* Reviews — full review wall with verified-buyer rating. */}

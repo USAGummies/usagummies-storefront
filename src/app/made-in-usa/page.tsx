@@ -5,6 +5,7 @@
 
 import type { Metadata } from "next";
 import Link from "next/link";
+import Image from "next/image";
 
 import { PageHero } from "@/components/lp/PageHero";
 import { ScarcityBar } from "@/components/lp/ScarcityBar";
@@ -215,6 +216,51 @@ export default function MadeInUsaPage() {
       </section>
 
       <FoundersLetter />
+
+      {/* Made-here proof shot — bag in a Pacific Northwest scene
+       * (the author's own backyard). Reinforces the "American
+       * landscape" half of the made-in-USA claim, complementing the
+       * "American jobs / American business" half from FoundersLetter. */}
+      <section className="bg-[var(--lp-cream)]">
+        <div className="mx-auto max-w-[1200px] px-5 py-14 sm:px-8 sm:py-20">
+          <div className="grid items-center gap-10 lg:grid-cols-[0.95fr_1.05fr]">
+            <div>
+              <p className="lp-label mb-3 text-[var(--lp-red)]">★ American Landscape ★</p>
+              <h2 className="lp-display text-[clamp(2rem,5vw,3.4rem)] leading-[1] text-[var(--lp-ink)]">
+                Sourced &amp; packed
+                <br />
+                <span className="lp-script text-[var(--lp-red)]">in our backyard.</span>
+              </h2>
+              <p className="lp-sans mt-5 text-[1.1rem] leading-[1.6] text-[var(--lp-ink)]/85">
+                Every bag of USA Gummies is sourced, manufactured, and
+                packed in the United States — a lot of it within sight of
+                Mount Rainier, where the Pacific Northwest&rsquo;s biggest
+                trees and biggest stories live.
+              </p>
+              <p className="lp-sans mt-3 text-[1rem] leading-[1.55] text-[var(--lp-ink)]/75">
+                Real American work, in real American places. The bag goes
+                where you go.
+              </p>
+            </div>
+
+            <figure
+              className="relative overflow-hidden border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] lg:order-last"
+              style={{ boxShadow: "8px 8px 0 var(--lp-red)" }}
+            >
+              <div className="relative aspect-square w-full">
+                <Image
+                  src="/brand/ad-assets-round2/photo-pacific-northwest.png"
+                  alt="USA Gummies bag with snow-capped mountain and Pacific Northwest forest"
+                  fill
+                  sizes="(max-width: 1024px) 88vw, 600px"
+                  className="object-cover"
+                />
+              </div>
+            </figure>
+          </div>
+        </div>
+      </section>
+
       <SustainabilityBlock />
 
       {/* FAQ */}

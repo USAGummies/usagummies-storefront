@@ -7,6 +7,7 @@
 
 import type { Metadata } from "next";
 import Link from "next/link";
+import Image from "next/image";
 
 import { PageHero } from "@/components/lp/PageHero";
 import { ScarcityBar } from "@/components/lp/ScarcityBar";
@@ -186,6 +187,41 @@ export default function AboutPage() {
       </section>
 
       <FoundersLetter />
+
+      {/* Source-story diptych — raspberry on the left, gummy bear on
+       * the right, in matched lighting. Visual proof that the colors
+       * + flavors are pulled directly from real ingredients. */}
+      <section className="bg-[var(--lp-cream)]">
+        <div className="mx-auto max-w-[1100px] px-5 py-14 sm:px-8 sm:py-20">
+          <div className="mb-10 text-center">
+            <p className="lp-label mb-3 text-[var(--lp-red)]">★ From the Source ★</p>
+            <h2 className="lp-display text-[clamp(2rem,5vw,3.4rem)] leading-[1] text-[var(--lp-ink)]">
+              Real fruit
+              <br />
+              <span className="lp-script text-[var(--lp-red)]">in, real bear out.</span>
+            </h2>
+            <p className="lp-sans mx-auto mt-6 max-w-[48ch] text-[1.05rem] leading-[1.6] text-[var(--lp-ink)]/85">
+              The reds are pulled from raspberries and beets. Side by
+              side, you can see exactly where the color came from.
+            </p>
+          </div>
+          <figure
+            className="relative overflow-hidden border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)]"
+            style={{ boxShadow: "8px 8px 0 var(--lp-red)" }}
+          >
+            <div className="relative aspect-[2/1] w-full sm:aspect-[5/2]">
+              <Image
+                src="/brand/ad-assets-round2/photo-source-story.png"
+                alt="Diptych: a fresh raspberry held up on the left, a red USA Gummies bear held up on the right, both in matched lighting"
+                fill
+                sizes="(max-width: 1024px) 88vw, 1100px"
+                className="object-cover"
+              />
+            </div>
+          </figure>
+        </div>
+      </section>
+
       <SustainabilityBlock />
       <GuaranteeBlock />
       <FaqAccordion />

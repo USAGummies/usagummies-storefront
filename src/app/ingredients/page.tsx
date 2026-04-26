@@ -236,6 +236,51 @@ export default function IngredientsPage() {
 
       <ScarcityBar />
 
+      {/* Real ingredients, real colors — macro proof shot. The
+       * raspberries + beets next to the bag set up the ingredient
+       * panel below as honest, not abstract. */}
+      <section className="bg-[var(--lp-cream)]">
+        <div className="mx-auto max-w-[1200px] px-5 py-14 sm:px-8 sm:py-20">
+          <div className="grid items-center gap-10 lg:grid-cols-2">
+            <figure
+              className="relative overflow-hidden border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)]"
+              style={{ boxShadow: "8px 8px 0 var(--lp-red)" }}
+            >
+              <div className="relative aspect-square w-full">
+                <Image
+                  src="/brand/ad-assets-round2/photo-ingredient-macro.png"
+                  alt="A bag of USA Gummies next to a bowl of raspberries, fresh beets, and a plate of dye-free gummy bears"
+                  fill
+                  sizes="(max-width: 1024px) 88vw, 560px"
+                  className="object-cover"
+                  priority
+                />
+              </div>
+            </figure>
+
+            <div>
+              <p className="lp-label mb-3 text-[var(--lp-red)]">★ Real Color, Real Fruit ★</p>
+              <h2 className="lp-display text-[clamp(2rem,5vw,3.4rem)] leading-[1] text-[var(--lp-ink)]">
+                Color comes
+                <br />
+                <span className="lp-script text-[var(--lp-red)]">from food.</span>
+              </h2>
+              <p className="lp-sans mt-5 text-[1.1rem] leading-[1.6] text-[var(--lp-ink)]/85">
+                The reds come from beets and raspberries. The yellows come
+                from curcumin (turmeric). The greens come from spirulina.
+                Every shade in the bag is something you could find on a
+                farmer&rsquo;s table.
+              </p>
+              <p className="lp-sans mt-3 text-[1rem] leading-[1.55] text-[var(--lp-ink)]/75">
+                Not one petroleum-derived dye on the panel. The full
+                ingredient list is right below, exactly as printed on the
+                bag.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Ingredients list + Nutrition Facts (structured table preserved) */}
       <section className="bg-[var(--lp-cream-soft)] border-y-2 border-[var(--lp-ink)]">
         <div className="mx-auto max-w-[1200px] px-5 py-14 sm:px-8 sm:py-20">

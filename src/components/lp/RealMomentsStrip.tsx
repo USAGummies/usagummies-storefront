@@ -1,31 +1,31 @@
-// Real moments strip — three actual lifestyle photos. Ben's audit:
-// "we need to use real images. like the gummies in my hand". Swapped
-// the brand billboards out for the real product-in-the-wild
-// photography staged in /public/brand/photos/.
-//
-// No copy claims, no captions that aren't on the bag — the photos
-// carry the story. Headline is the bag's own back-panel phrasing
-// ("Land of the Free, Home of the Brave").
+// Real moments strip — four product-in-the-wild bag photos from the
+// round-2 ad asset shoot. Each one features the actual USA Gummies bag
+// in a different real-world scene: outdoors, kitchen, hands opening,
+// gummies pouring. No copy claims, no captions that aren't on the bag —
+// the photos carry the story. Headline is the bag's own back-panel
+// phrasing ("Land of the Free, Home of the Brave").
 
 import Image from "next/image";
 
-// `objectPosition` aims the 5/4 crop at the most product-forward
-// part of each photo so the gummies + bag actually show in the card,
-// not just the background.
 const SHOTS = [
   {
-    src: "/brand/photos/hand-gummies.jpg",
-    alt: "A handful of USA Gummies dye-free gummy bears",
-    position: "center 65%",
-  },
-  {
-    src: "/brand/photos/book-pages-gummies.jpg",
-    alt: "USA Gummies bag with an open book and gummy bears",
+    src: "/brand/ad-assets-round2/photo-pacific-northwest.png",
+    alt: "USA Gummies bag with snow-capped mountain and Pacific Northwest forest",
     position: "center center",
   },
   {
-    src: "/brand/photos/diner-scene.png",
-    alt: "USA Gummies in an American diner setting",
+    src: "/brand/ad-assets-round2/photo-generations-table.png",
+    alt: "USA Gummies bag on a rustic wooden table with coffee and a bowl of gummy bears",
+    position: "center center",
+  },
+  {
+    src: "/brand/ad-assets-round2/photo-the-reveal.png",
+    alt: "Hands tearing open a bag of USA Gummies on a rustic table",
+    position: "center center",
+  },
+  {
+    src: "/brand/ad-assets-round2/photo-pour-test.png",
+    alt: "USA Gummies pouring out of the bag onto a marble surface",
     position: "center center",
   },
 ];
@@ -47,26 +47,24 @@ export function RealMomentsStrip() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {SHOTS.map((s, i) => (
             <figure
               key={s.src}
               className="relative overflow-hidden border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)]"
-              style={{ boxShadow: "5px 5px 0 var(--lp-red)" }}
+              style={{
+                boxShadow:
+                  i % 2 === 0 ? "5px 5px 0 var(--lp-red)" : "5px 5px 0 var(--lp-ink)",
+              }}
             >
-              <div className="relative aspect-[5/4] w-full">
+              <div className="relative aspect-square w-full">
                 <Image
                   src={s.src}
                   alt={s.alt}
                   fill
-                  sizes="(max-width: 640px) 88vw, (max-width: 1200px) 30vw, 360px"
+                  sizes="(max-width: 640px) 88vw, (max-width: 1024px) 44vw, 280px"
                   className="object-cover"
                   style={{ objectPosition: s.position }}
-                />
-                {/* Subtle navy multiply for cohesion with the palette */}
-                <div
-                  aria-hidden
-                  className="absolute inset-0 bg-[var(--lp-navy)] opacity-[0.04] mix-blend-multiply"
                 />
               </div>
               {/* Star count corner stamp on the first card only */}
@@ -75,9 +73,9 @@ export function RealMomentsStrip() {
                   <div
                     className="lp-stamp"
                     style={{
-                      width: "4.25rem",
-                      height: "4.25rem",
-                      fontSize: "0.55rem",
+                      width: "3.75rem",
+                      height: "3.75rem",
+                      fontSize: "0.5rem",
                       color: "var(--lp-red)",
                     }}
                   >
