@@ -13,6 +13,11 @@
 
 import { kv } from "@vercel/kv";
 import type { ReceiptOcrSuggestion } from "./receipt-ocr";
+import {
+  buildReceiptReviewPacket,
+  type BuildPacketOptions,
+  type ReceiptReviewPacket,
+} from "./receipt-review-packet";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -110,6 +115,11 @@ const KV_EXTRACTED_DOCS = "docs:extracted";
 const KV_TRANSCRIPTS = "docs:transcripts";
 const KV_RECEIPTS = "docs:receipts";
 const KV_INVOICE_RULES = "docs:invoice_watch_rules";
+// Phase 8 — review-packet store. Packets are draft-only queue
+// items: building one never opens a Slack/control-plane approval
+// (no taxonomy slug exists yet) and never mutates the underlying
+// receipt's canonical fields or status.
+const KV_RECEIPT_REVIEW_PACKETS = "docs:receipt_review_packets";
 
 // ---------------------------------------------------------------------------
 // Document Extraction
@@ -444,6 +454,80 @@ export async function attachOcrSuggestion(
   all[idx] = next;
   await kv.set(KV_RECEIPTS, all);
   return next;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 8 — Receipt review packet store
+// ---------------------------------------------------------------------------
+//
+// A packet is a draft-only queue item that pairs the canonical
+// (human-edited) fields on a receipt with the OCR suggestion (when
+// present) plus a per-field "canonical | ocr-suggested | missing"
+// merge. Promoting a receipt builds a packet — it does NOT change
+// the receipt's status, never overwrites canonical fields, and
+// never opens a Slack/control-plane approval (no taxonomy slug
+// exists for receipt promotion today).
+
+/**
+ * Request a Rene-review packet for a captured receipt.
+ *
+ * Hard contract:
+ *   - **Status preserved.** The receipt's `status` is left exactly
+ *     as it was. A `needs_review` receipt stays in `needs_review`.
+ *   - **Canonical fields untouched.** vendor / date / amount /
+ *     category / payment_method are left exactly as they were
+ *     entered (or as `processReceipt` left them — usually undefined
+ *     until a human edit).
+ *   - **Idempotent.** Re-requesting for the same receiptId
+ *     overwrites the packet under the same `packetId`.
+ *   - Returns `null` if no receipt with that id exists — the
+ *     route caller maps this to HTTP 404.
+ */
+export async function requestReceiptReviewPromotion(
+  receiptId: string,
+  options: BuildPacketOptions = {},
+): Promise<ReceiptReviewPacket | null> {
+  const all = (await kv.get<ReceiptRecord[]>(KV_RECEIPTS)) || [];
+  const receipt = all.find((r) => r.id === receiptId);
+  if (!receipt) return null;
+  const packet = buildReceiptReviewPacket(receipt, options);
+  const packets =
+    (await kv.get<ReceiptReviewPacket[]>(KV_RECEIPT_REVIEW_PACKETS)) || [];
+  // Idempotent: replace by packetId (deterministic in receipt.id).
+  const idx = packets.findIndex((p) => p.packetId === packet.packetId);
+  if (idx === -1) {
+    packets.push(packet);
+  } else {
+    packets[idx] = packet;
+  }
+  // Soft cap so the KV blob doesn't grow unbounded.
+  if (packets.length > 500) packets.splice(0, packets.length - 500);
+  await kv.set(KV_RECEIPT_REVIEW_PACKETS, packets);
+  return packet;
+}
+
+/** Read a single packet by id. Returns `null` if not present. */
+export async function getReceiptReviewPacket(
+  packetId: string,
+): Promise<ReceiptReviewPacket | null> {
+  const packets =
+    (await kv.get<ReceiptReviewPacket[]>(KV_RECEIPT_REVIEW_PACKETS)) || [];
+  return packets.find((p) => p.packetId === packetId) ?? null;
+}
+
+/** List packets, most-recent-first by `createdAt`. Bounded by `limit`
+ *  (default 50; max 500). */
+export async function listReceiptReviewPackets(opts: {
+  limit?: number;
+} = {}): Promise<ReceiptReviewPacket[]> {
+  const limit = Math.max(1, Math.min(500, opts.limit ?? 50));
+  const packets =
+    (await kv.get<ReceiptReviewPacket[]>(KV_RECEIPT_REVIEW_PACKETS)) || [];
+  return [...packets]
+    .sort(
+      (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt),
+    )
+    .slice(0, limit);
 }
 
 export async function listReceipts(

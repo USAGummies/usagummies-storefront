@@ -61,7 +61,7 @@ Current active lane at the time this runway was refreshed:
 - `/ops/finance/review` is read-only and aggregates finance review queues.
 - `/ops/ap-packets` has dashboard, template drafts, and AP packet send-on-approve.
 - `/api/ops/upload` writes durable docs to Drive when Drive parent env is configured.
-- Receipts intake is review-first. Phase 7 attaches a *suggestion* envelope (`ocr_suggestion`) to each receipt via auth-gated `POST /api/ops/docs/receipt/ocr` — extraction is review-only; status stays `needs_review`; canonical fields are NOT auto-filled; no QBO write path was added. QBO posting remains a future Rene-gated lane.
+- Receipts intake is review-first. Phase 7 attaches a *suggestion* envelope (`ocr_suggestion`) to each receipt via auth-gated `POST /api/ops/docs/receipt/ocr` — extraction is review-only; status stays `needs_review`; canonical fields are NOT auto-filled; no QBO write path was added. QBO posting remains a future Rene-gated lane. Phase 8 adds auth-gated `POST /api/ops/docs/receipt/promote-review` which produces a draft Rene approval *packet* (canonical + OCR side-by-side, eligibility rubric, missing-slug taxonomy disclosure) — no Slack approval is opened (no `receipt.review.promote` slug in the taxonomy yet); receipt status + canonical fields are still preserved; idempotent.
 
 ### Fulfillment / Shipping
 
@@ -162,12 +162,19 @@ Potential code only if smoke fails:
 
 ### Lane B — Receipt-to-Rene approval promotion
 
-Goal: turn a reviewed receipt + OCR suggestion into a Rene approval packet. This is still not a QBO posting lane.
+Phase 8 done at `260eab8 → next`. Promotion produces a draft review
+*packet* (canonical + OCR side-by-side, eligibility rubric, missing-
+slug taxonomy disclosure). No Slack approval is opened — the
+canonical taxonomy has no `receipt.review.promote` slug, and the
+fail-closed rule forbids inventing one. Next sub-lane: register
+`receipt.review.promote` in `contracts/approval-taxonomy.md` +
+`src/lib/ops/control-plane/taxonomy.ts`, then extend the route to
+open a Class B Rene approval when `eligibility.ok` is true.
 
 Boundary:
 
-- OCR/extraction can prepare suggestions. Done in Phase 7.
-- Promotion creates a review/approval packet only.
+- OCR/extraction prepares suggestions. ✅ Done (Phase 7).
+- Promotion creates a draft review packet. ✅ Done (Phase 8).
 - QBO posting remains a separate Rene-approved Class B/C action.
 - Do not auto-create bills, expenses, vendors, or categories.
 - Do not overwrite canonical receipt fields without explicit reviewer action.
