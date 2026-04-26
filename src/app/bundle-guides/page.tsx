@@ -1,9 +1,19 @@
-import Link from "next/link";
-import Image from "next/image";
+// /bundle-guides — index page in LP design language listing bag-count guides.
+// Structure: PageHero → ScarcityBar → OccasionBagPicker (client) → Guide grid
+// → ThreePromises → GuaranteeBlock → bottom CTA. ItemList + Breadcrumb
+// JSON-LD preserved for SEO.
+
 import type { Metadata } from "next";
+import Link from "next/link";
+
+import { PageHero } from "@/components/lp/PageHero";
+import { ScarcityBar } from "@/components/lp/ScarcityBar";
+import { ThreePromises } from "@/components/lp/ThreePromises";
+import { GuaranteeBlock } from "@/components/lp/GuaranteeBlock";
+import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
+
 import { OccasionBagPicker } from "@/components/guides/OccasionBagPicker.client";
 import { OCCASION_BAG_OPTIONS } from "@/data/occasionBagOptions";
-import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 import { getBundleVariants } from "@/lib/bundles/getBundleVariants";
 import { LatestFromBlog } from "@/components/blog/LatestFromBlog";
 
@@ -58,7 +68,7 @@ const GUIDES = [
   {
     href: "/patriotic-candy",
     title: "Patriotic candy gifts",
-    description: "American made candy gifts for July 4th, Veterans Day, and America 250.",
+    description: "American-made candy gifts for July 4th, Veterans Day, and America 250.",
   },
   {
     href: "/bulk-gummy-bears",
@@ -88,92 +98,119 @@ export default async function BundleGuidesPage() {
   const singleBagVariantId = bundleVariants?.singleBagVariantId;
 
   return (
-    <main className="relative overflow-hidden text-[var(--text)] min-h-screen pb-16">
-      <section className="mx-auto max-w-6xl px-4 py-8 lg:py-10">
-        <BreadcrumbJsonLd
-          items={[
-            { name: "Home", href: "/" },
-            { name: "Bag count guides", href: "/bundle-guides" },
-          ]}
-        />
-        <div className="candy-panel rounded-[36px] p-5 sm:p-6">
-          <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
-            <div>
-              <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-                Bag count guides
-              </div>
-              <h1 className="mt-2 text-3xl font-black text-[var(--text)] sm:text-4xl">
-                Find the right USA Gummies bag count
-              </h1>
-              <p className="mt-2 text-sm text-[var(--muted)] sm:text-base max-w-prose">
-                Use these guides to match bag count to the moment. Choose a gift bag count, plan party
-                snacks, or order bulk gummy bears for teams and events.
-              </p>
-            </div>
-            <div className="relative">
-              <div className="relative rounded-3xl border border-[var(--border)] bg-white p-2 shadow-[0_18px_44px_rgba(15,27,45,0.12)]">
-                <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-[var(--border)] bg-white">
-                  <Image
-                    src="/Hero-pack.jpeg"
-                    alt="USA Gummies gummy bear bag"
-                    fill
-                    sizes="(max-width: 768px) 90vw, 420px"
-                    className="object-contain"
-                  />
-                </div>
-              </div>
-            </div>
+    <main>
+      <BreadcrumbJsonLd
+        items={[
+          { name: "Home", href: "/" },
+          { name: "Bag count guides", href: "/bundle-guides" },
+        ]}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListJsonLd) }}
+      />
+
+      <PageHero
+        eyebrow="Bag Count Guides"
+        headline="Find the right"
+        scriptAccent="bag count."
+        sub="Match bag count to the moment. Choose a gift bag count, plan party snacks, or order bulk gummy bears for teams and events."
+        ctas={[
+          { href: "/shop#bundle-pricing", label: "Shop now" },
+          { href: "/faq", label: "Bag count FAQ", variant: "light" },
+        ]}
+      />
+
+      <ScarcityBar />
+
+      {/* Bag picker */}
+      <section className="bg-[var(--lp-cream-soft)] border-y-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[1100px] px-5 py-14 sm:px-8 sm:py-20">
+          <div className="mb-10 text-center">
+            <p className="lp-label mb-2 text-[var(--lp-red)]">★ Pick Your Occasion ★</p>
+            <h2 className="lp-display text-[clamp(2rem,5vw,3.2rem)] text-[var(--lp-ink)]">
+              Built for gifting,
+              <br />
+              <span className="lp-script text-[var(--lp-red)]">parties &amp; bulk.</span>
+            </h2>
           </div>
-          <div className="mt-5">
+          <div
+            className="border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-5 sm:p-7"
+            style={{ boxShadow: "5px 5px 0 var(--lp-red)" }}
+          >
             <OccasionBagPicker
               options={OCCASION_BAG_OPTIONS}
               defaultKey="gift"
               singleBagVariantId={singleBagVariantId}
             />
           </div>
+        </div>
+      </section>
 
-          <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {GUIDES.map((guide) => (
+      {/* Guide grid */}
+      <section className="bg-[var(--lp-cream)]">
+        <div className="mx-auto max-w-[1200px] px-5 py-14 sm:px-8 sm:py-20">
+          <div className="mb-10 text-center">
+            <p className="lp-label mb-2 text-[var(--lp-red)]">★ The Guides ★</p>
+            <h2 className="lp-display text-[clamp(2rem,5vw,3.2rem)] text-[var(--lp-ink)]">
+              Pick the path
+              <br />
+              <span className="lp-script text-[var(--lp-red)]">that fits.</span>
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {GUIDES.map((guide, i) => (
               <Link
                 key={guide.href}
                 href={guide.href}
-                className="rounded-2xl border border-[rgba(15,27,45,0.12)] bg-white p-4 hover:border-[rgba(15,27,45,0.22)] hover:shadow-[0_14px_30px_rgba(15,27,45,0.12)]"
+                className="border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-5 sm:p-6 transition-transform hover:-translate-y-0.5"
+                style={{ boxShadow: i === 0 ? "5px 5px 0 var(--lp-red)" : "5px 5px 0 var(--lp-ink)" }}
               >
-                <div className="text-sm font-black text-[var(--text)]">{guide.title}</div>
-                <div className="mt-2 text-xs text-[var(--muted)]">{guide.description}</div>
-                <div className="mt-3 text-xs font-semibold text-[var(--navy)]">
-                  View guide {"->"}
-                </div>
+                <h3 className="lp-display text-[1.25rem] leading-tight text-[var(--lp-ink)] sm:text-[1.4rem]">
+                  {guide.title}
+                </h3>
+                <p className="lp-sans mt-3 text-[0.95rem] leading-[1.55] text-[var(--lp-ink)]/82">
+                  {guide.description}
+                </p>
+                <span className="lp-label mt-4 block text-[var(--lp-red)]">View guide →</span>
               </Link>
             ))}
           </div>
-
-          <div className="mt-6 flex flex-wrap items-center gap-3">
-            <Link href="/shop#bundle-pricing" className="btn btn-candy">
-              Shop now
-            </Link>
-            <Link href="/faq" className="btn btn-outline">
-              Bag count FAQ
-            </Link>
-          </div>
-
-          <div className="mt-4 text-xs text-[var(--muted)]">
+          <p className="lp-sans mx-auto mt-10 max-w-[60ch] text-center text-[0.9rem] leading-[1.5] text-[var(--lp-ink)]/65">
             Made in the USA. No artificial dyes. Free shipping on 5+ bags.
-          </div>
+          </p>
         </div>
-
       </section>
 
-      <section className="bg-transparent">
-        <div className="mx-auto max-w-6xl px-4 pb-10">
+      <ThreePromises />
+      <GuaranteeBlock />
+
+      {/* Latest blog */}
+      <section className="bg-[var(--lp-cream)]">
+        <div className="mx-auto max-w-[1100px] px-5 py-14 sm:px-8 sm:py-16">
           <LatestFromBlog />
         </div>
       </section>
 
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListJsonLd) }}
-      />
+      {/* Bottom CTA */}
+      <section className="bg-[var(--lp-cream-soft)] border-t-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[900px] px-5 py-14 text-center sm:px-8 sm:py-16">
+          <p className="lp-label mb-3 text-[var(--lp-red)]">★ Pick &amp; Ship ★</p>
+          <h2 className="lp-display text-[clamp(2rem,5vw,3.2rem)] text-[var(--lp-ink)]">
+            Skip the guesswork,
+            <br />
+            <span className="lp-script text-[var(--lp-red)]">grab the bag.</span>
+          </h2>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+            <Link href="/shop#bundle-pricing" className="lp-cta">
+              Shop now
+            </Link>
+            <Link href="/faq" className="lp-cta lp-cta-light">
+              Bag count FAQ
+            </Link>
+          </div>
+        </div>
+      </section>
     </main>
   );
 }

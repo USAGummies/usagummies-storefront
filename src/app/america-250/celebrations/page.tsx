@@ -1,6 +1,15 @@
+// /america-250/celebrations — patriotic-celebration funnel page in LP design
+// language. Structure: PageHero → ScarcityBar → Celebration use-cases grid →
+// RealMomentsStrip → ThreePromises → bottom CTA.
+// BlogPosting + Breadcrumb JSON-LD preserved for SEO.
+
 import type { Metadata } from "next";
 import Link from "next/link";
-import Image from "next/image";
+
+import { PageHero } from "@/components/lp/PageHero";
+import { ScarcityBar } from "@/components/lp/ScarcityBar";
+import { ThreePromises } from "@/components/lp/ThreePromises";
+import { RealMomentsStrip } from "@/components/lp/RealMomentsStrip";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 import { BlogPostingJsonLd } from "@/components/seo/BlogPostingJsonLd";
 
@@ -45,68 +54,35 @@ export const metadata: Metadata = {
   },
 };
 
+const CELEBRATION_USES = [
+  {
+    title: "Party favor bowls",
+    body: "Drop a bag — or two — into a glass bowl on the parade table. Five natural flavors, no plastic-bright colors.",
+  },
+  {
+    title: "Parade snack packs",
+    body: "Grab-and-go pouches for kids, color-guard volunteers, and float crews waiting through the staging line.",
+  },
+  {
+    title: "Gift add-ons",
+    body: "Tuck a 7.5 oz bag into a thank-you gift, a baked-goods basket, or a town-celebration goody bag.",
+  },
+  {
+    title: "Road trip stash",
+    body: "America-250 is a road-trip year. Toss a few bags in the cooler — they ride well in cars, RVs, and tour buses.",
+  },
+];
+
 export default function America250CelebrationsPage() {
   return (
-    <main className="min-h-screen text-[var(--text)]">
-      <div className="mx-auto max-w-4xl px-4 py-14">
-        <BreadcrumbJsonLd
-          items={[
-            { name: "Home", href: "/" },
-            { name: "America 250", href: "/america-250" },
-            { name: "Celebrations", href: "/america-250/celebrations" },
-          ]}
-        />
-
-        <div className="mb-6">
-          <Link href="/america-250" className="text-sm text-[var(--muted)] hover:text-[var(--text)]">
-            Back to America 250
-          </Link>
-        </div>
-
-        <h1 className="text-4xl font-semibold tracking-tight">America 250 celebrations</h1>
-        <p className="mt-4 text-[var(--muted)]">
-          Built for parades, cookouts, road trips, and community events. Same premium gummies - just
-          curated and positioned for the moment.
-        </p>
-
-        <div className="mt-8 candy-panel rounded-3xl border border-[var(--border)] p-6">
-          <div className="grid gap-4 md:grid-cols-[1.1fr_0.9fr] md:items-center">
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
-                Celebration favorites
-              </div>
-              <h2 className="mt-2 text-2xl font-black text-[var(--text)]">
-                Built for cookouts, parade tables, and road trips.
-              </h2>
-              <ul className="mt-3 grid gap-2 text-sm text-[var(--muted)]">
-                <li>• Party favor bowls</li>
-                <li>• Parade snack packs</li>
-                <li>• Gift add-ons</li>
-                <li>• Road trip stash</li>
-              </ul>
-              <div className="mt-4 flex flex-wrap gap-3">
-                <Link href="/shop?campaign=america250#bundle-pricing" className="btn btn-candy">
-                  Shop celebration bundles
-                </Link>
-                <Link href="/patriotic-party-snacks" className="btn btn-outline">
-                  Party snack ideas
-                </Link>
-              </div>
-            </div>
-            <div className="relative">
-              <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-[var(--border)] bg-white p-3">
-                <Image
-                  src="/website%20assets/Jeep.png"
-                  alt="Vintage Jeep illustration"
-                  fill
-                  sizes="(max-width: 768px) 80vw, 240px"
-                  className="object-contain"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+    <main>
+      <BreadcrumbJsonLd
+        items={[
+          { name: "Home", href: "/" },
+          { name: "America 250", href: "/america-250" },
+          { name: "Celebrations", href: "/america-250/celebrations" },
+        ]}
+      />
 
       <BlogPostingJsonLd
         headline={PAGE_TITLE}
@@ -117,6 +93,76 @@ export default function America250CelebrationsPage() {
         dateModified={MODIFIED_DATE}
         publisherLogoUrl={`${SITE_URL}/brand/logo.png`}
       />
+
+      <PageHero
+        eyebrow="America 250 / Celebrations"
+        headline="Built for"
+        scriptAccent="the big one."
+        sub="Parades, cookouts, road trips, and community events. Same premium gummies — curated and positioned for the moment."
+        ctas={[
+          { href: "/shop?campaign=america250#bundle-pricing", label: "Shop celebration bundles" },
+          { href: "/patriotic-party-snacks", label: "Party snack ideas", variant: "light" },
+        ]}
+      />
+
+      <ScarcityBar />
+
+      {/* Celebration use-case grid */}
+      <section className="bg-[var(--lp-cream-soft)] border-y-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[1100px] px-5 py-14 sm:px-8 sm:py-20">
+          <div className="mb-10 text-center">
+            <p className="lp-label mb-2 text-[var(--lp-red)]">★ Celebration Favorites ★</p>
+            <h2 className="lp-display text-[clamp(2rem,5vw,3.2rem)] text-[var(--lp-ink)]">
+              Cookouts, parade tables,
+              <br />
+              <span className="lp-script text-[var(--lp-red)]">and road trips.</span>
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+            {CELEBRATION_USES.map((use, i) => (
+              <div
+                key={use.title}
+                className="border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-6 sm:p-7"
+                style={{ boxShadow: i === 0 ? "5px 5px 0 var(--lp-red)" : "5px 5px 0 var(--lp-ink)" }}
+              >
+                <h3 className="lp-display text-[1.4rem] leading-tight text-[var(--lp-ink)] sm:text-[1.6rem]">
+                  {use.title}
+                </h3>
+                <p className="lp-sans mt-3 text-[0.98rem] leading-[1.6] text-[var(--lp-ink)]/82">
+                  {use.body}
+                </p>
+              </div>
+            ))}
+          </div>
+          <p className="lp-sans mx-auto mt-10 max-w-[60ch] text-center text-[0.9rem] leading-[1.5] text-[var(--lp-ink)]/65">
+            Tip: <span className="font-semibold text-[var(--lp-ink)]">?campaign=america250</span> unlocks the patriotic naming on the shop page.
+          </p>
+        </div>
+      </section>
+
+      <RealMomentsStrip />
+
+      <ThreePromises />
+
+      {/* Bottom CTA */}
+      <section className="bg-[var(--lp-cream-soft)] border-t-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[900px] px-5 py-14 text-center sm:px-8 sm:py-16">
+          <p className="lp-label mb-3 text-[var(--lp-red)]">★ One Year, One Birthday ★</p>
+          <h2 className="lp-display text-[clamp(2rem,5vw,3.2rem)] text-[var(--lp-ink)]">
+            Make the moment
+            <br />
+            <span className="lp-script text-[var(--lp-red)]">taste right.</span>
+          </h2>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+            <Link href="/shop?campaign=america250#bundle-pricing" className="lp-cta">
+              Shop celebration bundles
+            </Link>
+            <Link href="/america-250" className="lp-cta lp-cta-light">
+              Back to America 250
+            </Link>
+          </div>
+        </div>
+      </section>
     </main>
   );
 }

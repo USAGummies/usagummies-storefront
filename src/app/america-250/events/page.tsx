@@ -1,6 +1,13 @@
+// /america-250/events — patriotic-event funnel page in LP design language.
+// Structure: PageHero → ScarcityBar → Event bundle-size grid → ThreePromises
+// → bottom CTA. BlogPosting + Breadcrumb JSON-LD preserved for SEO.
+
 import type { Metadata } from "next";
 import Link from "next/link";
-import Image from "next/image";
+
+import { PageHero } from "@/components/lp/PageHero";
+import { ScarcityBar } from "@/components/lp/ScarcityBar";
+import { ThreePromises } from "@/components/lp/ThreePromises";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 import { BlogPostingJsonLd } from "@/components/seo/BlogPostingJsonLd";
 
@@ -45,66 +52,34 @@ export const metadata: Metadata = {
   },
 };
 
+const EVENT_BUNDLES = [
+  {
+    title: "8 bags",
+    body: "Most popular for sharing tables. Enough to keep a parade booth or town-square pop-up stocked through the afternoon rush.",
+    badge: "Popular",
+  },
+  {
+    title: "12 bags",
+    body: "Best value for large groups, school events, parades, and multi-stop bus tours. Free shipping always.",
+    badge: "Best value",
+  },
+  {
+    title: "5 bags",
+    body: "Free-shipping minimum. Right-sized for tents, town meetings, and smaller crews.",
+    badge: "Free shipping",
+  },
+];
+
 export default function America250EventsPage() {
   return (
-    <main className="min-h-screen text-[var(--text)]">
-      <div className="mx-auto max-w-4xl px-4 py-14">
-        <BreadcrumbJsonLd
-          items={[
-            { name: "Home", href: "/" },
-            { name: "America 250", href: "/america-250" },
-            { name: "Events", href: "/america-250/events" },
-          ]}
-        />
-
-        <div className="mb-6">
-          <Link href="/america-250" className="text-sm text-[var(--muted)] hover:text-[var(--text)]">
-            Back to America 250
-          </Link>
-        </div>
-
-        <h1 className="text-4xl font-semibold tracking-tight">America 250 events</h1>
-        <p className="mt-4 text-[var(--muted)]">
-          A curated set of bundle sizes built for parades, community events, and patriotic gatherings.
-        </p>
-
-        <div className="mt-8 candy-panel rounded-3xl border border-[var(--border)] p-6">
-          <div className="grid gap-4 md:grid-cols-[1.1fr_0.9fr] md:items-center">
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
-                Event essentials
-              </div>
-              <h2 className="mt-2 text-2xl font-black text-[var(--text)]">
-                Built for teams, tents, and town squares.
-              </h2>
-              <ul className="mt-3 grid gap-2 text-sm text-[var(--muted)]">
-                <li>• 8 bags: most popular for sharing tables</li>
-                <li>• 12 bags: best value for large groups</li>
-                <li>• Free shipping on 5+ bags</li>
-              </ul>
-              <div className="mt-4 flex flex-wrap gap-3">
-                <Link href="/shop?campaign=america250#bundle-pricing" className="btn btn-candy">
-                  Shop event bundles
-                </Link>
-                <Link href="/bulk-gummy-bears" className="btn btn-outline">
-                  Bulk orders
-                </Link>
-              </div>
-            </div>
-            <div className="relative">
-              <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-[var(--border)] bg-white p-3">
-                <Image
-                  src="/website%20assets/Truck.png"
-                  alt="Delivery truck illustration"
-                  fill
-                  sizes="(max-width: 768px) 80vw, 240px"
-                  className="object-contain"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+    <main>
+      <BreadcrumbJsonLd
+        items={[
+          { name: "Home", href: "/" },
+          { name: "America 250", href: "/america-250" },
+          { name: "Events", href: "/america-250/events" },
+        ]}
+      />
 
       <BlogPostingJsonLd
         headline={PAGE_TITLE}
@@ -115,6 +90,74 @@ export default function America250EventsPage() {
         dateModified={MODIFIED_DATE}
         publisherLogoUrl={`${SITE_URL}/brand/logo.png`}
       />
+
+      <PageHero
+        eyebrow="America 250 / Events"
+        headline="Teams, tents,"
+        scriptAccent="and town squares."
+        sub="A curated set of bundle sizes built for parades, community events, and patriotic gatherings."
+        ctas={[
+          { href: "/shop?campaign=america250#bundle-pricing", label: "Shop event bundles" },
+          { href: "/bulk-gummy-bears", label: "Bulk orders", variant: "light" },
+        ]}
+      />
+
+      <ScarcityBar />
+
+      {/* Event bundle grid */}
+      <section className="bg-[var(--lp-cream-soft)] border-y-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[1100px] px-5 py-14 sm:px-8 sm:py-20">
+          <div className="mb-10 text-center">
+            <p className="lp-label mb-2 text-[var(--lp-red)]">★ Event Essentials ★</p>
+            <h2 className="lp-display text-[clamp(2rem,5vw,3.2rem)] text-[var(--lp-ink)]">
+              Pick the size
+              <br />
+              <span className="lp-script text-[var(--lp-red)]">that fits the crowd.</span>
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+            {EVENT_BUNDLES.map((bundle, i) => (
+              <div
+                key={bundle.title}
+                className="border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-6 sm:p-7"
+                style={{ boxShadow: i === 0 ? "5px 5px 0 var(--lp-red)" : "5px 5px 0 var(--lp-ink)" }}
+              >
+                <span className="lp-label inline-block border-2 border-[var(--lp-ink)] bg-[var(--lp-cream-soft)] px-3 py-1 text-[var(--lp-ink)]">
+                  {bundle.badge}
+                </span>
+                <h3 className="lp-display mt-4 text-[1.6rem] leading-tight text-[var(--lp-red)] sm:text-[1.9rem]">
+                  {bundle.title}
+                </h3>
+                <p className="lp-sans mt-3 text-[0.98rem] leading-[1.6] text-[var(--lp-ink)]/82">
+                  {bundle.body}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <ThreePromises />
+
+      {/* Bottom CTA */}
+      <section className="bg-[var(--lp-cream-soft)] border-t-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[900px] px-5 py-14 text-center sm:px-8 sm:py-16">
+          <p className="lp-label mb-3 text-[var(--lp-red)]">★ Plan Ahead ★</p>
+          <h2 className="lp-display text-[clamp(2rem,5vw,3.2rem)] text-[var(--lp-ink)]">
+            Stock the table
+            <br />
+            <span className="lp-script text-[var(--lp-red)]">before the parade starts.</span>
+          </h2>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+            <Link href="/shop?campaign=america250#bundle-pricing" className="lp-cta">
+              Shop event bundles
+            </Link>
+            <Link href="/america-250" className="lp-cta lp-cta-light">
+              Back to America 250
+            </Link>
+          </div>
+        </div>
+      </section>
     </main>
   );
 }

@@ -1,8 +1,20 @@
+// /america-250 — America 250 hub page in LP design language. Structure:
+// PageHero → ScarcityBar → Sub-hub grid (gifts/celebrations/events) →
+// Featured bundle pitch → Pillar context (brand + quick links) → Evergreen +
+// Event ideas grid → Search-intent block → FAQ accordion → ThreePromises →
+// GuaranteeBlock → bottom CTA. BlogPosting + FAQPage + Breadcrumb JSON-LD
+// preserved for SEO.
+
 import type { Metadata } from "next";
 import Link from "next/link";
-import Image from "next/image";
+
+import { PageHero } from "@/components/lp/PageHero";
+import { ScarcityBar } from "@/components/lp/ScarcityBar";
+import { ThreePromises } from "@/components/lp/ThreePromises";
+import { GuaranteeBlock } from "@/components/lp/GuaranteeBlock";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 import { BlogPostingJsonLd } from "@/components/seo/BlogPostingJsonLd";
+
 import { LatestFromBlog } from "@/components/blog/LatestFromBlog";
 
 function resolveSiteUrl() {
@@ -26,6 +38,55 @@ const PAGE_URL = `${SITE_URL}/america-250`;
 const OG_IMAGE = `${SITE_URL}/opengraph-image`;
 const PUBLISHED_DATE = "2026-01-01T15:10:31-08:00";
 const MODIFIED_DATE = "2026-02-05T22:32:05-08:00";
+
+const SUBHUBS = [
+  {
+    href: "/america-250/gifts",
+    title: "Gifts",
+    body: "Patriotic gummy gift ideas and bag options.",
+  },
+  {
+    href: "/america-250/celebrations",
+    title: "Celebrations",
+    body: "Party ideas, parade snacks, and shareable bag options.",
+  },
+  {
+    href: "/america-250/events",
+    title: "Events",
+    body: "Bundle sizes for parades, town squares, and community moments.",
+  },
+];
+
+const EVERGREEN = [
+  {
+    label: "Gummy gift bundles",
+    href: "/gummy-gift-bundles",
+    note: "Gift-forward bag-count picks for birthdays and team gifting.",
+  },
+  {
+    label: "Made-in-USA candy",
+    href: "/made-in-usa",
+    note: "USA-made favorites with the standard ingredient story.",
+  },
+  {
+    label: "Bulk gummy bears",
+    href: "/bulk-gummy-bears",
+    note: "Community tables, offices, and high-volume orders.",
+  },
+  {
+    label: "Patriotic party snacks",
+    href: "/patriotic-party-snacks",
+    note: "Sizing tips for July 4th and USA-themed events.",
+  },
+];
+
+const EVENTS = [
+  "Parades with route-day snack tables and grab-and-go candy.",
+  "Fireworks nights with picnic-ready gummy assortments.",
+  "School events where bagged treats keep tables stocked.",
+  "Community festivals that need easy shareable sweets.",
+  "Fundraisers that bundle candy for thank-you gifts.",
+];
 
 const FAQS = [
   {
@@ -79,259 +140,13 @@ export const metadata: Metadata = {
 
 export default function America250HubPage() {
   return (
-    <main className="min-h-screen text-[var(--text)]">
-      <div className="mx-auto max-w-4xl px-4 py-14">
-        <BreadcrumbJsonLd
-          items={[
-            { name: "Home", href: "/" },
-            { name: "America250", href: "/america-250" },
-          ]}
-        />
-
-        <div className="mb-6 flex items-center justify-between">
-          <Link href="/shop" className="text-sm text-[var(--muted)] hover:text-[var(--text)]">
-            Back to shop
-          </Link>
-          <Link href="/cart" className="text-sm text-[var(--muted)] hover:text-[var(--text)]">
-            View cart
-          </Link>
-        </div>
-
-        <div className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface-strong)] px-3 py-1 text-xs text-[var(--text)]">
-          <span className="font-semibold tracking-wide">AMERICA250 CANDY</span>
-          <span className="text-[var(--muted)]">•</span>
-          <span className="text-[var(--muted)]">Hub</span>
-        </div>
-
-        <h1 className="mt-4 text-4xl font-semibold tracking-tight">America250 Candy</h1>
-        <p className="mt-4 text-[var(--muted)]">
-          America250 celebration treats, gifts, and event-ready gummy bundles built for the 250th anniversary moment.
-        </p>
-        <p className="mt-3 text-sm text-[var(--muted)]">
-          USA Gummies is an America250 brand, creating shareable, USA-made gummy candy for community
-          gatherings, year-round gifting, and patriotic candy moments.
-        </p>
-        <p className="mt-3 text-sm text-[var(--muted)]">
-          Looking for America 250 candy for milestone celebrations? This hub maps America250 drops,
-          gifts, and planning guides.
-        </p>
-
-        <div className="mt-10 grid gap-4 md:grid-cols-3">
-          <Link
-            href="/america-250/gifts"
-            className="rounded-3xl border border-[var(--border)] bg-[var(--surface-strong)] p-6 hover:bg-white"
-          >
-            <div className="text-lg font-semibold">Gifts</div>
-            <div className="mt-2 text-sm text-[var(--muted)]">
-              Patriotic gummy gift ideas and bag options.
-            </div>
-          </Link>
-
-          <Link
-            href="/america-250/celebrations"
-            className="rounded-3xl border border-[var(--border)] bg-[var(--surface-strong)] p-6 hover:bg-white"
-          >
-            <div className="text-lg font-semibold">Celebrations</div>
-            <div className="mt-2 text-sm text-[var(--muted)]">
-              Party ideas, parade snacks, and shareable bag options.
-            </div>
-          </Link>
-
-          <Link
-            href="/america-250/events"
-            className="rounded-3xl border border-[var(--border)] bg-[var(--surface-strong)] p-6 hover:bg-white"
-          >
-            <div className="text-lg font-semibold">Events</div>
-            <div className="mt-2 text-sm text-[var(--muted)]">
-              A simple page to pair with event-focused content.
-            </div>
-          </Link>
-        </div>
-
-        <div className="mt-10 candy-panel rounded-3xl border border-[var(--border)] p-6">
-          <div className="grid gap-4 md:grid-cols-[1.3fr_0.7fr] md:items-center">
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
-                Featured bundle
-              </div>
-              <h2 className="mt-2 text-2xl font-black text-[var(--text)]">
-                America250 gifting, ready to share.
-              </h2>
-              <p className="mt-2 text-sm text-[var(--muted)]">
-                Our most popular bag counts for patriotic gifts, community events, and celebration tables.
-              </p>
-              <p className="mt-3 text-sm text-[var(--muted)]">Made in the USA. No artificial dyes.</p>
-              <div className="mt-4 flex flex-wrap gap-3">
-                <Link href="/shop?campaign=america250#bundle-pricing" className="btn btn-candy">
-                  Shop America 250
-                </Link>
-                <Link href="/gummy-gift-bundles" className="btn btn-outline">
-                  Gift bundles
-                </Link>
-              </div>
-              <p className="mt-3 text-xs text-[var(--muted)]">
-                Add <span className="font-semibold text-[var(--text)]">?campaign=america250</span> to any product page.
-              </p>
-            </div>
-            <div className="relative">
-              <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-[var(--border)] bg-white p-3">
-                <Image
-                  src="/Hero-pack.jpeg"
-                  alt="USA Gummies gummy bear bag"
-                  fill
-                  sizes="(max-width: 768px) 80vw, 240px"
-                  className="object-contain"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <section className="mt-12 rounded-3xl border border-[var(--border)] bg-[var(--surface-strong)] p-6">
-          <h2 className="text-2xl font-semibold tracking-tight text-[var(--text)]">
-            America250 candy for patriotic celebrations
-          </h2>
-          <p className="mt-3 text-sm text-[var(--muted)]">
-            This pillar page highlights America250 candy ideas, patriotic celebration treats, and
-            gift-ready gummy bags from USA Gummies. Explore evergreen gifting options and event-based
-            moments that keep your table, parade route, or community event stocked with red, white,
-            and blue energy.
-          </p>
-          <div className="mt-6 grid gap-4 md:grid-cols-2">
-            <div className="rounded-2xl border border-[var(--border)] bg-white p-5">
-              <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">
-                America250 brand
-              </div>
-              <p className="mt-2 text-sm text-[var(--muted)]">
-                USA Gummies celebrates America&apos;s 250th with curated gummy assortments, patriotic
-                packaging, and gifting formats that work for both small gatherings and large community
-                events.
-              </p>
-            </div>
-            <div className="rounded-2xl border border-[var(--border)] bg-white p-5">
-              <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">
-                Quick links
-              </div>
-              <p className="mt-2 text-sm text-[var(--muted)]">
-                Explore <Link href="/america-250/gifts" className="text-[var(--text)] underline">America250 gifts</Link>,
-                plan <Link href="/america-250/celebrations" className="text-[var(--text)] underline">patriotic celebrations</Link>,
-                or align with <Link href="/america-250/events" className="text-[var(--text)] underline">America250 events</Link>.
-              </p>
-              <p className="mt-2 text-sm text-[var(--muted)]">
-                Prefer dye-free gummies? Read{" "}
-                <Link href="/no-artificial-dyes-gummy-bears" className="text-[var(--text)] underline">
-                  Red 40 Free Gummies
-                </Link>
-                .
-              </p>
-              <p className="mt-2 text-sm text-[var(--muted)]">
-                Need a sourcing primer? See{" "}
-                <Link href="/made-in-usa-candy" className="text-[var(--text)] underline">
-                  Candy Made in the USA
-                </Link>
-                .
-              </p>
-            </div>
-          </div>
-        </section>
-
-        <section className="mt-10 grid gap-6 md:grid-cols-2">
-          <div className="rounded-3xl border border-[var(--border)] bg-white p-6">
-            <h2 className="text-xl font-semibold text-[var(--text)]">Evergreen America250 candy ideas</h2>
-            <p className="mt-3 text-sm text-[var(--muted)]">
-              Year-round options for gifting, team celebrations, classroom treats, and corporate
-              events that want an America250 theme with made in USA candy.
-            </p>
-            <ul className="mt-4 space-y-2 text-sm text-[var(--muted)]">
-              <li>
-                Gift-forward bundles inspired by <Link href="/gummy-gift-bundles" className="text-[var(--text)] underline">gummy gift bundles</Link> and{" "}
-                <Link href="/america-250/gifts" className="text-[var(--text)] underline">America250 gifting</Link>.
-              </li>
-              <li>
-                Made-in-USA favorites from <Link href="/made-in-usa" className="text-[var(--text)] underline">USA-made candy</Link> collections.
-              </li>
-              <li>
-                Bulk-friendly options for community tables and offices via <Link href="/bulk-gummy-bears" className="text-[var(--text)] underline">bulk gummy bears</Link>.
-              </li>
-              <li>
-                Patriotic snack inspiration in <Link href="/patriotic-party-snacks" className="text-[var(--text)] underline">patriotic party snacks</Link>.
-              </li>
-            </ul>
-          </div>
-
-          <div className="rounded-3xl border border-[var(--border)] bg-white p-6">
-            <h2 className="text-xl font-semibold text-[var(--text)]">Event-based patriotic celebration treats</h2>
-            <p className="mt-3 text-sm text-[var(--muted)]">
-              Seasonal and event-driven candy moments that map naturally to America250 planning and
-              patriotic festivities.
-            </p>
-            <ul className="mt-4 space-y-2 text-sm text-[var(--muted)]">
-              <li>
-                parades with route-day snack tables and grab-and-go candy.
-              </li>
-              <li>
-                fireworks nights with picnic-ready gummy assortments.
-              </li>
-              <li>
-                school events where bagged treats keep tables stocked.
-              </li>
-              <li>
-                community festivals that need easy shareable sweets.
-              </li>
-              <li>
-                fundraisers that bundle candy for thank-you gifts.
-              </li>
-            </ul>
-          </div>
-        </section>
-
-        <section className="mt-10 rounded-3xl border border-[var(--border)] bg-[var(--surface-strong)] p-6">
-          <h2 className="text-xl font-semibold text-[var(--text)]">America250 candy search intent, covered</h2>
-          <p className="mt-3 text-sm text-[var(--muted)]">
-            Looking for America250 candy ideas, patriotic celebration treats, or America250 gifts? This
-            hub connects the most requested ideas with USA Gummies products and planning guides.
-            Explore the linked pages above or shop directly from the America250 bundle lineup.
-          </p>
-        </section>
-
-        <section className="mt-10 rounded-3xl border border-[var(--border)] bg-white p-6">
-          <h2 className="text-xl font-semibold text-[var(--text)]">America250 candy FAQs</h2>
-          <div className="mt-4 space-y-4 text-sm text-[var(--muted)]">
-            <div>
-              <h3 className="text-base font-semibold text-[var(--text)]">What is America250 candy?</h3>
-              <p className="mt-2">
-                America250 candy refers to celebration-ready gummy assortments designed for the 250th
-                anniversary moment and year-round gifting.
-              </p>
-            </div>
-            <div>
-              <h3 className="text-base font-semibold text-[var(--text)]">
-                Are USA Gummies products made in the USA?
-              </h3>
-              <p className="mt-2">
-                Yes. We produce and pack our gummies in the United States for consistent quality and
-                faster turnaround.
-              </p>
-            </div>
-            <div>
-              <h3 className="text-base font-semibold text-[var(--text)]">
-                Which celebrations are these bundles best for?
-              </h3>
-              <p className="mt-2">
-                They are built for community gatherings, team gifting, and milestone moments where
-                shareable bags keep tables stocked.
-              </p>
-            </div>
-          </div>
-        </section>
-      </div>
-
-      <section className="bg-transparent">
-        <div className="mx-auto max-w-6xl px-4 pb-10">
-          <LatestFromBlog />
-        </div>
-      </section>
-
+    <main>
+      <BreadcrumbJsonLd
+        items={[
+          { name: "Home", href: "/" },
+          { name: "America250", href: "/america-250" },
+        ]}
+      />
       <BlogPostingJsonLd
         headline={PAGE_TITLE}
         description={PAGE_DESCRIPTION}
@@ -342,6 +157,263 @@ export default function America250HubPage() {
         publisherLogoUrl={`${SITE_URL}/brand/logo.png`}
       />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
+
+      <PageHero
+        eyebrow="America 250 / Hub"
+        headline="America250"
+        scriptAccent="candy."
+        sub="Celebration treats, gifts, and event-ready gummy bundles built for the 250th anniversary moment — and shareable, USA-made gummy candy for the everyday in between."
+        ctas={[
+          { href: "/shop?campaign=america250#bundle-pricing", label: "Shop America 250" },
+          { href: "/gummy-gift-bundles", label: "Gift bundles", variant: "light" },
+        ]}
+      />
+
+      <ScarcityBar />
+
+      {/* Sub-hubs */}
+      <section className="bg-[var(--lp-cream-soft)] border-y-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[1100px] px-5 py-14 sm:px-8 sm:py-20">
+          <div className="mb-10 text-center">
+            <p className="lp-label mb-2 text-[var(--lp-red)]">★ The Hub ★</p>
+            <h2 className="lp-display text-[clamp(2rem,5vw,3.2rem)] text-[var(--lp-ink)]">
+              Three paths
+              <br />
+              <span className="lp-script text-[var(--lp-red)]">to the bag.</span>
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+            {SUBHUBS.map((hub, i) => (
+              <Link
+                key={hub.href}
+                href={hub.href}
+                className="border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-6 sm:p-7 transition-transform hover:-translate-y-0.5"
+                style={{ boxShadow: i === 0 ? "5px 5px 0 var(--lp-red)" : "5px 5px 0 var(--lp-ink)" }}
+              >
+                <h3 className="lp-display text-[1.6rem] leading-tight text-[var(--lp-red)] sm:text-[1.8rem]">
+                  {hub.title}
+                </h3>
+                <p className="lp-sans mt-3 text-[0.98rem] leading-[1.6] text-[var(--lp-ink)]/82">
+                  {hub.body}
+                </p>
+                <span className="lp-label mt-4 block text-[var(--lp-red)]">Explore →</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Featured pitch */}
+      <section className="bg-[var(--lp-cream)]">
+        <div className="mx-auto max-w-[1100px] px-5 py-14 sm:px-8 sm:py-20">
+          <div className="mb-10 text-center">
+            <p className="lp-label mb-2 text-[var(--lp-red)]">★ Featured Bundle ★</p>
+            <h2 className="lp-display text-[clamp(2rem,5vw,3.2rem)] text-[var(--lp-ink)]">
+              America 250 gifting,
+              <br />
+              <span className="lp-script text-[var(--lp-red)]">ready to share.</span>
+            </h2>
+          </div>
+          <div
+            className="border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-6 sm:p-8"
+            style={{ boxShadow: "5px 5px 0 var(--lp-red)" }}
+          >
+            <p className="lp-sans text-[1.05rem] leading-[1.7] text-[var(--lp-ink)]/85">
+              Our most popular bag counts for patriotic gifts, community events, and celebration tables.
+              Made in the USA. No artificial dyes.
+            </p>
+            <p className="lp-sans mt-3 text-[0.9rem] leading-[1.5] text-[var(--lp-ink)]/65">
+              Add <span className="font-semibold text-[var(--lp-ink)]">?campaign=america250</span> to any product page to unlock the patriotic naming.
+            </p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Link href="/shop?campaign=america250#bundle-pricing" className="lp-cta">
+                Shop America 250
+              </Link>
+              <Link href="/gummy-gift-bundles" className="lp-cta lp-cta-light">
+                Gift bundles
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Pillar — brand + quick links */}
+      <section className="bg-[var(--lp-cream-soft)] border-y-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[1100px] px-5 py-14 sm:px-8 sm:py-20">
+          <div className="mb-10 text-center">
+            <p className="lp-label mb-2 text-[var(--lp-red)]">★ The Pillar ★</p>
+            <h2 className="lp-display text-[clamp(2rem,5vw,3.2rem)] text-[var(--lp-ink)]">
+              America 250 candy
+              <br />
+              <span className="lp-script text-[var(--lp-red)]">for patriotic celebrations.</span>
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+            <div
+              className="border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-6"
+              style={{ boxShadow: "4px 4px 0 var(--lp-red)" }}
+            >
+              <p className="lp-label mb-2 text-[var(--lp-red)]">★ America 250 Brand ★</p>
+              <p className="lp-sans text-[1rem] leading-[1.65] text-[var(--lp-ink)]/85">
+                USA Gummies celebrates America&rsquo;s 250th with curated gummy assortments, patriotic packaging,
+                and gifting formats that work for both small gatherings and large community events.
+              </p>
+            </div>
+            <div
+              className="border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-6"
+              style={{ boxShadow: "4px 4px 0 var(--lp-ink)" }}
+            >
+              <p className="lp-label mb-2 text-[var(--lp-red)]">★ Quick Links ★</p>
+              <p className="lp-sans text-[1rem] leading-[1.65] text-[var(--lp-ink)]/85">
+                Explore <Link href="/america-250/gifts" className="underline decoration-[var(--lp-red)] underline-offset-2">America250 gifts</Link>, plan{" "}
+                <Link href="/america-250/celebrations" className="underline decoration-[var(--lp-red)] underline-offset-2">patriotic celebrations</Link>, or align with{" "}
+                <Link href="/america-250/events" className="underline decoration-[var(--lp-red)] underline-offset-2">America250 events</Link>.
+              </p>
+              <p className="lp-sans mt-3 text-[1rem] leading-[1.65] text-[var(--lp-ink)]/85">
+                Prefer dye-free? Read{" "}
+                <Link href="/no-artificial-dyes-gummy-bears" className="underline decoration-[var(--lp-red)] underline-offset-2">Red 40 Free Gummies</Link>.
+                Need a sourcing primer? See{" "}
+                <Link href="/made-in-usa-candy" className="underline decoration-[var(--lp-red)] underline-offset-2">Candy Made in the USA</Link>.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Evergreen + Event lists */}
+      <section className="bg-[var(--lp-cream)]">
+        <div className="mx-auto max-w-[1100px] px-5 py-14 sm:px-8 sm:py-20">
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+            <div
+              className="border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-6 sm:p-7"
+              style={{ boxShadow: "4px 4px 0 var(--lp-red)" }}
+            >
+              <p className="lp-label mb-2 text-[var(--lp-red)]">★ Evergreen Ideas ★</p>
+              <h3 className="lp-display text-[1.5rem] leading-tight text-[var(--lp-ink)]">
+                Year-round patriotic candy moments.
+              </h3>
+              <p className="lp-sans mt-2 text-[0.95rem] leading-[1.6] text-[var(--lp-ink)]/82">
+                Gifting, team celebrations, classroom treats, and corporate events that want an
+                America 250 theme with made-in-USA candy.
+              </p>
+              <ul className="mt-4 grid gap-3">
+                {EVERGREEN.map((item) => (
+                  <li key={item.href} className="flex items-start gap-3">
+                    <span className="lp-display mt-1 text-[1.2rem] leading-none text-[var(--lp-red)]">★</span>
+                    <span className="lp-sans text-[0.95rem] leading-[1.55] text-[var(--lp-ink)]/85">
+                      <Link
+                        href={item.href}
+                        className="font-semibold underline decoration-[var(--lp-red)] underline-offset-2"
+                      >
+                        {item.label}
+                      </Link>{" "}
+                      — {item.note}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div
+              className="border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-6 sm:p-7"
+              style={{ boxShadow: "4px 4px 0 var(--lp-ink)" }}
+            >
+              <p className="lp-label mb-2 text-[var(--lp-red)]">★ Event-Based ★</p>
+              <h3 className="lp-display text-[1.5rem] leading-tight text-[var(--lp-ink)]">
+                Patriotic celebration treats.
+              </h3>
+              <p className="lp-sans mt-2 text-[0.95rem] leading-[1.6] text-[var(--lp-ink)]/82">
+                Seasonal and event-driven candy moments that map naturally to America 250 planning.
+              </p>
+              <ul className="mt-4 grid gap-3">
+                {EVENTS.map((item) => (
+                  <li key={item} className="flex items-start gap-3">
+                    <span className="lp-display mt-1 text-[1.2rem] leading-none text-[var(--lp-red)]">★</span>
+                    <span className="lp-sans text-[0.95rem] leading-[1.55] text-[var(--lp-ink)]/85">{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Search intent */}
+      <section className="bg-[var(--lp-cream-soft)] border-y-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[900px] px-5 py-14 text-center sm:px-8 sm:py-16">
+          <p className="lp-label mb-2 text-[var(--lp-red)]">★ Search Intent, Covered ★</p>
+          <h2 className="lp-display text-[clamp(2rem,5vw,3.2rem)] text-[var(--lp-ink)]">
+            All the ideas
+            <br />
+            <span className="lp-script text-[var(--lp-red)]">in one place.</span>
+          </h2>
+          <p className="lp-sans mx-auto mt-6 max-w-[60ch] text-[1rem] leading-[1.6] text-[var(--lp-ink)]/85">
+            Looking for America 250 candy ideas, patriotic celebration treats, or America 250 gifts?
+            This hub connects the most-requested ideas with USA Gummies products and planning guides.
+          </p>
+        </div>
+      </section>
+
+      {/* FAQ */}
+      <section className="bg-[var(--lp-cream)]">
+        <div className="mx-auto max-w-[900px] px-5 py-14 sm:px-8 sm:py-20">
+          <div className="mb-10 text-center">
+            <p className="lp-label mb-2 text-[var(--lp-red)]">★ America 250 FAQs ★</p>
+            <h2 className="lp-display text-[clamp(2rem,5vw,3.2rem)] text-[var(--lp-ink)]">
+              Quick answers
+              <br />
+              <span className="lp-script text-[var(--lp-red)]">about the moment.</span>
+            </h2>
+          </div>
+          <div className="space-y-3">
+            {FAQS.map((item, i) => (
+              <details
+                key={item.question}
+                className="group border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] px-5 py-4"
+                style={{ boxShadow: i === 0 ? "4px 4px 0 var(--lp-red)" : "4px 4px 0 var(--lp-ink)" }}
+              >
+                <summary className="flex cursor-pointer items-center justify-between gap-3 lp-display text-[1.05rem] leading-snug text-[var(--lp-ink)]">
+                  <span>{item.question}</span>
+                  <span className="text-[var(--lp-red)] transition-transform group-open:rotate-45">+</span>
+                </summary>
+                <div className="lp-sans mt-3 text-[0.98rem] leading-[1.6] text-[var(--lp-ink)]/82">
+                  {item.answer}
+                </div>
+              </details>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <ThreePromises />
+      <GuaranteeBlock />
+
+      {/* Latest blog */}
+      <section className="bg-[var(--lp-cream)]">
+        <div className="mx-auto max-w-[1100px] px-5 py-14 sm:px-8 sm:py-16">
+          <LatestFromBlog />
+        </div>
+      </section>
+
+      {/* Bottom CTA */}
+      <section className="bg-[var(--lp-cream-soft)] border-t-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[900px] px-5 py-14 text-center sm:px-8 sm:py-16">
+          <p className="lp-label mb-3 text-[var(--lp-red)]">★ Make 250 Taste Right ★</p>
+          <h2 className="lp-display text-[clamp(2rem,5vw,3.2rem)] text-[var(--lp-ink)]">
+            One year,
+            <br />
+            <span className="lp-script text-[var(--lp-red)]">one big birthday.</span>
+          </h2>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+            <Link href="/shop?campaign=america250#bundle-pricing" className="lp-cta">
+              Shop America 250
+            </Link>
+            <Link href="/america-250/gifts" className="lp-cta lp-cta-light">
+              Gift options
+            </Link>
+          </div>
+        </div>
+      </section>
     </main>
   );
 }

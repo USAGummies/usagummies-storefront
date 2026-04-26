@@ -1,6 +1,13 @@
+// /america-250/gifts — patriotic-gift funnel page in LP design language.
+// Structure: PageHero → ScarcityBar → Gift bundle picks → ThreePromises →
+// bottom CTA. BlogPosting + Breadcrumb JSON-LD preserved for SEO.
+
 import type { Metadata } from "next";
 import Link from "next/link";
-import Image from "next/image";
+
+import { PageHero } from "@/components/lp/PageHero";
+import { ScarcityBar } from "@/components/lp/ScarcityBar";
+import { ThreePromises } from "@/components/lp/ThreePromises";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 import { BlogPostingJsonLd } from "@/components/seo/BlogPostingJsonLd";
 
@@ -45,72 +52,34 @@ export const metadata: Metadata = {
   },
 };
 
+const GIFT_BUNDLES = [
+  {
+    title: "5 bags",
+    body: "Easy gift with free shipping. Right-sized for thank-yous, hostess gifts, and care packages.",
+    badge: "Free shipping",
+  },
+  {
+    title: "8 bags",
+    body: "Most popular for hosting and sharing. The bag-count people pick when they want to look generous without overdoing it.",
+    badge: "Most popular",
+  },
+  {
+    title: "12 bags",
+    body: "Stock-up size for office gifting, party tables, and group thank-you orders. Free shipping included.",
+    badge: "Stock-up",
+  },
+];
+
 export default function America250GiftsPage() {
   return (
-    <main className="min-h-screen text-[var(--text)]">
-      <div className="mx-auto max-w-4xl px-4 py-14">
-        <BreadcrumbJsonLd
-          items={[
-            { name: "Home", href: "/" },
-            { name: "America 250", href: "/america-250" },
-            { name: "Gifts", href: "/america-250/gifts" },
-          ]}
-        />
-
-        <div className="mb-6 flex items-center justify-between">
-          <Link href="/america-250" className="text-sm text-[var(--muted)] hover:text-[var(--text)]">
-            Back to America 250
-          </Link>
-          <Link href="/shop" className="text-sm text-[var(--muted)] hover:text-[var(--text)]">
-            Shop now
-          </Link>
-        </div>
-
-        <h1 className="text-4xl font-semibold tracking-tight">America 250 gifts</h1>
-        <p className="mt-4 text-[var(--muted)]">
-          Simple, gift-ready bag options with an Americana feel and built to show up looking premium.
-        </p>
-
-        <div className="mt-8 candy-panel rounded-3xl border border-[var(--border)] p-6">
-          <div className="grid gap-4 md:grid-cols-[1.2fr_0.8fr] md:items-center">
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
-                Gift-ready picks
-              </div>
-              <h2 className="mt-2 text-2xl font-black text-[var(--text)]">
-                Built for thank-yous, care packages, and celebrations.
-              </h2>
-              <ul className="mt-3 grid gap-2 text-sm text-[var(--muted)]">
-                <li>• 5 bags: easy gift with free shipping</li>
-                <li>• 8 bags: most popular for hosting + sharing</li>
-                <li>• 12 bags: stock-up / party table</li>
-              </ul>
-              <div className="mt-4 flex flex-wrap gap-3">
-                <Link href="/shop?campaign=america250#bundle-pricing" className="btn btn-candy">
-                  Shop gift bundles
-                </Link>
-                <Link href="/gummy-gift-bundles" className="btn btn-outline">
-                  Gift guides
-                </Link>
-              </div>
-              <p className="mt-3 text-xs text-[var(--muted)]">
-                Tip: Use <span className="font-semibold text-[var(--text)]">?campaign=america250</span> for the special naming mode.
-              </p>
-            </div>
-            <div className="relative">
-              <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-[var(--border)] bg-white p-3">
-                <Image
-                  src="/website%20assets/Jeep.png"
-                  alt="Vintage Jeep illustration"
-                  fill
-                  sizes="(max-width: 768px) 80vw, 240px"
-                  className="object-contain"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+    <main>
+      <BreadcrumbJsonLd
+        items={[
+          { name: "Home", href: "/" },
+          { name: "America 250", href: "/america-250" },
+          { name: "Gifts", href: "/america-250/gifts" },
+        ]}
+      />
 
       <BlogPostingJsonLd
         headline={PAGE_TITLE}
@@ -121,6 +90,77 @@ export default function America250GiftsPage() {
         dateModified={MODIFIED_DATE}
         publisherLogoUrl={`${SITE_URL}/brand/logo.png`}
       />
+
+      <PageHero
+        eyebrow="America 250 / Gifts"
+        headline="Thank-yous, care packages,"
+        scriptAccent="and celebrations."
+        sub="Simple, gift-ready bag options with an Americana feel — built to show up looking premium."
+        ctas={[
+          { href: "/shop?campaign=america250#bundle-pricing", label: "Shop gift bundles" },
+          { href: "/gummy-gift-bundles", label: "Gift guides", variant: "light" },
+        ]}
+      />
+
+      <ScarcityBar />
+
+      {/* Gift bundle grid */}
+      <section className="bg-[var(--lp-cream-soft)] border-y-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[1100px] px-5 py-14 sm:px-8 sm:py-20">
+          <div className="mb-10 text-center">
+            <p className="lp-label mb-2 text-[var(--lp-red)]">★ Gift-Ready Picks ★</p>
+            <h2 className="lp-display text-[clamp(2rem,5vw,3.2rem)] text-[var(--lp-ink)]">
+              Easy gifts.
+              <br />
+              <span className="lp-script text-[var(--lp-red)]">Real candy.</span>
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+            {GIFT_BUNDLES.map((bundle, i) => (
+              <div
+                key={bundle.title}
+                className="border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-6 sm:p-7"
+                style={{ boxShadow: i === 0 ? "5px 5px 0 var(--lp-red)" : "5px 5px 0 var(--lp-ink)" }}
+              >
+                <span className="lp-label inline-block border-2 border-[var(--lp-ink)] bg-[var(--lp-cream-soft)] px-3 py-1 text-[var(--lp-ink)]">
+                  {bundle.badge}
+                </span>
+                <h3 className="lp-display mt-4 text-[1.6rem] leading-tight text-[var(--lp-red)] sm:text-[1.9rem]">
+                  {bundle.title}
+                </h3>
+                <p className="lp-sans mt-3 text-[0.98rem] leading-[1.6] text-[var(--lp-ink)]/82">
+                  {bundle.body}
+                </p>
+              </div>
+            ))}
+          </div>
+          <p className="lp-sans mx-auto mt-10 max-w-[60ch] text-center text-[0.9rem] leading-[1.5] text-[var(--lp-ink)]/65">
+            Tip: <span className="font-semibold text-[var(--lp-ink)]">?campaign=america250</span> unlocks the patriotic naming on the shop page.
+          </p>
+        </div>
+      </section>
+
+      <ThreePromises />
+
+      {/* Bottom CTA */}
+      <section className="bg-[var(--lp-cream-soft)] border-t-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[900px] px-5 py-14 text-center sm:px-8 sm:py-16">
+          <p className="lp-label mb-3 text-[var(--lp-red)]">★ Send the Bag ★</p>
+          <h2 className="lp-display text-[clamp(2rem,5vw,3.2rem)] text-[var(--lp-ink)]">
+            Ship a gift
+            <br />
+            <span className="lp-script text-[var(--lp-red)]">they&rsquo;ll actually open.</span>
+          </h2>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+            <Link href="/shop?campaign=america250#bundle-pricing" className="lp-cta">
+              Shop gift bundles
+            </Link>
+            <Link href="/america-250" className="lp-cta lp-cta-light">
+              Back to America 250
+            </Link>
+          </div>
+        </div>
+      </section>
     </main>
   );
 }
