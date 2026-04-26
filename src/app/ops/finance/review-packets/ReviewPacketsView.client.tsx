@@ -163,6 +163,29 @@ interface AuditFeedResponse {
   reason?: string;
 }
 
+// Phase 26 — lazy permalink resolver. Fetches the per-packet route
+// (which already returns approvalStatus etc) and pulls the
+// permalink. One network round trip per user click; never invented
+// when null. Returns null on any failure path so the click handler
+// can fall back to a no-op without throwing.
+async function fetchPacketPermalink(
+  packetId: string,
+): Promise<string | null> {
+  try {
+    const res = await fetch(
+      `/api/ops/docs/receipt-review-packets/${encodeURIComponent(packetId)}`,
+      { method: "GET", cache: "no-store" },
+    );
+    if (!res.ok) return null;
+    const body = (await res.json()) as { permalink?: string | null };
+    return typeof body.permalink === "string" && body.permalink.length > 0
+      ? body.permalink
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 async function fetchAuditFeed(
   limit = 10,
 ): Promise<{ entries: AuditFeedRow[]; err: string | null }> {
@@ -811,6 +834,51 @@ export function ReviewPacketsView() {
                         <span style={{ color: RED, fontSize: 11 }}>
                           — {entry.errorMessage}
                         </span>
+                      )}
+                      {/* Phase 26 — Open thread link. Lazy: clicks
+                       *   trigger a per-packet route fetch that
+                       *   resolves the Slack permalink. NEVER
+                       *   renders for rows without a packetId
+                       *   (closer-error-no-id rows). When the
+                       *   resolver returns null (degraded mode /
+                       *   network error), the click is a no-op and
+                       *   the button label flips to "Unavailable".
+                       *   No fabricated URLs. */}
+                      {entry.packetId && (
+                        <button
+                          type="button"
+                          onClick={async (e) => {
+                            const btn = e.currentTarget;
+                            const originalLabel = btn.textContent ?? "";
+                            btn.textContent = "Resolving…";
+                            btn.disabled = true;
+                            const url = await fetchPacketPermalink(
+                              entry.packetId!,
+                            );
+                            btn.disabled = false;
+                            if (url) {
+                              btn.textContent = originalLabel;
+                              window.open(url, "_blank", "noopener,noreferrer");
+                            } else {
+                              btn.textContent = "Unavailable";
+                              setTimeout(() => {
+                                btn.textContent = originalLabel;
+                              }, 2000);
+                            }
+                          }}
+                          style={{
+                            fontSize: 10,
+                            padding: "1px 6px",
+                            borderRadius: 3,
+                            border: `1px solid ${BORDER}`,
+                            background: "#fff",
+                            color: NAVY,
+                            cursor: "pointer",
+                          }}
+                          title="Open the Slack thread for this approval"
+                        >
+                          Open thread →
+                        </button>
                       )}
                       <span
                         style={{

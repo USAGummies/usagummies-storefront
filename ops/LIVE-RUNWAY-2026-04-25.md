@@ -162,7 +162,19 @@ Potential code only if smoke fails:
 
 ### Lane B — Receipt-to-Rene approval promotion
 
-Phases 7-25 done. Phase 25 adds a "Recent activity" sub-card
+Phases 7-26 done. Phase 26 adds "Open thread →" buttons to the
+Phase 25 "Recent activity" sub-card — operators jump from a closer
+transition row to the Slack thread for that decision in one click.
+Lazy resolution: one round trip per click via the existing
+per-packet route (which now also returns `permalink: string | null`
+via Phase 12's `getPermalink`). NEVER fabricates URLs; flips to
+"Unavailable" when getPermalink returns null or throws. NEVER
+called when no approval matches OR when `slackThread.ts` is missing
+(saves wasted round trips). With Phase 25 + 26 stacked, the
+dashboard can fully replace "switching to Slack to see what's
+happening" for routine queue-management.
+
+Phase 25 adds a "Recent activity" sub-card
 between the counts strip and the table — operators see the
 last 10 closer transitions (`✅ pkt-belma… approved · 5m ago`,
 `❌ pkt-uline… rejected · 12m ago`, `⚠️ pkt-bad… closer error
@@ -237,6 +249,7 @@ Boundary:
 - ID-substring search on dashboard. ✅ Done (Phase 23).
 - Cache freshness indicator on dashboard. ✅ Done (Phase 24).
 - Recent activity audit feed sub-card. ✅ Done (Phase 25).
+- Audit feed click-through to Slack threads. ✅ Done (Phase 26).
 - **PARKED:** `qbo.bill.create` entry — STOP-AND-ASK on the
   QBO-write boundary. Blocked on Rene's chart-of-accounts mapping
   (per-category vs per-vendor account-default scheme). Slack draft
