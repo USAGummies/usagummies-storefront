@@ -171,3 +171,143 @@ describe("read-only contract — no forbidden imports", () => {
     expect(src).not.toMatch(/export\s+(async\s+)?function\s+(POST|PUT|DELETE|PATCH)/);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 15 — server-side filtering via canonical helper
+// ---------------------------------------------------------------------------
+
+describe("Phase 15 — server-side filtering", () => {
+  beforeEach(() => isAuthorizedMock.mockResolvedValue(true));
+
+  async function seedThreePackets() {
+    const r1 = await processReceipt({
+      source_url: "https://example.com/belmark.jpg",
+      source_channel: "test",
+      vendor: "Belmark Inc",
+      date: "2026-04-15",
+      amount: 250,
+      category: "supplies",
+    });
+    const r2 = await processReceipt({
+      source_url: "https://example.com/uline.jpg",
+      source_channel: "test",
+      vendor: "Uline",
+      date: "2026-04-22",
+      amount: 50,
+      category: "supplies",
+    });
+    const r3 = await processReceipt({
+      source_url: "https://example.com/albanese.jpg",
+      source_channel: "test",
+      vendor: "Albanese",
+      date: "2026-04-23",
+      amount: 1200,
+      category: "supplies",
+    });
+    await requestReceiptReviewPromotion(r1.id);
+    await requestReceiptReviewPromotion(r2.id);
+    await requestReceiptReviewPromotion(r3.id);
+    return { r1, r2, r3 };
+  }
+
+  it("no filter params → returns all packets, filterApplied=false", async () => {
+    await seedThreePackets();
+    const res = await GET(makeReq());
+    const body = (await res.json()) as {
+      count: number;
+      totalBeforeFilter: number;
+      filterApplied: boolean;
+      packets: Array<{ packetId: string }>;
+    };
+    expect(body.count).toBe(3);
+    expect(body.totalBeforeFilter).toBe(3);
+    expect(body.filterApplied).toBe(false);
+  });
+
+  it("vendor query param narrows packets server-side", async () => {
+    await seedThreePackets();
+    const res = await GET(
+      makeReq("/api/ops/docs/receipt-review-packets?vendor=belmark"),
+    );
+    const body = (await res.json()) as {
+      count: number;
+      totalBeforeFilter: number;
+      filterApplied: boolean;
+      packets: Array<{ canonical: { vendor: string | null } }>;
+    };
+    expect(body.filterApplied).toBe(true);
+    expect(body.count).toBe(1);
+    expect(body.totalBeforeFilter).toBe(3);
+    expect(body.packets[0].canonical.vendor).toMatch(/Belmark/i);
+  });
+
+  it("status query param narrows by packet status", async () => {
+    await seedThreePackets();
+    const res = await GET(
+      makeReq("/api/ops/docs/receipt-review-packets?status=draft"),
+    );
+    const body = (await res.json()) as { count: number };
+    expect(body.count).toBe(3); // all three are draft until closer runs
+  });
+
+  it("status=all is treated as no filter (filterApplied=false)", async () => {
+    await seedThreePackets();
+    const res = await GET(
+      makeReq("/api/ops/docs/receipt-review-packets?status=all"),
+    );
+    const body = (await res.json()) as {
+      filterApplied: boolean;
+      count: number;
+    };
+    expect(body.filterApplied).toBe(false);
+    expect(body.count).toBe(3);
+  });
+
+  it("createdAfter / createdBefore narrow the date range", async () => {
+    await seedThreePackets();
+    // All three packets were created roughly now (in test env). Use a
+    // far-future createdAfter to filter them all out.
+    const res = await GET(
+      makeReq(
+        "/api/ops/docs/receipt-review-packets?createdAfter=2099-01-01",
+      ),
+    );
+    const body = (await res.json()) as { count: number };
+    expect(body.count).toBe(0);
+  });
+
+  it("server filter is bit-identical to the client helper for the same input", async () => {
+    const { r1, r2, r3 } = await seedThreePackets();
+    void r1; void r2; void r3;
+    // Pull the canonical client helper + run it against the same KV
+    // seed. The server's response packetIds must match.
+    const { listReceiptReviewPackets } = await import("@/lib/ops/docs");
+    const { filterPacketsBySpec } = await import(
+      "@/app/ops/finance/review-packets/data"
+    );
+    const allPackets = await listReceiptReviewPackets({ limit: 100 });
+    const clientFiltered = filterPacketsBySpec(allPackets, {
+      vendorContains: "belmark",
+    });
+
+    const res = await GET(
+      makeReq("/api/ops/docs/receipt-review-packets?vendor=belmark"),
+    );
+    const body = (await res.json()) as { packets: Array<{ packetId: string }> };
+    expect(body.packets.map((p) => p.packetId).sort()).toEqual(
+      clientFiltered.map((p) => p.packetId).sort(),
+    );
+  });
+
+  it("unknown query params are ignored (URL tracking compatibility)", async () => {
+    await seedThreePackets();
+    const res = await GET(
+      makeReq(
+        "/api/ops/docs/receipt-review-packets?utm_source=slack&random=foo",
+      ),
+    );
+    const body = (await res.json()) as { count: number; filterApplied: boolean };
+    expect(body.count).toBe(3);
+    expect(body.filterApplied).toBe(false);
+  });
+});

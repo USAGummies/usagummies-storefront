@@ -17,6 +17,7 @@ import {
   buildReviewPacketsView,
   formatAmountCell,
   formatVendorCell,
+  reviewPacketsFilterSpecToQuery,
   type ReviewPacketRowStatus,
   type ReviewPacketStatusColor,
   type ReviewPacketsFilterSpec,
@@ -31,23 +32,40 @@ const PILL_COLOR: Record<ReviewPacketStatusColor, string> = {
   red: RED,
 };
 
+// Phase 15 — bounded passive poll. 60s × 10 = 10 min worst case.
+// Locked by the no-noisy-poll discipline used in Phase 12's
+// per-row poll. Operator interactions (filter change / manual
+// refresh) reset the bound; failures stop the poll silently.
+const POLL_INTERVAL_MS = 60_000;
+const POLL_MAX_TICKS = 10;
+
 interface ListResponse {
   ok?: boolean;
   count?: number;
+  /** Phase 15 — count BEFORE the server-side filter; helps the
+   *  operator see "filter narrowed N → M". Optional for backwards
+   *  compat with older route versions. */
+  totalBeforeFilter?: number;
+  /** Phase 15 — true when the route applied any filter. */
+  filterApplied?: boolean;
   packets?: ReceiptReviewPacket[];
   error?: string;
   reason?: string;
 }
 
-async function fetchPackets(): Promise<{
+async function fetchPackets(
+  spec: ReviewPacketsFilterSpec = {},
+): Promise<{
   view: ReviewPacketsViewShape | null;
   err: string | null;
 }> {
   try {
-    const res = await fetch("/api/ops/docs/receipt-review-packets?limit=200", {
-      method: "GET",
-      cache: "no-store",
-    });
+    const params = reviewPacketsFilterSpecToQuery(spec);
+    params.set("limit", "200");
+    const res = await fetch(
+      `/api/ops/docs/receipt-review-packets?${params.toString()}`,
+      { method: "GET", cache: "no-store" },
+    );
     let body: ListResponse | null = null;
     try {
       body = (await res.json()) as ListResponse;
@@ -124,23 +142,9 @@ export function ReviewPacketsView() {
     Record<string, "loading" | "ok" | { error: string }>
   >({});
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    void fetchPackets().then((r) => {
-      if (cancelled) return;
-      setView(r.view);
-      setErr(r.err);
-      setLoading(false);
-      setRepromote({}); // fresh load → drop stale per-row pills
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [refreshKey]);
-
-  // Pure derivation: applyReviewPacketsFilters runs every render.
-  // The helper is tested at the data.ts boundary so we trust it.
+  // Filter spec captured before the fetch effect so the effect can
+  // pass it to the route. Memoized so identity stays stable when
+  // unrelated state changes — prevents fetch loops.
   const filterSpec: ReviewPacketsFilterSpec = useMemo(
     () => ({
       status: filterStatus,
@@ -150,6 +154,52 @@ export function ReviewPacketsView() {
     }),
     [filterStatus, filterVendor, filterAfter, filterBefore],
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    void fetchPackets(filterSpec).then((r) => {
+      if (cancelled) return;
+      setView(r.view);
+      setErr(r.err);
+      setLoading(false);
+      setRepromote({}); // fresh load → drop stale per-row pills
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshKey, filterSpec]);
+
+  // Phase 15 — bounded passive poll. Refreshes the list every
+  // POLL_INTERVAL_MS for at most POLL_MAX_TICKS ticks (10 min total
+  // at default 60s × 10). Operator interactions reset the poll
+  // (filter change → effect above re-fires; manual refresh →
+  // refreshKey increments). On any failure or a final tick, the
+  // poll stops silently. Bounded by design — matches Phase 12's
+  // per-row poll discipline so the client stays cheap and
+  // predictable.
+  useEffect(() => {
+    let ticks = 0;
+    let cancelled = false;
+    const id = setInterval(() => {
+      if (cancelled) return;
+      ticks += 1;
+      setRefreshKey((k) => k + 1);
+      if (ticks >= POLL_MAX_TICKS) clearInterval(id);
+    }, POLL_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+    // Re-arm whenever the filter changes (fresh user interaction).
+    // refreshKey is intentionally NOT a dep — that would create a
+    // tight loop with the increment inside the interval.
+  }, [filterSpec]);
+
+  // Defensive client-side filter belt. Server pre-filters via the
+  // same canonical helper, so this re-application is a no-op on
+  // already-filtered data — but it keeps the rendered view honest
+  // even if a route version skews ahead of the client.
   const filteredView = useMemo(() => {
     if (!view) return null;
     return applyReviewPacketsFilters(view, filterSpec);

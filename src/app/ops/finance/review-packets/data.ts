@@ -272,3 +272,124 @@ function parseFilterDate(value: string | undefined): number | null {
   const ms = Date.parse(trimmed);
   return Number.isFinite(ms) ? ms : null;
 }
+
+// ---------------------------------------------------------------------------
+// Phase 15 — query-string parser (server-safe, no React imports)
+// ---------------------------------------------------------------------------
+//
+// Pure adapter that turns a `URLSearchParams` (or any object with a
+// `.get(name): string | null` method) into a `ReviewPacketsFilterSpec`.
+// The list route (`GET /api/ops/docs/receipt-review-packets`) calls
+// this server-side so client and server share the SAME filter
+// semantics — no parallel implementations.
+//
+// Hard rules:
+//   - Reads ONLY `status`, `vendor`, `createdAfter`, `createdBefore`.
+//   - Unknown / extra params are ignored (defensive — operator URLs
+//     can carry tracking params without affecting the filter).
+//   - `status` accepts `all | draft | rene-approved | rejected`.
+//     Anything else collapses to `undefined` (= no filter via the
+//     canonical helper's defensive default).
+//   - Empty / whitespace-only `vendor` / dates → omitted from the
+//     spec entirely so the canonical helper's "empty = no filter"
+//     branch fires.
+
+const STATUS_VALUES: Array<ReviewPacketRowStatus | "all"> = [
+  "all",
+  "draft",
+  "rene-approved",
+  "rejected",
+];
+
+interface QueryReader {
+  get(name: string): string | null;
+}
+
+export function parseReviewPacketsFilterSpec(
+  query: QueryReader,
+): ReviewPacketsFilterSpec {
+  const spec: ReviewPacketsFilterSpec = {};
+  const rawStatus = query.get("status");
+  if (rawStatus !== null) {
+    const candidate = rawStatus.trim();
+    if (
+      (STATUS_VALUES as string[]).includes(candidate)
+    ) {
+      spec.status = candidate as ReviewPacketRowStatus | "all";
+    }
+  }
+  const rawVendor = query.get("vendor");
+  if (typeof rawVendor === "string" && rawVendor.trim().length > 0) {
+    spec.vendorContains = rawVendor;
+  }
+  const rawAfter = query.get("createdAfter");
+  if (typeof rawAfter === "string" && rawAfter.trim().length > 0) {
+    spec.createdAfter = rawAfter;
+  }
+  const rawBefore = query.get("createdBefore");
+  if (typeof rawBefore === "string" && rawBefore.trim().length > 0) {
+    spec.createdBefore = rawBefore;
+  }
+  return spec;
+}
+
+/**
+ * Inverse of `parseReviewPacketsFilterSpec`. Builds a
+ * `URLSearchParams` payload from a spec. Used by the client view to
+ * encode the operator's filters into the list-route URL so the
+ * server can pre-filter for larger datasets.
+ *
+ * Rules:
+ *   - `status: "all"` (or undefined) → omitted (default at server).
+ *   - Empty / whitespace-only string fields → omitted.
+ *   - Other fields → added as `URLSearchParams` entries.
+ */
+export function reviewPacketsFilterSpecToQuery(
+  spec: ReviewPacketsFilterSpec,
+): URLSearchParams {
+  const params = new URLSearchParams();
+  if (spec.status && spec.status !== "all") {
+    params.set("status", spec.status);
+  }
+  if (
+    typeof spec.vendorContains === "string" &&
+    spec.vendorContains.trim().length > 0
+  ) {
+    params.set("vendor", spec.vendorContains.trim());
+  }
+  if (
+    typeof spec.createdAfter === "string" &&
+    spec.createdAfter.trim().length > 0
+  ) {
+    params.set("createdAfter", spec.createdAfter.trim());
+  }
+  if (
+    typeof spec.createdBefore === "string" &&
+    spec.createdBefore.trim().length > 0
+  ) {
+    params.set("createdBefore", spec.createdBefore.trim());
+  }
+  return params;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 15 — server-side filter (operates on raw packets)
+// ---------------------------------------------------------------------------
+
+/**
+ * Apply the canonical filter spec to a raw packet list. Used
+ * server-side by the list route. Internally projects through
+ * `buildReviewPacketsView` + `applyReviewPacketsFilters` so the
+ * server's filter behavior is bit-identical to the client's. The
+ * matching packets are returned in the same order they came in
+ * (the route returns raw packets; the client re-derives the view).
+ */
+export function filterPacketsBySpec(
+  packets: ReceiptReviewPacket[],
+  spec: ReviewPacketsFilterSpec,
+): ReceiptReviewPacket[] {
+  const view = buildReviewPacketsView(packets);
+  const filtered = applyReviewPacketsFilters(view, spec);
+  const allowed = new Set(filtered.rows.map((r) => r.packetId));
+  return packets.filter((p) => allowed.has(p.packetId));
+}

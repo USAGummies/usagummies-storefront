@@ -18,8 +18,11 @@ import { describe, expect, it } from "vitest";
 import {
   applyReviewPacketsFilters,
   buildReviewPacketsView,
+  filterPacketsBySpec,
   formatAmountCell,
   formatVendorCell,
+  parseReviewPacketsFilterSpec,
+  reviewPacketsFilterSpecToQuery,
 } from "../data";
 import { buildReceiptReviewPacket } from "@/lib/ops/receipt-review-packet";
 import type { ReceiptReviewPacket } from "@/lib/ops/receipt-review-packet";
@@ -568,5 +571,189 @@ describe("applyReviewPacketsFilters", () => {
       createdAfter: "2026-04-01",
     });
     expect(filtered.rows.length).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 15 — query-string parsing + serialization + lockstep filter
+// ---------------------------------------------------------------------------
+
+describe("parseReviewPacketsFilterSpec", () => {
+  function q(pairs: Record<string, string>): URLSearchParams {
+    return new URLSearchParams(pairs);
+  }
+
+  it("empty params → empty spec", () => {
+    expect(parseReviewPacketsFilterSpec(q({}))).toEqual({});
+  });
+
+  it("known status values pass through", () => {
+    expect(parseReviewPacketsFilterSpec(q({ status: "draft" }))).toEqual({
+      status: "draft",
+    });
+    expect(parseReviewPacketsFilterSpec(q({ status: "rene-approved" }))).toEqual(
+      { status: "rene-approved" },
+    );
+    expect(parseReviewPacketsFilterSpec(q({ status: "rejected" }))).toEqual({
+      status: "rejected",
+    });
+    expect(parseReviewPacketsFilterSpec(q({ status: "all" }))).toEqual({
+      status: "all",
+    });
+  });
+
+  it("unknown status → omitted (defensive — collapses to no filter)", () => {
+    const spec = parseReviewPacketsFilterSpec(q({ status: "fubar" }));
+    expect(spec.status).toBeUndefined();
+  });
+
+  it("vendor / dates parse through verbatim", () => {
+    const spec = parseReviewPacketsFilterSpec(
+      q({
+        vendor: "Belmark",
+        createdAfter: "2026-04-01",
+        createdBefore: "2026-04-30",
+      }),
+    );
+    expect(spec).toEqual({
+      vendorContains: "Belmark",
+      createdAfter: "2026-04-01",
+      createdBefore: "2026-04-30",
+    });
+  });
+
+  it("empty / whitespace string params are omitted from the spec", () => {
+    const spec = parseReviewPacketsFilterSpec(
+      q({ vendor: "   ", createdAfter: "", createdBefore: " \t " }),
+    );
+    expect(spec.vendorContains).toBeUndefined();
+    expect(spec.createdAfter).toBeUndefined();
+    expect(spec.createdBefore).toBeUndefined();
+  });
+
+  it("ignores unknown / extra params (URL tracking compatibility)", () => {
+    const spec = parseReviewPacketsFilterSpec(
+      q({ utm_source: "slack", limit: "200", random: "x" }),
+    );
+    expect(spec).toEqual({});
+  });
+});
+
+describe("reviewPacketsFilterSpecToQuery", () => {
+  it("empty spec → empty params", () => {
+    expect(reviewPacketsFilterSpecToQuery({}).toString()).toBe("");
+  });
+
+  it('status: "all" omits the param (route default)', () => {
+    expect(
+      reviewPacketsFilterSpecToQuery({ status: "all" }).toString(),
+    ).toBe("");
+  });
+
+  it("status non-default → set", () => {
+    expect(
+      reviewPacketsFilterSpecToQuery({ status: "rene-approved" }).toString(),
+    ).toContain("status=rene-approved");
+  });
+
+  it("trims string fields before serializing", () => {
+    const params = reviewPacketsFilterSpecToQuery({
+      vendorContains: "  Belmark  ",
+      createdAfter: " 2026-04-01 ",
+    });
+    expect(params.get("vendor")).toBe("Belmark");
+    expect(params.get("createdAfter")).toBe("2026-04-01");
+  });
+
+  it("empty / whitespace string fields are omitted", () => {
+    const params = reviewPacketsFilterSpecToQuery({
+      vendorContains: "   ",
+      createdAfter: "",
+    });
+    expect(params.get("vendor")).toBeNull();
+    expect(params.get("createdAfter")).toBeNull();
+  });
+
+  it("round-trip: parse(serialize(spec)) === spec for typical inputs", () => {
+    const original: import("../data").ReviewPacketsFilterSpec = {
+      status: "draft",
+      vendorContains: "Belmark",
+      createdAfter: "2026-04-01",
+      createdBefore: "2026-04-30",
+    };
+    const params = reviewPacketsFilterSpecToQuery(original);
+    expect(parseReviewPacketsFilterSpec(params)).toEqual(original);
+  });
+});
+
+describe("filterPacketsBySpec — lockstep with applyReviewPacketsFilters", () => {
+  function fixture() {
+    return [
+      buildReceiptReviewPacket(
+        mkReceipt({
+          id: "r-belmark",
+          vendor: "Belmark Inc",
+          date: "2026-04-15",
+          amount: 250,
+          category: "supplies",
+        }),
+        { now: new Date("2026-04-15T00:00:00Z") },
+      ),
+      buildReceiptReviewPacket(
+        mkReceipt({
+          id: "r-uline",
+          vendor: "Uline",
+          date: "2026-04-22",
+          amount: 50,
+          category: "supplies",
+        }),
+        { now: new Date("2026-04-22T00:00:00Z") },
+      ),
+    ];
+  }
+
+  it("returns the SAME packetIds that applyReviewPacketsFilters keeps", () => {
+    const packets = fixture();
+    const view = buildReviewPacketsView(packets);
+    const spec = { vendorContains: "belmark" };
+    const clientFiltered = applyReviewPacketsFilters(view, spec);
+    const serverFiltered = filterPacketsBySpec(packets, spec);
+    expect(serverFiltered.map((p) => p.packetId).sort()).toEqual(
+      clientFiltered.rows.map((r) => r.packetId).sort(),
+    );
+  });
+
+  it("preserves input order (route returns raw packets — client re-derives view)", () => {
+    const packets = fixture();
+    const filtered = filterPacketsBySpec(packets, {});
+    expect(filtered.map((p) => p.packetId)).toEqual(
+      packets.map((p) => p.packetId),
+    );
+  });
+
+  it("does not mutate the input packets array", () => {
+    const packets = fixture();
+    const before = JSON.stringify(packets);
+    filterPacketsBySpec(packets, { status: "draft" });
+    expect(JSON.stringify(packets)).toBe(before);
+  });
+
+  it("excluding all → empty array (no fabrication)", () => {
+    expect(
+      filterPacketsBySpec(fixture(), {
+        vendorContains: "no-such-vendor-anywhere",
+      }),
+    ).toEqual([]);
+  });
+
+  it("pure: same input + same spec → same output", () => {
+    const packets = fixture();
+    const spec = {
+      status: "draft" as const,
+      vendorContains: "belmark",
+    };
+    const a = filterPacketsBySpec(packets, spec);
+    const b = filterPacketsBySpec(packets, spec);
+    expect(a).toEqual(b);
   });
 });
