@@ -23,11 +23,20 @@ const GA4_ID = process.env.NEXT_PUBLIC_GA4_ID?.trim() || "G-31X673PSVY";
 // Google Ads customer 775-414-2374 (account tied to ben@usagummies.com).
 // AW-* remarketing tag = customer ID without dashes. Safe default so the base
 // tag fires even if Vercel env is empty — enables audiences, view-through
-// conversions, and enhanced-conversion payloads immediately. The conversion
-// LABEL must still be set via NEXT_PUBLIC_GOOGLE_ADS_CONVERSION_LABEL for
-// purchase events to register as a specific conversion action.
+// conversions, and enhanced-conversion payloads immediately.
 const GOOGLE_ADS_ID = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID?.trim() || "AW-7754142374";
-const GOOGLE_ADS_CONVERSION_LABEL = process.env.NEXT_PUBLIC_GOOGLE_ADS_CONVERSION_LABEL?.trim() || "";
+// Conversion-event send_to — created in Google Ads UI on 2026-04-25 as
+// "USAG Web Purchase" (Manual code, Purchase category, Every count, 90-day
+// click-through, Data-driven attribution, Primary action). Note the AW
+// prefix (17658867475) differs from the account-level remarketing tag
+// above (7754142374) — Google Ads issues a unique conversion-action AW
+// per event, distinct from the base account tag, and PurchaseTracker
+// should fire `gtag('event','conversion',{send_to:<this full string>})`.
+// Hardcoded as a fallback so it works without the Vercel env var (the
+// value is public anyway — it's inlined into HTML for every visitor).
+const GOOGLE_ADS_CONVERSION_SEND_TO =
+  process.env.NEXT_PUBLIC_GOOGLE_ADS_CONVERSION_SEND_TO?.trim() ||
+  "AW-17658867475/DvHdCO3n7KIcEJPes-RB";
 const GOOGLE_SITE_VERIFICATION = process.env.NEXT_PUBLIC_GSC_VERIFICATION?.trim();
 const META_PIXEL_ID = "26033875762978520";
 // Microsoft Clarity project for usagummies.com. Safe default so session
@@ -57,7 +66,7 @@ function GoogleAnalytics() {
             },
           });
           ${GOOGLE_ADS_ID ? `gtag('config', '${GOOGLE_ADS_ID}', { allow_enhanced_conversions: true });` : ""}
-          ${GOOGLE_ADS_ID && GOOGLE_ADS_CONVERSION_LABEL ? `window.__usaGadsConversionId = '${GOOGLE_ADS_ID}/${GOOGLE_ADS_CONVERSION_LABEL}';` : ""}
+          ${GOOGLE_ADS_CONVERSION_SEND_TO ? `window.__usaGadsConversionId = '${GOOGLE_ADS_CONVERSION_SEND_TO}';` : ""}
         `}
       </Script>
     </>
