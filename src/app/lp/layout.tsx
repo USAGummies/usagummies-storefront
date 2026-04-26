@@ -1,8 +1,7 @@
 // /lp/* — scoped layout for paid-traffic landing pages.
-// Fonts now flow from the root layout (Zuume + Rosseville canonical, Anton
-// + Inter + Allison fallbacks until the licensed files are dropped into
-// `public/fonts/`). The LP scope keeps its own CSS so layout components
-// can rely on the LP-specific tokens (--lp-ink, --lp-red, --lp-cream).
+// Fonts flow from the root layout (Anton / Inter / Allison — canonical
+// brand stack). The LP scope keeps its own CSS so layout components can
+// rely on the LP-specific tokens (--lp-ink, --lp-red, --lp-cream).
 import type { Metadata, Viewport } from "next";
 import "@/styles/lp.css";
 

@@ -1,36 +1,12 @@
 @import "tailwindcss";
 
-/* ─────────────────────────────────────────────────────────────────────
- * Brand typography — Zuume (headliner) + Rosseville (script accent).
- * Both are commercial fonts. Once licensed font files are dropped into
- * `public/fonts/zuume/` and `public/fonts/rosseville/`, uncomment the
- * @font-face blocks below to activate them. Until then, the font-family
- * stacks below resolve to the Google Fonts fallbacks loaded in
- * `src/app/layout.tsx` (Anton / Inter / Allison).
- *
- * Required files:
- *   public/fonts/zuume/Zuume-Variable.woff2   (variable, 100–900)
- *   public/fonts/rosseville/Rosseville.woff2  (single weight)
- *
- * Replace `/fonts/...` paths if you license a different filename.
- * ──────────────────────────────────────────────────────────────────── */
-
-/*
-@font-face {
-  font-family: "Zuume";
-  src: url("/fonts/zuume/Zuume-Variable.woff2") format("woff2-variations");
-  font-weight: 100 900;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Rosseville";
-  src: url("/fonts/rosseville/Rosseville.woff2") format("woff2");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-*/
+/* Brand typography (locked 2026-04-25):
+ *   Anton    via --font-display — headlines, hero display, h1/h2/h3
+ *   Inter    via --font-sans    — body, UI, paragraphs
+ *   Allison  via --font-script  — script accent (10–30% sparingly)
+ * All three are loaded as Google Fonts via `next/font/google` in
+ * `src/app/layout.tsx`. See `src/app/layout.tsx` for the full
+ * declaration including weight ranges. */
 
 :root {
   /* Brand palette — matches /go landing page design language */
@@ -126,7 +102,7 @@ body {
     linear-gradient(180deg, #fbf9f5 0%, #f4efe6 100%);
   background-attachment: fixed;
   color: var(--text, #1c2430);
-  font-family: "Zuume", var(--font-sans, system-ui, -apple-system, sans-serif);
+  font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
   letter-spacing: -0.01em;
   line-height: 1.6;
   text-rendering: optimizeLegibility;
@@ -145,7 +121,7 @@ h1,
 h2,
 h3,
 .font-display {
-  font-family: "Zuume", var(--font-display, var(--font-sans, system-ui, -apple-system, sans-serif));
+  font-family: var(--font-display, var(--font-sans, system-ui, -apple-system, sans-serif));
   letter-spacing: -0.02em;
   text-transform: uppercase;
 }
@@ -154,7 +130,7 @@ h2{ line-height: 1.12; font-weight: 800; }
 h3{ line-height: 1.18; font-weight: 700; }
 p{ line-height: 1.65; }
 .font-script{
-  font-family: "Rosseville", var(--font-script, cursive);
+  font-family: var(--font-script, cursive);
   letter-spacing: 0;
   text-transform: none;
 }
@@ -662,7 +638,7 @@ a:focus-visible:not(.btn):not(.focus-ring),
   background: #c7362c;
   color: #ffffff;
   border-radius: 12px;
-  font-family: "Zuume", var(--font-display), 'Anton', sans-serif;
+  font-family: var(--font-display), 'Anton', sans-serif;
   letter-spacing: 1px;
   box-shadow: 0 4px 12px rgba(199, 54, 44, 0.22);
 }
@@ -3612,7 +3588,7 @@ a:focus-visible:not(.btn):not(.focus-ring),
   color: var(--muted);
 }
 .big-callout{
-  font-family: "Zuume", var(--font-display, var(--font-sans, system-ui, -apple-system, sans-serif));
+  font-family: var(--font-display, var(--font-sans, system-ui, -apple-system, sans-serif));
   font-weight: 700;
   font-size: clamp(20px, 2.2vw, 28px);
   line-height: 1.2;

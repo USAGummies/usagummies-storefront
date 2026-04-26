@@ -3,15 +3,13 @@ import "./globals.css";
 import type { Metadata } from "next";
 import Script from "next/script";
 import { Analytics } from "@vercel/analytics/react";
-// Fallback fonts. Ben's typography spec is Zuume (headliner) + Rosseville
-// (script accent) — both commercial. Until the licensed font files are
-// dropped into `public/fonts/zuume/` and `public/fonts/rosseville/` (and
-// loaded via the @font-face block in globals.css), these Google Fonts
-// stand in as the closest visual match: Anton for Zuume's tall condensed
-// display weights, Inter for Zuume's lighter body weights, Allison for
-// Rosseville's casual script. The font-family stacks in globals.css /
-// lp.css already put `'Zuume'` and `'Rosseville'` first, so once the
-// real fonts load the swap is automatic — no app code changes needed.
+// Brand fonts (canonical, locked 2026-04-25):
+//   Anton    — The Headliner. Tall condensed bold sans for headlines,
+//              titles, hero display lines. Visual cousin to Zuume Black.
+//   Inter    — Body. Clean modern sans for paragraphs, UI, captions.
+//   Allison  — American Accent. Casual handwritten script, used 10–30%
+//              sparingly per the typography spec. Cousin to Rosseville.
+// All three are Google Fonts (free, served from Vercel via next/font).
 import { Anton, Inter, Allison } from "next/font/google";
 import { AppShell } from "@/components/layout/AppShell.client";
 import { AMAZON_LISTING_URL } from "@/lib/amazon";
@@ -122,8 +120,9 @@ function resolveSiteUrl() {
 const SITE_URL = resolveSiteUrl();
 const DEFAULT_DESCRIPTION = "All natural, American-made gummy bears with no artificial dyes.";
 
-// `--font-display` — Zuume fallback. Anton is a tall condensed bold
-// sans, single weight (400). Closest free match for Zuume Black.
+// The Headliner — Anton. Tall, condensed, bold sans-serif, single
+// weight (400). Used for h1/h2/h3, hero display lines, and the LP
+// `.lp-display` ornamental headlines.
 const display = Anton({
   subsets: ["latin"],
   variable: "--font-display",
@@ -132,9 +131,8 @@ const display = Anton({
   preload: false,
 });
 
-// `--font-sans` — Zuume body fallback. Inter is a clean modern sans
-// with a wide weight range; reasonable stand-in for Zuume Light/Regular
-// until the licensed variable Zuume file ships.
+// Body sans — Inter. Clean modern sans, full weight range. Used for
+// paragraphs, UI elements, captions, navigation.
 const sans = Inter({
   subsets: ["latin"],
   variable: "--font-sans",
@@ -143,9 +141,9 @@ const sans = Inter({
   preload: true,
 });
 
-// `--font-script` — Rosseville fallback. Allison is a casual handwritten
-// script, Google Fonts' closest match to Rosseville's loose romantic
-// flair. Used 10–30% sparingly per the typography spec.
+// American Accent — Allison. Casual handwritten script, used 10–30%
+// sparingly per the typography spec. Drives the `.font-script` /
+// `.lp-script` accent flourishes ("Made in the U.S.A.", etc.).
 const script = Allison({
   subsets: ["latin"],
   variable: "--font-script",

@@ -20,41 +20,39 @@
 
   color: var(--lp-ink);
   background: var(--lp-cream);
-  font-family: "Zuume", var(--font-sans, "Inter"), system-ui, sans-serif;
+  font-family: var(--font-sans, "Inter"), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   font-feature-settings: "kern" on, "liga" on;
 }
 
-/* The Headliner — Zuume Black for monumental display lines.
- * Fallback: Anton (loaded via root layout as `--font-display`). */
+/* The Headliner — Anton (canonical brand display, single weight 400). */
 .lp-scope .lp-display {
-  font-family: "Zuume", var(--font-display, "Anton"), "Bowlby One SC", sans-serif;
-  font-weight: 900;
+  font-family: var(--font-display, "Anton"), "Bowlby One SC", sans-serif;
+  font-weight: 400;
   letter-spacing: -0.005em;
   line-height: 0.95;
   text-transform: uppercase;
 }
 
-/* Body / subheads — Zuume Regular weight. */
+/* Body / subheads — Inter, regular weight. */
 .lp-scope .lp-sans {
-  font-family: "Zuume", var(--font-sans, "Inter"), system-ui, sans-serif;
+  font-family: var(--font-sans, "Inter"), system-ui, sans-serif;
   font-weight: 500;
   letter-spacing: 0.01em;
 }
 
-/* American Accent — Rosseville script, used 10–30% sparingly per spec.
- * Fallback: Allison (loaded via root layout as `--font-script`). */
+/* American Accent — Allison script (10–30% sparingly per spec). */
 .lp-scope .lp-script {
-  font-family: "Rosseville", var(--font-script, "Allison"), cursive;
+  font-family: var(--font-script, "Allison"), cursive;
   font-weight: 400;
   letter-spacing: 0;
   text-transform: none;
 }
 
-/* Small caps label — Zuume Bold tracked out. */
+/* Small caps label — Inter bold tracked out. */
 .lp-scope .lp-label {
-  font-family: "Zuume", var(--font-sans, "Inter"), system-ui, sans-serif;
+  font-family: var(--font-sans, "Inter"), system-ui, sans-serif;
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
