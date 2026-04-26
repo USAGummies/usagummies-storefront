@@ -263,10 +263,10 @@ describe("eligibility rubric — never fabricates", () => {
 // Taxonomy gap — locked at the contract level
 // ---------------------------------------------------------------------------
 
-describe("taxonomy gap — packet is honest about missing slug", () => {
-  it("taxonomy.slug is null by default (no slug exists today)", () => {
+describe("taxonomy slug — Phase 9: registered as receipt.review.promote", () => {
+  it("taxonomy.slug is the canonical registered slug", () => {
     const p = buildReceiptReviewPacket(mkReceipt(), { now: FIXED_NOW });
-    expect(p.taxonomy.slug).toBeNull();
+    expect(p.taxonomy.slug).toBe("receipt.review.promote");
   });
 
   it("taxonomy.classExpected is 'B' (Rene single-approval)", () => {
@@ -274,20 +274,23 @@ describe("taxonomy gap — packet is honest about missing slug", () => {
     expect(p.taxonomy.classExpected).toBe("B");
   });
 
-  it("taxonomy.reason names the missing slug + the fail-closed rule", () => {
+  it("taxonomy.reason describes the post-Phase-9 review-only semantic", () => {
     const p = buildReceiptReviewPacket(mkReceipt(), { now: FIXED_NOW });
-    expect(p.taxonomy.reason).toMatch(/receipt\.review\.promote/);
-    expect(p.taxonomy.reason).toMatch(/fail-closed/i);
+    // Slug is registered; reason explicitly notes this is review-only,
+    // NOT a QBO write. A separate `qbo.bill.create` runs later.
+    expect(p.taxonomy.reason).toMatch(/registered/i);
+    expect(p.taxonomy.reason).toMatch(/Class B, Rene/);
+    expect(p.taxonomy.reason).toMatch(/NOT post to QBO/i);
+    expect(p.taxonomy.reason).toMatch(/qbo\.bill\.create/);
   });
 
-  it("taxonomyOverride lets a future test stage a registered slug", () => {
+  it("taxonomyOverride lets a test simulate a future un-registered state", () => {
     const p = buildReceiptReviewPacket(mkReceipt(), {
       now: FIXED_NOW,
-      taxonomyOverride: { slug: "receipt.review.promote", reason: "registered" },
+      taxonomyOverride: { slug: null, reason: "deregistered" },
     });
-    expect(p.taxonomy.slug).toBe("receipt.review.promote");
-    expect(p.taxonomy.reason).toBe("registered");
-    // classExpected still defaults to 'B' (override merges).
+    expect(p.taxonomy.slug).toBeNull();
+    expect(p.taxonomy.reason).toBe("deregistered");
     expect(p.taxonomy.classExpected).toBe("B");
   });
 });

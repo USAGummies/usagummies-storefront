@@ -61,7 +61,7 @@ Current active lane at the time this runway was refreshed:
 - `/ops/finance/review` is read-only and aggregates finance review queues.
 - `/ops/ap-packets` has dashboard, template drafts, and AP packet send-on-approve.
 - `/api/ops/upload` writes durable docs to Drive when Drive parent env is configured.
-- Receipts intake is review-first. Phase 7 attaches a *suggestion* envelope (`ocr_suggestion`) to each receipt via auth-gated `POST /api/ops/docs/receipt/ocr` — extraction is review-only; status stays `needs_review`; canonical fields are NOT auto-filled; no QBO write path was added. QBO posting remains a future Rene-gated lane. Phase 8 adds auth-gated `POST /api/ops/docs/receipt/promote-review` which produces a draft Rene approval *packet* (canonical + OCR side-by-side, eligibility rubric, missing-slug taxonomy disclosure) — no Slack approval is opened (no `receipt.review.promote` slug in the taxonomy yet); receipt status + canonical fields are still preserved; idempotent.
+- Receipts intake is review-first. Phase 7 attaches a *suggestion* envelope (`ocr_suggestion`) to each receipt via auth-gated `POST /api/ops/docs/receipt/ocr` — extraction is review-only; status stays `needs_review`; canonical fields are NOT auto-filled; no QBO write path was added. QBO posting remains a future Rene-gated lane. Phase 8 adds auth-gated `POST /api/ops/docs/receipt/promote-review` which produces a draft Rene approval *packet* (canonical + OCR side-by-side, eligibility rubric, taxonomy disclosure); receipt status + canonical fields preserved; idempotent. Phase 9 registers `receipt.review.promote` (Class B, Rene) in the canonical taxonomy and extends the route to ALSO open a Class B Rene approval when the packet's `eligibility.ok` is true. Ineligible packets stay draft-only with a reason naming the missing fields. The approval is review-only (NOT a QBO write — a separate `qbo.bill.create` runs later). Idempotent on the approval store. Closer (auto packet `draft → rene-approved` on Slack approve) deferred to Phase 10.
 
 ### Fulfillment / Shipping
 
@@ -162,19 +162,24 @@ Potential code only if smoke fails:
 
 ### Lane B — Receipt-to-Rene approval promotion
 
-Phase 8 done at `260eab8 → next`. Promotion produces a draft review
-*packet* (canonical + OCR side-by-side, eligibility rubric, missing-
-slug taxonomy disclosure). No Slack approval is opened — the
-canonical taxonomy has no `receipt.review.promote` slug, and the
-fail-closed rule forbids inventing one. Next sub-lane: register
-`receipt.review.promote` in `contracts/approval-taxonomy.md` +
-`src/lib/ops/control-plane/taxonomy.ts`, then extend the route to
-open a Class B Rene approval when `eligibility.ok` is true.
+Phases 7-9 done. Phase 9 (this commit) registers
+`receipt.review.promote` in the canonical taxonomy doc + code and
+extends the route to open a Class B Rene approval when the packet's
+`eligibility.ok` is true. Approval is read-only on external systems
+(NOT a QBO write — separate `qbo.bill.create` runs later).
+
+Next sub-lane (Phase 10): the closer that transitions the packet
+from `draft → rene-approved` when Rene clicks approve in Slack. Add
+a UI button in `/ops/finance/review` that calls the promote-review
+route and surfaces the resulting `approval.id` so reviewers can
+follow the Slack-thread permalink.
 
 Boundary:
 
 - OCR/extraction prepares suggestions. ✅ Done (Phase 7).
 - Promotion creates a draft review packet. ✅ Done (Phase 8).
+- Eligible packets open a Class B Rene approval. ✅ Done (Phase 9).
+- Closer (Slack approve → packet `rene-approved`) — Phase 10.
 - QBO posting remains a separate Rene-approved Class B/C action.
 - Do not auto-create bills, expenses, vendors, or categories.
 - Do not overwrite canonical receipt fields without explicit reviewer action.

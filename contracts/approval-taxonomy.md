@@ -2,7 +2,7 @@
 
 **Status:** CANONICAL
 **Source:** Notion blueprint §15.3
-**Version:** 1.2 — 2026-04-20
+**Version:** 1.3 — 2026-04-25
 **Governing file:** Also defined in code at `src/lib/ops/control-plane/taxonomy.ts`. Code and this doc must stay in lockstep.
 
 ---
@@ -70,6 +70,7 @@ One approver. Request lands in `#ops-approvals` with tap-to-approve UX.
 | `qbo.invoice.void` | Void a QBO invoice (pre-send correction) | Rene |
 | `qbo.bill.create` | Create a QBO bill from vendor invoice intake | Rene |
 | `qbo.bill.approve-for-payment` | Mark a QBO bill approved for the next payment run | Rene |
+| `receipt.review.promote` | Acknowledge a captured receipt + OCR suggestion as Rene-reviewed. NOT a QBO write — an eligible packet still flows through a separate Class B `qbo.bill.create` later. Approval transitions the in-repo review packet from `draft` → `rene-approved`; canonical receipt fields and QBO state are untouched. | Rene |
 | `vendor.master.create` | Create a new vendor master (QBO vendor + Notion dossier + Drive) | Rene (Drew may originate supply-vendors) |
 | `invoice.write-off.draft` | Draft a bad-debt write-off on overdue invoice under Rene-only threshold | Rene |
 | `ar.hold.set` | Set AR-hold flag on a customer/company — blocks new orders across Shopify B2B, Faire, direct | Rene |
@@ -141,6 +142,7 @@ The `qbo.class.create/modify` and `qbo.location.create/modify` slugs registered 
 
 ## Version history
 
+- **1.3 — 2026-04-25** — Added `receipt.review.promote` (Class B, Rene). Phase 9 of the Sales Command receipt lane: acknowledges a Phase 7 OCR-suggested receipt as Rene-reviewed by transitioning the in-repo review packet from `draft` → `rene-approved`. Strictly NOT a QBO write — an eligible packet still flows through a separate Class B `qbo.bill.create` action later. Doc and code in lockstep at `src/lib/ops/control-plane/taxonomy.ts`.
 - **1.2 — 2026-04-20** — Finance extraction + Drive retrieval + CF-09 BOTH resolution. Added 44 new slugs across all four classes: 10 Class A (booke.categorize.suggest, qbo.invoice.partial-payment.apply, invoice.dispute.flag, research.post.tagged, brief.publish, audit.sample.score, coi.expiry-alert, connector.health.post, shipment.tracking-push, lead.enrichment.write); 21 Class B (booke.categorize.edit, qbo.class.create/modify, qbo.location.create/modify, qbo.credit-memo.create, qbo.invoice.void, qbo.bill.create, qbo.bill.approve-for-payment, vendor.master.create, invoice.write-off.draft, ar.hold.set/clear, legal.doc.expiry-override, shipstation.rule.modify, approved-claims.add/retire, faire-direct.invite, account.tier-upgrade.propose, retailer.onboard.company-create, claim.counsel-review.request); 7 Class C (invoice.write-off.execute, payment.batch.release, credit-limit.expand, qbo.period.close.final, ad.spend.launch, run.plan.commit, inventory.adjustment.large); 6 Class D (qbo.chart-of-accounts.modify, qbo.investor-transfer.recategorize, qbo.journal-entry.autonomous, qbo.period.close.reopen, ad.claim.publish-unreviewed, customer.data.export-external). Sourced from Finance Doctrine 05 + 22.C taxonomy queue + CF-09 resolution. Code and doc in lockstep at `src/lib/ops/control-plane/taxonomy.ts`.
 - **1.1 — 2026-04-18** — Registered the 4 activation slugs (`division.activate`, `division.deactivate`, `pod.trade-show.activate`, `pod.trade-show.deactivate`) so the approval queue can accept them. Downstream flip-the-JSON automation is still manual — see [`activation-triggers.md`](activation-triggers.md) §"What this actually automates."
 - **1.0 — 2026-04-17** — First canonical publication. Derived from blueprint §15.3.

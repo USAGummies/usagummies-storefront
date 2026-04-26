@@ -132,7 +132,7 @@ describe("404 path", () => {
 describe("happy path", () => {
   beforeEach(() => isAuthorizedMock.mockResolvedValue(true));
 
-  it("200 + packet returned with taxonomy_status surfacing the missing-slug gap", async () => {
+  it("200 + packet returned with taxonomy_status mirroring the registered slug (Phase 9)", async () => {
     const captured = await processReceipt({
       source_url: "https://example.com/receipt.jpg",
       source_channel: "test",
@@ -149,6 +149,9 @@ describe("happy path", () => {
         taxonomy: { slug: string | null; classExpected: string };
         receiptStatusAtBuild: string;
       };
+      approval:
+        | { opened: true; id: string; status: string; requiredApprovers: string[] }
+        | { opened: false; reason: string };
       taxonomy_status: {
         has_slug: boolean;
         slug: string | null;
@@ -159,13 +162,19 @@ describe("happy path", () => {
     expect(body.ok).toBe(true);
     expect(body.packet.receiptId).toBe(captured.id);
     expect(body.packet.status).toBe("draft");
-    expect(body.packet.taxonomy.slug).toBeNull();
+    expect(body.packet.taxonomy.slug).toBe("receipt.review.promote");
     expect(body.packet.taxonomy.classExpected).toBe("B");
-    // Envelope-level taxonomy_status mirrors the packet honestly.
-    expect(body.taxonomy_status.has_slug).toBe(false);
-    expect(body.taxonomy_status.slug).toBeNull();
+    // Envelope-level taxonomy_status mirrors the packet.
+    expect(body.taxonomy_status.has_slug).toBe(true);
+    expect(body.taxonomy_status.slug).toBe("receipt.review.promote");
     expect(body.taxonomy_status.class_expected).toBe("B");
-    expect(body.taxonomy_status.reason).toMatch(/receipt\.review\.promote/);
+    // No OCR / canonical fields for this captured receipt → eligibility false.
+    expect(body.packet.eligibility.ok).toBe(false);
+    // Phase 9: ineligible packets do NOT open an approval.
+    expect(body.approval.opened).toBe(false);
+    if (body.approval.opened === false) {
+      expect(body.approval.reason).toMatch(/ineligible/i);
+    }
   });
 
   it("eligibility=false with missing fields when receipt + OCR are empty", async () => {
@@ -274,28 +283,140 @@ describe("happy path", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Phase 9 — eligible packets open a Class B Rene approval
+// ---------------------------------------------------------------------------
+
+describe("Phase 9 — approval-open behavior", () => {
+  beforeEach(() => isAuthorizedMock.mockResolvedValue(true));
+
+  it("eligible packet opens a Class B Rene approval and returns the id + status", async () => {
+    const captured = await processReceipt({
+      source_url: "https://example.com/receipt.jpg",
+      source_channel: "test",
+      vendor: "Belmark Inc",
+      date: "2026-04-20",
+      amount: 250,
+      category: "supplies",
+    });
+    const res = await POST(postJson({ receiptId: captured.id }));
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      packet: { eligibility: { ok: boolean } };
+      approval:
+        | { opened: true; id: string; status: string; requiredApprovers: string[] }
+        | { opened: false; reason: string };
+    };
+    expect(body.packet.eligibility.ok).toBe(true);
+    expect(body.approval.opened).toBe(true);
+    if (body.approval.opened) {
+      expect(body.approval.id).toMatch(/^[0-9a-f-]{36}$/i);
+      expect(body.approval.status).toBe("pending");
+      expect(body.approval.requiredApprovers).toEqual(["Rene"]);
+    }
+  });
+
+  it("idempotent on approvals — re-promote returns the existing pending approval (no duplicate)", async () => {
+    const captured = await processReceipt({
+      source_url: "https://example.com/receipt.jpg",
+      source_channel: "test",
+      vendor: "Belmark Inc",
+      date: "2026-04-20",
+      amount: 250,
+      category: "supplies",
+    });
+    const first = await POST(postJson({ receiptId: captured.id }));
+    const firstBody = (await first.json()) as {
+      approval: { opened: boolean; id?: string };
+    };
+    const second = await POST(postJson({ receiptId: captured.id }));
+    const secondBody = (await second.json()) as {
+      approval: { opened: boolean; id?: string };
+    };
+    expect(firstBody.approval.opened).toBe(true);
+    expect(secondBody.approval.opened).toBe(true);
+    expect(secondBody.approval.id).toBe(firstBody.approval.id);
+  });
+
+  it("ineligible packet (missing required fields) does NOT open an approval", async () => {
+    const captured = await processReceipt({
+      source_url: "https://example.com/receipt.jpg",
+      source_channel: "test",
+      // No vendor / date / amount / category — eligibility.ok=false.
+    });
+    const res = await POST(postJson({ receiptId: captured.id }));
+    const body = (await res.json()) as {
+      packet: { eligibility: { ok: boolean; missing: string[] } };
+      approval:
+        | { opened: true; id: string }
+        | { opened: false; reason: string };
+    };
+    expect(body.packet.eligibility.ok).toBe(false);
+    expect(body.approval.opened).toBe(false);
+    if (body.approval.opened === false) {
+      expect(body.approval.reason).toMatch(/ineligible/i);
+      // Reason names every missing field verbatim.
+      for (const f of body.packet.eligibility.missing) {
+        expect(body.approval.reason).toContain(f);
+      }
+    }
+  });
+
+  it("does NOT change the receipt's status when an approval is opened", async () => {
+    const captured = await processReceipt({
+      source_url: "https://example.com/receipt.jpg",
+      source_channel: "test",
+      vendor: "Belmark Inc",
+      date: "2026-04-20",
+      amount: 250,
+      category: "supplies",
+    });
+    expect(captured.status).toBe("ready"); // all required fields → ready
+    await POST(postJson({ receiptId: captured.id }));
+    type StoredReceipt = { id: string; status: string };
+    const all = (store.get("docs:receipts") as StoredReceipt[] | null) ?? [];
+    const found = all.find((r) => r.id === captured.id);
+    expect(found?.status).toBe("ready"); // unchanged
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Static-source assertion
 // ---------------------------------------------------------------------------
 
-describe("read-only contract — no forbidden imports", () => {
-  it("the route imports nothing from QBO, HubSpot, Slack send/client, vendor-create, OR the control-plane approvals store", async () => {
+describe("read-only contract — no forbidden imports (Phase 9)", () => {
+  it("the route imports nothing from QBO, HubSpot, Slack send/client, or vendor-create paths", async () => {
+    // Phase 9 NOTE: the route DOES import from `control-plane/approvals`
+    // and `control-plane/stores` to open a Class B Rene approval when
+    // eligibility.ok is true. That's the deliberate Phase 9 behavior.
+    // The forbidden-import set narrows: QBO/HubSpot writes,
+    // Shopify/Slack-send paths, and vendor-create are still blocked.
     const fs = await import("node:fs/promises");
     const src = await fs.readFile(
       new URL("../route.ts", import.meta.url),
       "utf8",
     );
-    expect(src).not.toMatch(/from\s+["'].*qbo/);
+    expect(src).not.toMatch(/from\s+["'].*qbo-client/);
+    expect(src).not.toMatch(/from\s+["'].*qbo-auth/);
     expect(src).not.toMatch(/from\s+["'].*hubspot/);
     expect(src).not.toMatch(/from\s+["'].*slack-(send|client)/);
     expect(src).not.toMatch(/createQBOVendor|onboardVendor|\/api\/ops\/vendors/);
-    // Critically: no approvals store. This lane intentionally does
-    // NOT open a Slack/control-plane approval — the taxonomy slug
-    // is missing. Locked here so a future refactor can't silently
-    // wire one in without also registering the slug.
-    expect(src).not.toMatch(/from\s+["'].*control-plane\/approvals/);
-    expect(src).not.toMatch(/from\s+["'].*control-plane\/stores/);
-    expect(src).not.toMatch(/buildApprovalRequest/);
+    // No QBO write helpers — the approval acknowledges Rene reviewed,
+    // it does NOT post to QBO. A separate Class B `qbo.bill.create`
+    // runs later.
+    expect(src).not.toMatch(/createQBOBill|createQBOInvoice|createQBOJournalEntry/);
     // GET / PUT / DELETE / PATCH NOT exported.
     expect(src).not.toMatch(/export\s+(async\s+)?function\s+(GET|PUT|DELETE|PATCH)/);
+  });
+
+  it("the route does NOT post to Slack directly — approval surface is the existing approvalStore.put path", async () => {
+    const fs = await import("node:fs/promises");
+    const src = await fs.readFile(
+      new URL("../route.ts", import.meta.url),
+      "utf8",
+    );
+    // No direct `chat.postMessage` / `WebClient` / `slack.com/api/chat.postMessage`.
+    expect(src).not.toMatch(/chat\.postMessage/);
+    expect(src).not.toMatch(/WebClient/);
+    expect(src).not.toMatch(/slack\.com\/api\/chat/);
   });
 });

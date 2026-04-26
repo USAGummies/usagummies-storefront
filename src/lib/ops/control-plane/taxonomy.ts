@@ -418,6 +418,19 @@ export const SINGLE_APPROVAL_ACTIONS: ActionSpec[] = [
     irreversible: true, // external comm to counsel
     examples: ["'supports immunity' claim review before publish"],
   },
+
+  // ---- v1.3 additions (Class B) — Phase 9 receipt review ----
+  {
+    slug: "receipt.review.promote",
+    name: "Acknowledge a captured receipt + OCR suggestion as Rene-reviewed",
+    class: "B",
+    requiredApprovers: ["Rene"],
+    irreversible: false,
+    examples: [
+      "Belmark $250 receipt with OCR suggestion + canonical category 'supplies' → Rene reviews and approves the in-repo packet (no QBO write)",
+      "Albanese receipt with eligible canonical fields → packet transitions draft → rene-approved (separate qbo.bill.create runs later)",
+    ],
+  },
 ];
 
 // ---- Class C — Dual approval -------------------------------------------

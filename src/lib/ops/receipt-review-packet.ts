@@ -132,17 +132,20 @@ const REQUIRED_FIELDS: Array<keyof ProposedFields> = [
   "category",
 ];
 
-// Default missing-slug taxonomy contract. Surfaced through every
-// packet build so reviewers see why the route doesn't open a Slack
-// approval today.
+// Phase 9 — taxonomy slug `receipt.review.promote` is registered.
+// The packet builder reports the registered slug in every build;
+// the route opens a Class B Rene approval when `eligibility.ok` is
+// true and falls back to a draft-only packet otherwise (with the
+// reason naming why no approval was opened).
 const DEFAULT_TAXONOMY: PacketTaxonomy = {
-  slug: null,
+  slug: "receipt.review.promote",
   classExpected: "B",
   reason:
-    "No `receipt.review.promote` slug exists in `contracts/approval-taxonomy.md`. " +
-    "Per blueprint fail-closed rule, this packet is a review-queue item only — " +
-    "it does NOT open a Slack/control-plane approval. Register a slug in " +
-    "`src/lib/ops/control-plane/taxonomy.ts` and the doc to lift this gate.",
+    "`receipt.review.promote` is registered (Class B, Rene). " +
+    "The route opens a Slack approval when `eligibility.ok` is true; " +
+    "ineligible packets stay draft-only with `eligibility.missing` listing " +
+    "the gaps. Approval acknowledges Rene reviewed — it does NOT post to " +
+    "QBO. A separate Class B `qbo.bill.create` action runs later.",
 };
 
 // ---------------------------------------------------------------------------
