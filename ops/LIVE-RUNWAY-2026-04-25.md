@@ -162,17 +162,17 @@ Potential code only if smoke fails:
 
 ### Lane B — Receipt-to-Rene approval promotion
 
-Phases 7-15 done. Phase 15 pushes the canonical filter spec into the
-list route's query string AND adds a bounded passive poll on the
-aggregate dashboard (60s × 10 ticks). Server pre-filters via the
-same helper the client uses — locked by a parity test. The
-defensive client-side filter belt remains so a route version skew
-can never silently widen the rendered set.
+Phases 7-16 done. Phase 16 adds the approval-status dimension —
+operators can ask "what's stuck in `#ops-approvals` waiting for
+Rene's click?" via a single dropdown. Each row's approval state is
+visible at a glance, color-coded; the route does the read-only
+join via `approvalStore.listPending` + `listByAgent` and surfaces
+the lookup map in the response.
 
-Next sub-lane (Phase 16): cursor-based pagination on the list route
-for >500-packet queues, OR an approval-status filter (pending /
-approved / rejected) that joins through `approvalStore`. Pick
-whichever surfaces first when operator data scales.
+Next sub-lane (Phase 17): cursor-based pagination on the list route
+for >500-packet queues. The current single-page limit (500) buys
+~6 months at current ingress rates; when data scales we'll need
+deterministic cursor encoding (`createdAt|packetId`) + Load more.
 
 Boundary:
 
@@ -185,7 +185,8 @@ Boundary:
 - Aggregate review-packets dashboard. ✅ Done (Phase 13).
 - Filters + inline re-promote. ✅ Done (Phase 14).
 - Server-side filtering + passive poll. ✅ Done (Phase 15).
-- Cursor pagination OR approval-status filter — Phase 16.
+- Approval-status filter. ✅ Done (Phase 16).
+- Cursor-based pagination — Phase 17.
 - QBO posting remains a separate Rene-approved Class B/C action.
 - Do not auto-create bills, expenses, vendors, or categories.
 - Do not overwrite canonical receipt fields without explicit reviewer action.

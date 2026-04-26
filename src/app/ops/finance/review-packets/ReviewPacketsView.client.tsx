@@ -20,6 +20,7 @@ import {
   reviewPacketsFilterSpecToQuery,
   type ReviewPacketRowStatus,
   type ReviewPacketStatusColor,
+  type ReviewPacketsApprovalStatusFilter,
   type ReviewPacketsFilterSpec,
   type ReviewPacketsView as ReviewPacketsViewShape,
 } from "./data";
@@ -49,6 +50,9 @@ interface ListResponse {
   /** Phase 15 — true when the route applied any filter. */
   filterApplied?: boolean;
   packets?: ReceiptReviewPacket[];
+  /** Phase 16 — read-only approval lookup keyed by packetId.
+   *  Optional for backwards compat. */
+  approvals?: Record<string, { id: string; status: string }>;
   error?: string;
   reason?: string;
 }
@@ -78,7 +82,25 @@ async function fetchPackets(
       return { view: null, err: reason };
     }
     const packets = Array.isArray(body.packets) ? body.packets : [];
-    return { view: buildReviewPacketsView(packets), err: null };
+    // Phase 16 — rebuild the approval lookup map from the route's
+    // flat object so each row picks up its approvalId / approvalStatus.
+    const approvalsByPacketId = new Map<string, { id: string; status: string }>();
+    if (body.approvals && typeof body.approvals === "object") {
+      for (const [packetId, info] of Object.entries(body.approvals)) {
+        if (
+          info &&
+          typeof info === "object" &&
+          typeof info.id === "string" &&
+          typeof info.status === "string"
+        ) {
+          approvalsByPacketId.set(packetId, info);
+        }
+      }
+    }
+    return {
+      view: buildReviewPacketsView(packets, approvalsByPacketId),
+      err: null,
+    };
   } catch (err) {
     return {
       view: null,
@@ -134,6 +156,9 @@ export function ReviewPacketsView() {
   const [filterVendor, setFilterVendor] = useState<string>("");
   const [filterAfter, setFilterAfter] = useState<string>("");
   const [filterBefore, setFilterBefore] = useState<string>("");
+  // Phase 16 — approval-status filter (control-plane state).
+  const [filterApprovalStatus, setFilterApprovalStatus] =
+    useState<ReviewPacketsApprovalStatusFilter>("any");
 
   // Per-row re-promote feedback (Phase 14). Map: receiptId → state.
   // Cleared on refresh so a stale "queued" or "failed" can't linger
@@ -151,8 +176,15 @@ export function ReviewPacketsView() {
       vendorContains: filterVendor,
       createdAfter: filterAfter,
       createdBefore: filterBefore,
+      approvalStatus: filterApprovalStatus,
     }),
-    [filterStatus, filterVendor, filterAfter, filterBefore],
+    [
+      filterStatus,
+      filterVendor,
+      filterAfter,
+      filterBefore,
+      filterApprovalStatus,
+    ],
   );
 
   useEffect(() => {
@@ -231,7 +263,8 @@ export function ReviewPacketsView() {
     filterStatus !== "all" ||
     filterVendor.trim().length > 0 ||
     filterAfter.trim().length > 0 ||
-    filterBefore.trim().length > 0;
+    filterBefore.trim().length > 0 ||
+    filterApprovalStatus !== "any";
 
   return (
     <div style={{ background: BG, minHeight: "100vh", padding: 16 }}>
@@ -369,6 +402,33 @@ export function ReviewPacketsView() {
               }}
             />
           </label>
+          <label>
+            Approval:{" "}
+            <select
+              value={filterApprovalStatus}
+              onChange={(e) =>
+                setFilterApprovalStatus(
+                  e.target.value as ReviewPacketsApprovalStatusFilter,
+                )
+              }
+              style={{
+                fontSize: 11,
+                padding: "2px 6px",
+                borderRadius: 4,
+                border: `1px solid ${BORDER}`,
+                background: "#fff",
+                color: NAVY,
+              }}
+            >
+              <option value="any">Any</option>
+              <option value="no-approval">No approval</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+              <option value="expired">Expired</option>
+              <option value="stood-down">Stood down</option>
+            </select>
+          </label>
           {filtersActive && (
             <button
               type="button"
@@ -377,6 +437,7 @@ export function ReviewPacketsView() {
                 setFilterVendor("");
                 setFilterAfter("");
                 setFilterBefore("");
+                setFilterApprovalStatus("any");
               }}
               style={{
                 fontSize: 11,
@@ -456,6 +517,9 @@ export function ReviewPacketsView() {
                     Eligibility
                   </th>
                   <th style={{ padding: "6px 10px", fontWeight: 600 }}>
+                    Approval
+                  </th>
+                  <th style={{ padding: "6px 10px", fontWeight: 600 }}>
                     Created
                   </th>
                   <th style={{ padding: "6px 10px", fontWeight: 600 }}>
@@ -517,6 +581,35 @@ export function ReviewPacketsView() {
                       ) : (
                         <span style={{ color: RED }}>
                           missing: {r.eligibilityMissing.join(", ") || "(none)"}
+                        </span>
+                      )}
+                    </td>
+                    <td
+                      style={{
+                        padding: "6px 10px",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {r.approvalStatus === null ? (
+                        <span style={{ color: DIM, fontSize: 11 }}>
+                          —
+                        </span>
+                      ) : (
+                        <span
+                          style={{
+                            color:
+                              r.approvalStatus === "approved"
+                                ? "#1f7a3a"
+                                : r.approvalStatus === "rejected"
+                                  ? RED
+                                  : r.approvalStatus === "pending"
+                                    ? GOLD
+                                    : DIM,
+                            fontWeight: 600,
+                            fontSize: 11,
+                          }}
+                        >
+                          {r.approvalStatus}
                         </span>
                       )}
                     </td>
