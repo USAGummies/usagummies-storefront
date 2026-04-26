@@ -2,7 +2,7 @@
 
 **Last refreshed:** 2026-04-25  
 **Repo:** `/Users/ben/usagummies-storefront`  
-**Latest verified baseline before this doc:** `4c66f70 feat(ops): Phase 6 Sales Command — wholesale inquiry archive + internal list API`
+**Latest verified baseline before this doc:** `260eab8 feat(ops): Phase 7 receipts — OCR extraction (prepare-for-review only)`
 
 **Mode:** keep building, but do not edit the same code lane as another active agent.
 
@@ -14,8 +14,8 @@ If Claude Code is actively working a lane, do not touch its files. Work on docs,
 
 Current active lane at the time this runway was refreshed:
 
-- **Claude Code:** wholesale inquiry archive + internal list API is complete at `4c66f70`.
-- **Next non-conflicting code lane:** receipt OCR/Rene review queue.
+- **Claude Code:** receipt OCR extraction is complete at `260eab8`.
+- **Next non-conflicting code lane:** Drive/readiness unblock if env smoke fails; otherwise receipt-to-Rene approval promotion.
 - **Safe parallel work:** production envs, Notion handoff, blocker docs, smoke checklist, and operator runbooks.
 
 ## What Is Live
@@ -160,18 +160,17 @@ Potential code only if smoke fails:
 - Fix Drive scope/env error handling.
 - Do not weaken file limits, MIME gates, or public upload rate limits.
 
-### Lane B — Receipt OCR/Rene queue
+### Lane B — Receipt-to-Rene approval promotion
 
-Phase 7 done (extraction prepares review-only suggestions; no QBO write
-path). Next sub-lane: Rene-approved promotion flow that turns a
-reviewed receipt into a Class B/C QBO posting via the existing
-approval taxonomy.
+Goal: turn a reviewed receipt + OCR suggestion into a Rene approval packet. This is still not a QBO posting lane.
 
 Boundary:
 
-- OCR/extraction can prepare suggestions. ✅ Done.
-- QBO posting remains Rene-approved Class B/C.
-- Do not auto-create bills or expenses.
+- OCR/extraction can prepare suggestions. Done in Phase 7.
+- Promotion creates a review/approval packet only.
+- QBO posting remains a separate Rene-approved Class B/C action.
+- Do not auto-create bills, expenses, vendors, or categories.
+- Do not overwrite canonical receipt fields without explicit reviewer action.
 
 ### Lane C — B2B revenue Phase 2 attribution
 
@@ -214,19 +213,19 @@ Read:
 - src/lib/ops/docs.ts
 - src/app/ops/finance/review/FinanceReviewView.client.tsx
 
-Goal: build receipt OCR extraction into the existing receipts review flow. This is a prepare-for-review lane only; do not post to QBO.
+Goal: build receipt-to-Rene approval promotion from existing OCR suggestions. This prepares a review packet only; do not post to QBO.
 
 Build:
-1. Audit existing receipt capture/listing helpers and finance review surface.
-2. Add a pure OCR/extraction normalization helper that turns OCR text into a suggested receipt envelope: vendor, date, amount, currency, tax, last4/payment hint, confidence, and warnings.
-3. Add a route that can attach OCR suggestions to an existing receipt record or accept OCR text for a receipt id. Keep it auth-gated.
-4. Surface suggestions in /ops/finance/review as review-only fields.
+1. Audit Phase 7 receipt OCR suggestion shape and Finance Review UI.
+2. Add a pure helper that turns a reviewed receipt + OCR suggestion into a Rene approval packet draft.
+3. Add an auth-gated route to request receipt review approval when a receipt has sufficient reviewed/suggested fields.
+4. Open a Slack/Class B approval only if the existing taxonomy has an appropriate slug; otherwise create a review queue item and document the missing slug.
 5. No QBO writes, no auto-categorization, no vendor creation, no payment classification beyond suggestion/warning.
-6. Tests for no-fabrication: missing amount/date/vendor stays null with warning, never guessed.
+6. Tests for no-fabrication and no side effects.
 
 Acceptance:
-- Receipts still queue as needs_review.
-- OCR suggestions are visible to Rene/Ben as suggestions only.
+- Receipts still queue as `needs_review` until a human/reviewer action changes them.
+- Approval packet clearly distinguishes canonical fields from OCR suggestions.
 - No QBO write path added.
 - No fabricated vendor/date/amount.
 - Tests/typecheck/lint pass.

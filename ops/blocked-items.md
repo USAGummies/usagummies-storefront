@@ -15,8 +15,8 @@ This file contains historical April 20-21 tasks below. The current live runway i
 
 ### Current baseline
 
-- Latest verified baseline before this overlay: `4c66f70 feat(ops): Phase 6 Sales Command — wholesale inquiry archive + internal list API`.
-- Latest reported full-suite result: **1075 tests passing**, `tsc --noEmit` clean, `npm run lint` clean.
+- Latest verified baseline before this overlay: `260eab8 feat(ops): Phase 7 receipts — OCR extraction (prepare-for-review only)`.
+- Latest reported full-suite result: **1132 tests passing**, `tsc --noEmit` clean, `npm run lint` clean.
 - The old "174 tests" and April 20 agent activation language below is retained as history, not current state.
 
 ### Current P0 manual/env blockers
@@ -40,7 +40,7 @@ This file contains historical April 20-21 tasks below. The current live runway i
 
 ### Current next code lane
 
-Receipt OCR/Rene review queue: add extraction suggestions to the existing receipt review flow without posting to QBO, auto-categorizing, or inventing missing vendor/date/amount data.
+Drive/readiness unblock first if envs are still red; otherwise receipt-to-Rene approval promotion. Receipt OCR suggestions exist, but QBO posting remains explicitly out of scope until Rene approves a separate Class B/C write path.
 
 ## Secret handling rule
 - **Never paste full secret values into this file or any tracked repo file.** Use prefix-only references (`shpat_…`, `AKIA…`, `xoxb-…`, `sk-…`) or the literal placeholder `<ROTATE_THIS_TOKEN>`.
