@@ -51,61 +51,21 @@ import { NextResponse } from "next/server";
 
 import { isAuthorized } from "@/lib/ops/abra-auth";
 import { listReceiptReviewPackets } from "@/lib/ops/docs";
-import { approvalStore } from "@/lib/ops/control-plane/stores";
+import { getCachedApprovalLookup } from "@/lib/ops/receipt-review-approval-lookup";
 import {
   filterPacketsBySpec,
   paginateReviewPackets,
   parseReviewPacketsFilterSpec,
-  type ApprovalsByPacketId,
 } from "@/app/ops/finance/review-packets/data";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/**
- * Phase 16 — read-only approval lookup builder. Indexes by
- * `targetEntity.id` so the canonical view helper can attach the
- * matching approval to each packet row.
- *
- * Both `listPending()` and `listByAgent()` are read-only. Either
- * source failing is non-fatal — we return a partial map; rows with
- * no match end up with `approvalStatus: null`.
- */
-async function buildApprovalLookup(): Promise<ApprovalsByPacketId> {
-  const map: ApprovalsByPacketId = new Map();
-  const store = approvalStore();
-  try {
-    const pending = await store.listPending();
-    for (const a of pending) {
-      const id = a.targetEntity?.id;
-      if (typeof id === "string" && id.length > 0) {
-        map.set(id, { id: a.id, status: a.status });
-      }
-    }
-  } catch {
-    // partial — continue with the listByAgent fallback
-  }
-  try {
-    // Terminal-state approvals routed by the promote-review route's
-    // agent id. Cap at 200 — the operator-facing dashboard only
-    // shows the most-recent batch; older closer history lives in
-    // the audit log.
-    const recent = await store.listByAgent("ops-route:receipt-promote", 200);
-    for (const a of recent) {
-      const id = a.targetEntity?.id;
-      if (typeof id === "string" && id.length > 0) {
-        // Don't overwrite a pending entry with the older terminal
-        // state; the pending lookup wins on conflict.
-        if (!map.has(id)) {
-          map.set(id, { id: a.id, status: a.status });
-        }
-      }
-    }
-  } catch {
-    // partial — already accumulated whatever listPending returned
-  }
-  return map;
-}
+// Phase 19 (Option B): the inlined `buildApprovalLookup` helper
+// was extracted to `src/lib/ops/receipt-review-approval-lookup.ts`
+// + wrapped in a 30-second KV cache. Both this list route and the
+// CSV export route now share the canonical helper. The previous
+// duplicate copies are gone.
 
 export async function GET(req: Request): Promise<Response> {
   if (!(await isAuthorized(req))) {
@@ -134,8 +94,10 @@ export async function GET(req: Request): Promise<Response> {
     // approvals doesn't get half-empty pages.
     const allPackets = await listReceiptReviewPackets({ limit: 500 });
 
-    // Phase 16 — read-only approval lookup. Both reads fail-soft.
-    const approvalsByPacketId = await buildApprovalLookup();
+    // Phase 16/19 — read-only approval lookup, KV-cached (30s TTL)
+    // through the shared canonical helper. Both reads inside the
+    // helper fail-soft; the cache write is best-effort.
+    const approvalsByPacketId = await getCachedApprovalLookup();
 
     const filtered = filterApplied
       ? filterPacketsBySpec(allPackets, spec, approvalsByPacketId)

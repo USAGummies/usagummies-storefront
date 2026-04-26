@@ -41,55 +41,23 @@
  */
 import { isAuthorized } from "@/lib/ops/abra-auth";
 import { listReceiptReviewPackets } from "@/lib/ops/docs";
-import { approvalStore } from "@/lib/ops/control-plane/stores";
+import { getCachedApprovalLookup } from "@/lib/ops/receipt-review-approval-lookup";
 import {
   buildReviewPacketsView,
   filterPacketsBySpec,
   parseReviewPacketsFilterSpec,
   renderReviewPacketsCsv,
   reviewPacketsCsvFilename,
-  type ApprovalsByPacketId,
 } from "@/app/ops/finance/review-packets/data";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/**
- * Phase 16 — same read-only approval lookup builder used by the
- * JSON list route. Duplicated here rather than imported because
- * the JSON route's helper is module-private. Kept in lockstep by
- * a test that asserts both routes return the same packet set for
- * the same filter spec.
- */
-async function buildApprovalLookup(): Promise<ApprovalsByPacketId> {
-  const map: ApprovalsByPacketId = new Map();
-  const store = approvalStore();
-  try {
-    const pending = await store.listPending();
-    for (const a of pending) {
-      const id = a.targetEntity?.id;
-      if (typeof id === "string" && id.length > 0) {
-        map.set(id, { id: a.id, status: a.status });
-      }
-    }
-  } catch {
-    // partial — continue
-  }
-  try {
-    const recent = await store.listByAgent("ops-route:receipt-promote", 200);
-    for (const a of recent) {
-      const id = a.targetEntity?.id;
-      if (typeof id === "string" && id.length > 0) {
-        if (!map.has(id)) {
-          map.set(id, { id: a.id, status: a.status });
-        }
-      }
-    }
-  } catch {
-    // partial
-  }
-  return map;
-}
+// Phase 19 (Option B): the inlined `buildApprovalLookup` helper
+// here was extracted to `src/lib/ops/receipt-review-approval-lookup.ts`
+// + wrapped in a 30-second KV cache. Both this CSV route and the
+// JSON list route now share the canonical helper. The previous
+// duplicate copy is gone.
 
 export async function GET(req: Request): Promise<Response> {
   if (!(await isAuthorized(req))) {
@@ -115,7 +83,9 @@ export async function GET(req: Request): Promise<Response> {
 
   try {
     const allPackets = await listReceiptReviewPackets({ limit });
-    const approvalsByPacketId = await buildApprovalLookup();
+    // Phase 16/19 — KV-cached canonical approval lookup, shared
+    // with the JSON list route. Read-only; fail-soft.
+    const approvalsByPacketId = await getCachedApprovalLookup();
     const filtered = filterApplied
       ? filterPacketsBySpec(allPackets, spec, approvalsByPacketId)
       : allPackets;
