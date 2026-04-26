@@ -45,14 +45,12 @@ export function ThreePromises() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-3 sm:gap-0">
-          {PROMISES.map((p, i) => (
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-3 sm:gap-7">
+          {PROMISES.map((p) => (
             <div
               key={p.n}
-              className={`relative bg-[var(--lp-off-white)] p-6 sm:p-8 ${
-                i > 0 ? "sm:border-l-2 sm:border-[var(--lp-ink)]" : ""
-              }`}
-              style={{ boxShadow: i === 0 ? "4px 4px 0 var(--lp-ink)" : undefined }}
+              className="relative border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-6 sm:p-7"
+              style={{ boxShadow: "5px 5px 0 var(--lp-ink)" }}
             >
               <div className="relative mb-4 h-16 w-16">
                 <Image
@@ -78,18 +76,29 @@ export function ThreePromises() {
 
         {/* Five flavor line-up — each bear character is verified bag art */}
         <div className="mt-12 rounded-sm border-2 border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-5 sm:mt-16 sm:p-7">
-          <p className="lp-label mb-4 text-center text-[var(--lp-red)]">
+          <p className="lp-label mb-5 text-center text-[var(--lp-red)]">
             ★ ★ ★ Five Natural Flavors ★ ★ ★
           </p>
-          <div className="flex items-center justify-between gap-2">
+          {/* Image-file note: `gummy-red.png` is actually the pink/raspberry
+           * bear (Watermelon) and `gummy-pink.png` is the dark wine-red
+           * bear (Cherry). The file names predate this rebuild and were
+           * mislabeled — Cherry/Watermelon mappings here match the actual
+           * pixel colors so the brand reads correctly on the page. */}
+          <div className="flex flex-wrap items-start justify-center gap-x-2 gap-y-5 sm:flex-nowrap sm:gap-2">
             {[
-              { src: "/brand/gummies/gummy-red.png", label: "Cherry" },
+              { src: "/brand/gummies/gummy-pink.png", label: "Cherry" },
               { src: "/brand/gummies/gummy-yellow.png", label: "Lemon" },
               { src: "/brand/gummies/gummy-green.png", label: "Green Apple" },
               { src: "/brand/gummies/gummy-orange.png", label: "Orange" },
-              { src: "/brand/gummies/gummy-pink.png", label: "Watermelon" },
+              { src: "/brand/gummies/gummy-red.png", label: "Watermelon" },
             ].map((g) => (
-              <figure key={g.label} className="flex flex-1 flex-col items-center gap-2">
+              <figure
+                key={g.label}
+                /* Mobile: 30% width (3 per row, 5 items wrap to 3+2 with the
+                 * second row centered by `justify-center` on the parent).
+                 * Desktop: flex-1 distributes all 5 evenly on one row. */
+                className="flex w-[30%] flex-col items-center gap-2 sm:w-auto sm:flex-1"
+              >
                 <div className="relative h-14 w-14 sm:h-20 sm:w-20">
                   <Image
                     src={g.src}
@@ -99,7 +108,11 @@ export function ThreePromises() {
                     className="object-contain drop-shadow-[2px_3px_0_rgba(14,22,56,0.6)]"
                   />
                 </div>
-                <figcaption className="lp-label text-center text-[0.62rem] text-[var(--lp-ink)] sm:text-[0.7rem]">
+                {/* Mobile: tighter tracking + smaller font + leading-tight
+                 * so two-word labels ("Green Apple") wrap cleanly to 2
+                 * lines and one-word labels ("Watermelon") stay on a
+                 * single line within the 30%-wide cell. */}
+                <figcaption className="text-center text-[0.58rem] font-bold uppercase leading-tight tracking-[0.06em] text-[var(--lp-ink)] sm:text-[0.7rem] sm:tracking-[0.14em]">
                   {g.label}
                 </figcaption>
               </figure>

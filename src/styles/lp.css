@@ -320,9 +320,13 @@
 
 .lp-scope .lp-starfield {
   background-color: var(--lp-navy);
+  /* Stars dimmed to ~45% so they read as a soft texture under headline
+   * copy instead of competing with it. Earlier full-brightness gold
+   * stars on navy + gold ScarcityBar text made the headline vanish
+   * into the pattern on mobile (Ben's audit, 2026-04-25). */
   background-image:
-    radial-gradient(var(--lp-gold-light) 1.5px, transparent 2px),
-    radial-gradient(var(--lp-gold-light) 1px, transparent 1.5px);
+    radial-gradient(rgba(245, 200, 96, 0.45) 1.5px, transparent 2px),
+    radial-gradient(rgba(245, 200, 96, 0.32) 1px, transparent 1.5px);
   background-size: 42px 42px, 64px 64px;
   background-position: 0 0, 21px 21px;
   color: var(--lp-off-white);
