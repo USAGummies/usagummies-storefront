@@ -1,22 +1,34 @@
-// src/app/shop/page.tsx
+// /shop — single-product brand storefront. Uses the same LP-language
+// skeleton as the homepage (HeroSection, ScarcityBar, etc.) plus
+// shop-specific extras: internal-link modules (related products + top
+// guides), bag-count guide links, and ProductJsonLd for rich-result
+// eligibility.
+//
+// Net: 413-line bespoke shop page → ~140-line LP-flow shop page with
+// all SEO machinery + commerce wiring intact.
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
-import BagSlider from "@/components/purchase/BagSlider.client";
+
+import { HeroSection } from "@/components/lp/HeroSection";
+import { ScarcityBar } from "@/components/lp/ScarcityBar";
+import { ThreePromises } from "@/components/lp/ThreePromises";
+import { GuaranteeBlock } from "@/components/lp/GuaranteeBlock";
+import { FaqAccordion } from "@/components/lp/FaqAccordion";
+import { StickyBuyBar } from "@/components/lp/StickyBuyBar";
+
 import { GuideCard } from "@/components/internal-links/GuideCard";
 import { LinkModule } from "@/components/internal-links/LinkModule";
 import { RelatedProductCard } from "@/components/internal-links/RelatedProductCard";
-import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 import { LatestFromBlog } from "@/components/blog/LatestFromBlog";
+import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
+import { ProductJsonLd } from "@/components/seo/ProductJsonLd";
+
 import { getProductsPage } from "@/lib/shopify/products";
 import { getProductsForInternalLinks } from "@/lib/shopify/internalLinks";
 import { getProductByHandle } from "@/lib/storefront";
-import { BASE_PRICE, FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 import { getBundleVariants } from "@/lib/bundles/getBundleVariants";
+import { BASE_PRICE } from "@/lib/bundles/pricing";
 import { SINGLE_BAG_SKU } from "@/lib/bundles/atomic";
-import { DETAIL_BULLETS } from "@/data/productDetails";
-import { ProductJsonLd } from "@/components/seo/ProductJsonLd";
-import { SocialProofStat } from "@/components/social-proof/TrustBar";
 import { getReviewAggregate } from "@/lib/reviews/aggregate";
 import { buildCanonicalUrl } from "@/lib/seo/canonical";
 import {
@@ -26,11 +38,10 @@ import {
   rankRelated,
 } from "@/lib/internalLinks";
 import { getTopGuideCandidates } from "@/lib/guides";
-import { TrustBar, GuaranteeBadge } from "@/components/social-proof/TrustBar";
-import styles from "../homepage-scenes.module.css";
 
 const PAGE_SIZE = 1;
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
 function resolveSiteUrl() {
   const preferred = "https://www.usagummies.com";
   const fromEnv = process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || null;
@@ -66,28 +77,15 @@ export async function generateMetadata({
     title,
     description,
     alternates: { canonical },
-    openGraph: {
-      title,
-      description,
-      url: canonical,
-      images: [{ url: OG_IMAGE }],
-    },
-    twitter: {
-      card: "summary_large_image",
-      title,
-      description,
-      images: [OG_IMAGE],
-    },
+    openGraph: { title, description, url: canonical, images: [{ url: OG_IMAGE }] },
+    twitter: { card: "summary_large_image", title, description, images: [OG_IMAGE] },
   };
 }
 
 export default async function ShopPage() {
   let results: Awaited<ReturnType<typeof getProductsPage>>;
   try {
-    results = await getProductsPage({
-      pageSize: PAGE_SIZE,
-      sort: "best-selling",
-    });
+    results = await getProductsPage({ pageSize: PAGE_SIZE, sort: "best-selling" });
   } catch {
     results = {
       nodes: [],
@@ -126,11 +124,15 @@ export default async function ShopPage() {
   }
 
   const reviewAggregate = await getReviewAggregate();
-
   const guideCandidates = getTopGuideCandidates();
   const productHandle =
-    detailedProduct?.handle || primaryProduct?.handle || "all-american-gummy-bears-7-5-oz-single-bag";
+    detailedProduct?.handle ||
+    primaryProduct?.handle ||
+    "all-american-gummy-bears-7-5-oz-single-bag";
 
+  // Rank related products + guides for the bottom internal-link
+  // modules. Relevance signals come from product type / tags /
+  // collections / SEO metafields.
   const sourceSignals = buildProductSignals({
     handle: productHandle,
     productType: detailedProduct?.productType,
@@ -184,8 +186,11 @@ export default async function ShopPage() {
 
   const hasModules = relatedProducts.length || topGuides.length;
 
+  // SEO data for ProductJsonLd
   const stickyImage =
-    detailedProduct?.featuredImage?.url || primaryProduct?.featuredImage?.url || "/brand/usa-gummies-family.webp";
+    detailedProduct?.featuredImage?.url ||
+    primaryProduct?.featuredImage?.url ||
+    "/brand/usa-gummies-family.webp";
   const productImages =
     (detailedProduct?.images?.edges || []).map((edge: any) => edge?.node) || [];
   const productImageUrls = productImages.map((img: any) => img?.url).filter(Boolean);
@@ -194,7 +199,8 @@ export default async function ShopPage() {
   const priceAmount =
     detailedProduct?.priceRange?.minVariantPrice?.amount ||
     (fallbackPrice !== null ? fallbackPrice.toFixed(2) : BASE_PRICE.toFixed(2));
-  const priceCurrency = detailedProduct?.priceRange?.minVariantPrice?.currencyCode || "USD";
+  const priceCurrency =
+    detailedProduct?.priceRange?.minVariantPrice?.currencyCode || "USD";
   const productSku =
     detailedProduct?.variants?.edges
       ?.map((edge: any) => edge?.node)
@@ -203,34 +209,7 @@ export default async function ShopPage() {
     SINGLE_BAG_SKU;
 
   return (
-    <main className="relative overflow-hidden text-[var(--text)] min-h-screen pb-16">
-      <div className="relative w-full h-[280px] sm:h-[340px] lg:h-[380px] overflow-hidden">
-        <Image
-          src="/brand/americana/founding-fathers-fireside.jpg"
-          alt="Founding fathers in a warm fireside setting with USA Gummies"
-          fill
-          sizes="100vw"
-          className="object-cover object-top"
-          priority
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#1B2A4A]/55 to-[#1B2A4A]/75" />
-        <div className="relative z-10 flex flex-col items-center justify-center h-full text-center px-4">
-          <div className="relative w-52 h-24 mb-3">
-            <Image src="/brand/logo-full.png" alt="USA Gummies" fill sizes="208px" className="object-contain drop-shadow-[0_6px_24px_rgba(0,0,0,0.5)]" />
-          </div>
-          <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold uppercase tracking-wide text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.5)]">
-            Shop USA Gummies
-          </h1>
-          <p className="mt-2 text-sm text-white/90 max-w-md drop-shadow-[0_1px_4px_rgba(0,0,0,0.3)]">
-            Classic gummy bears, made in the USA. No artificial dyes.
-          </p>
-        </div>
-      </div>
-
-      <div className="mx-auto max-w-6xl px-4 -mt-5 relative z-10 flex justify-center">
-        <SocialProofStat />
-      </div>
-
+    <main>
       <BreadcrumbJsonLd
         items={[
           { name: "Home", href: "/" },
@@ -238,130 +217,25 @@ export default async function ShopPage() {
         ]}
       />
 
-      <section className={`${styles.scene} ${styles.sceneBundle} home-purchase-stage`} data-zone="BUNDLE">
-        <div className={styles.sceneBg} aria-hidden="true" />
-        <div className={styles.sceneOverlay} aria-hidden="true" />
-        <div className={styles.sceneContent}>
-          <div className="mx-auto max-w-6xl px-4 pb-1 sm:pb-1.5 lg:pb-2">
-            <div className="mt-0">
-              <div id="hero-primary-cta" className="atomic-buy americana-panel">
-                <div className="atomic-buy__glow" aria-hidden="true" />
-                <div className="atomic-buy__header">
-                  <div className="atomic-buy__headerMain">
-                    <div className="atomic-buy__kicker flex items-center gap-2">
-                      <Image
-                        src="/brand/logo.png"
-                        alt="USA Gummies logo"
-                        aria-hidden="true"
-                        width={72}
-                        height={24}
-                        className="brand-logo-mark"
-                      />
-                      <span>USA Gummies</span>
-                    </div>
-                    <div className="atomic-buy__headerTitle">
-                      Classic gummy bears, made in the USA.
-                    </div>
-                  </div>
-                  <div className="atomic-buy__headerSub">
-                    Add more bags and watch your per-bag price drop. Savings apply to your total bag count.
-                  </div>
-                </div>
-                <div className="atomic-buy__grid">
-                  <div className="atomic-buy__details">
-                    <ul className="atomic-buy__bullets">
-                      {DETAIL_BULLETS.slice(0, 3).map((bullet) => (
-                        <li key={bullet} className="atomic-buy__bullet">
-                          <span className="atomic-buy__bulletDot" aria-hidden="true" />
-                          <span>{bullet}</span>
-                        </li>
-                      ))}
-                    </ul>
-                    <div className="atomic-buy__chips">
-                      <span className="atomic-buy__chip">Made in USA</span>
-                      <span className="atomic-buy__chip">No artificial dyes</span>
-                      <span className="atomic-buy__chip">All natural</span>
-                      <span className="atomic-buy__chip">{FREE_SHIPPING_PHRASE}</span>
-                    </div>
-                    <div className="atomic-buy__ingredients">
-                      Ingredients &amp; allergen info: <Link href="/ingredients">ingredients</Link>. Guide:{" "}
-                      <Link href="/no-artificial-dyes-gummy-bears">No Artificial Dyes Gummy Bears</Link>.
-                    </div>
-                  </div>
-                  <div className="atomic-buy__media">
-                    <div className="atomic-buy__mediaFrame">
-                      <div className="relative aspect-[4/5] w-full">
-                        <Image
-                          src="/Hero-pack.jpeg"
-                          alt="Bag of USA Gummies classic gummy bears"
-                          fill
-                          priority
-                          fetchPriority="high"
-                          sizes="(max-width: 640px) 90vw, (max-width: 1023px) 92vw, 560px"
-                          className="object-contain drop-shadow-[0_24px_50px_rgba(13,28,51,0.2)]"
-                        />
-                      </div>
-                      <span className="usa-stamp usa-stamp--small atomic-buy__stamp">
-                        Made in USA
-                      </span>
-                    </div>
-                  </div>
-                  <div className="atomic-buy__bundle">
-                    <BagSlider variant="full" defaultQty={5} />
-                  </div>
-                  <div className="mt-2 flex items-center gap-3 rounded-xl border border-[rgba(15,27,45,0.08)] bg-[var(--surface-strong)] px-3 py-2">
-                    <div className="flex-1">
-                      <div className="text-xs font-semibold text-[var(--text)]">Not ready to commit?</div>
-                      <div className="text-[10px] text-[var(--muted)]">Try a single bag for $5.99. Love&nbsp;it?&nbsp;Come&nbsp;back&nbsp;for&nbsp;the&nbsp;5&#8209;pack.</div>
-                    </div>
-                    <Link href="/go/checkout?qty=1" className="btn btn-outline pressable whitespace-nowrap px-3 py-1.5 text-xs">
-                      Try 1 bag
-                    </Link>
-                  </div>
-                  <div className="mt-3">
-                    <GuaranteeBadge />
-                  </div>
-                </div>
-              </div>
-              <div className="mt-3">
-                <TrustBar variant="compact" />
-              </div>
-              <div className="mt-1.5 flex flex-wrap gap-1.5 text-[10px] text-[#1B2A4A]/70">
-                <span className="font-semibold text-[#1B2A4A]">Bag count guides:</span>
-                <Link href="/gummy-gift-bundles" className="underline underline-offset-4">
-                  Gift bag options
-                </Link>
-                <Link href="/patriotic-party-snacks" className="underline underline-offset-4">
-                  Party snacks
-                </Link>
-                <Link href="/bulk-gummy-bears" className="underline underline-offset-4">
-                  Bulk gummy bears
-                </Link>
-                <Link href="/no-artificial-dyes-gummy-bears" className="underline underline-offset-4">
-                  Red 40 Free Gummies
-                </Link>
-              </div>
-              <div className="mt-2 text-[11px] text-[#1B2A4A]/80">
-                Learn about{" "}
-                <Link href="/made-in-usa-candy" className="underline underline-offset-4">
-                  American-Made Candy
-                </Link>
-                .
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+      <HeroSection />
+      <ScarcityBar />
+      <ThreePromises />
+      <GuaranteeBlock />
 
-      <section className="bg-transparent" data-zone="BLOG">
-        <div className="mx-auto max-w-6xl px-4 py-4">
-          <LatestFromBlog />
-        </div>
-      </section>
-
+      {/* Internal-link hub — SEO-valuable cross-links to bag-count guides
+       * and related products. Wrapped in an LP-language section so it
+       * matches the brand. */}
       {hasModules ? (
-        <section className="bg-transparent" data-zone="INTERNAL-LINKS">
-          <div className="mx-auto max-w-6xl px-4 py-4">
+        <section className="border-y-2 border-[var(--lp-ink)] bg-[var(--lp-cream-soft)]">
+          <div className="mx-auto max-w-[1200px] px-5 py-14 sm:px-8 sm:py-20">
+            <div className="mb-8 text-center">
+              <p className="lp-label mb-2 text-[var(--lp-red)]">★ Explore the Lineup ★</p>
+              <h2 className="lp-display text-[clamp(2rem,5vw,3.4rem)] text-[var(--lp-ink)]">
+                More from
+                <br />
+                <span className="lp-script text-[var(--lp-red)]">USA Gummies.</span>
+              </h2>
+            </div>
             <div className="link-modules">
               {relatedProducts.length ? (
                 <LinkModule title="Related Products">
@@ -370,7 +244,6 @@ export default async function ShopPage() {
                   ))}
                 </LinkModule>
               ) : null}
-
               {topGuides.length ? (
                 <LinkModule title="Top Guides">
                   {topGuides.map((guide) => (
@@ -383,7 +256,50 @@ export default async function ShopPage() {
         </section>
       ) : null}
 
-      <BagSlider variant="sticky" defaultQty={5} />
+      {/* Bag-count guides — direct text links for SEO + navigation. */}
+      <section className="bg-[var(--lp-cream)]">
+        <div className="mx-auto max-w-[1200px] px-5 py-10 sm:px-8 sm:py-14 text-center">
+          <p className="lp-label mb-3 text-[var(--lp-red)]">★ How Many Bags? ★</p>
+          <h2 className="lp-display text-[clamp(1.8rem,4vw,2.6rem)] text-[var(--lp-ink)]">
+            Pick the right bag count.
+          </h2>
+          <div className="mt-6 flex flex-wrap justify-center gap-3">
+            {[
+              { href: "/gummy-gift-bundles", label: "Gift bag options" },
+              { href: "/patriotic-party-snacks", label: "Party snacks" },
+              { href: "/bulk-gummy-bears", label: "Bulk gummy bears" },
+              { href: "/no-artificial-dyes-gummy-bears", label: "Red 40 free" },
+              { href: "/made-in-usa-candy", label: "American-made candy" },
+            ].map((g) => (
+              <Link
+                key={g.href}
+                href={g.href}
+                className="lp-label inline-flex items-center gap-2 border-2 border-[var(--lp-ink)] bg-[var(--lp-off-white)] px-4 py-2 text-[var(--lp-ink)] shadow-[3px_3px_0_var(--lp-red)] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0_var(--lp-red)] transition-transform"
+              >
+                <span aria-hidden className="lp-star-ornament h-3 w-3 text-[var(--lp-red)]" />
+                {g.label}
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <FaqAccordion />
+
+      {/* Latest from blog — content hub signal. */}
+      <section className="bg-[var(--lp-cream-soft)] border-y-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[1200px] px-5 py-14 sm:px-8 sm:py-20">
+          <div className="mb-8 text-center">
+            <p className="lp-label mb-2 text-[var(--lp-red)]">★ From the Journal ★</p>
+            <h2 className="lp-display text-[clamp(2rem,5vw,3.4rem)] text-[var(--lp-ink)]">
+              Latest stories.
+            </h2>
+          </div>
+          <LatestFromBlog />
+        </div>
+      </section>
+
+      <StickyBuyBar />
 
       <ProductJsonLd
         name={detailedProduct?.title || "USA Gummies - All American Gummy Bears"}
@@ -398,7 +314,9 @@ export default async function ShopPage() {
         priceAmount={priceAmount}
         brandName="USA Gummies"
         siteUrl={SITE_URL}
-        availability={bundleVariants?.availableForSale === false ? "OutOfStock" : "InStock"}
+        availability={
+          bundleVariants?.availableForSale === false ? "OutOfStock" : "InStock"
+        }
         aggregateRating={
           reviewAggregate
             ? {

@@ -1,22 +1,38 @@
+// /products/[handle] — single-product PDP. Uses the LP design language
+// (HeroSection, ScarcityBar, ThreePromises, GuaranteeBlock, FaqAccordion)
+// with PDP-specific extras: ProductGallery (multi-angle bag photos for
+// SEO image search), ReviewsSection (full review wall), ProductFaqAccordion
+// (product-specific FAQ), BagSlider as the second purchase opportunity at
+// the bottom. ProductJsonLd + BreadcrumbJsonLd preserved for rich results.
+//
+// Net: 298-line bespoke PDP → ~140-line LP-flow PDP with all SEO +
+// commerce wiring intact.
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+
+import { HeroSection } from "@/components/lp/HeroSection";
+import { ScarcityBar } from "@/components/lp/ScarcityBar";
+import { ThreePromises } from "@/components/lp/ThreePromises";
+import { GuaranteeBlock } from "@/components/lp/GuaranteeBlock";
+import { FaqAccordion } from "@/components/lp/FaqAccordion";
+import { StickyBuyBar } from "@/components/lp/StickyBuyBar";
+
 import BagSlider from "@/components/purchase/BagSlider.client";
 import { ProductGallery } from "@/components/product/ProductGallery.client";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 import { ProductJsonLd } from "@/components/seo/ProductJsonLd";
 import FocusBundles from "./FocusBundles.client";
+import ReviewsSection from "@/components/home/ReviewsSection";
+import ProductFaqAccordion from "./ProductFaqAccordion";
+import ProductViewTracker from "@/components/tracking/ProductViewTracker.client";
+
 import { getBundleVariants } from "@/lib/bundles/getBundleVariants";
 import { SINGLE_BAG_SKU } from "@/lib/bundles/atomic";
 import { BASE_PRICE, FREE_SHIPPING_PHRASE } from "@/lib/bundles/pricing";
 import { buildCanonicalUrl, resolveSiteUrl } from "@/lib/seo/canonical";
 import { getProductByHandle } from "@/lib/storefront";
-import { DETAIL_BULLETS } from "@/data/productDetails";
-import ReviewsSection from "@/components/home/ReviewsSection";
-import { TrustBar, GuaranteeBadge } from "@/components/social-proof/TrustBar";
-import ProductFaqAccordion from "./ProductFaqAccordion";
 import { getReviewAggregate } from "@/lib/reviews/aggregate";
-import ProductViewTracker from "@/components/tracking/ProductViewTracker.client";
 
 export const revalidate = 3600;
 
@@ -46,7 +62,9 @@ function buildProductTitle(name?: string | null) {
 function buildProductDescription(name?: string | null) {
   if (!name) return PRODUCT_DESCRIPTION_FALLBACK;
   const maxName =
-    PRODUCT_DESCRIPTION_MAX - PRODUCT_DESCRIPTION_PREFIX.length - PRODUCT_DESCRIPTION_SUFFIX.length;
+    PRODUCT_DESCRIPTION_MAX -
+    PRODUCT_DESCRIPTION_PREFIX.length -
+    PRODUCT_DESCRIPTION_SUFFIX.length;
   const safeName = clampText(name, Math.max(0, maxName));
   return `${PRODUCT_DESCRIPTION_PREFIX}${safeName}${PRODUCT_DESCRIPTION_SUFFIX}`;
 }
@@ -62,7 +80,10 @@ type PageProps = {
   params: Promise<{ handle: string }>;
 };
 
-export async function generateMetadata({ params, searchParams }: MetadataProps): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+  searchParams,
+}: MetadataProps): Promise<Metadata> {
   const { handle } = await params;
   const resolvedSearchParams = (await searchParams) ?? {};
   const siteUrl = resolveSiteUrl();
@@ -95,18 +116,8 @@ export async function generateMetadata({ params, searchParams }: MetadataProps):
     title,
     description,
     alternates: { canonical },
-    openGraph: {
-      title,
-      description,
-      url: canonical,
-      images: [{ url: ogImage }],
-    },
-    twitter: {
-      card: "summary_large_image",
-      title,
-      description,
-      images: [ogImage],
-    },
+    openGraph: { title, description, url: canonical, images: [{ url: ogImage }] },
+    twitter: { card: "summary_large_image", title, description, images: [ogImage] },
   };
 }
 
@@ -128,10 +139,14 @@ export default async function ProductPage({ params }: PageProps) {
 
   const reviewAggregate = await getReviewAggregate();
 
-  const productImages = (product.images?.edges || []).map((edge: any) => edge?.node).filter(Boolean);
+  const productImages = (product.images?.edges || [])
+    .map((edge: any) => edge?.node)
+    .filter(Boolean);
   const productImageUrls = productImages.map((img: any) => img?.url).filter(Boolean);
   const stickyImage =
-    product.featuredImage?.url || productImageUrls[0] || "/brand/usa-gummies-family.webp";
+    product.featuredImage?.url ||
+    productImageUrls[0] ||
+    "/brand/usa-gummies-family.webp";
   const fallbackPrice =
     bundleVariants?.variants?.find((variant) => variant.quantity === 1)?.totalPrice ?? null;
   const priceAmount =
@@ -145,10 +160,8 @@ export default async function ProductPage({ params }: PageProps) {
     bundleVariants?.singleBagSku ||
     SINGLE_BAG_SKU;
 
-  const summaryCopy = clampText(product.description || PRODUCT_DESCRIPTION_FALLBACK, 140);
-
   return (
-    <main className="min-h-screen bg-white text-[var(--text)]">
+    <main>
       <ProductViewTracker
         productId={product.handle}
         productName={product.title}
@@ -165,112 +178,98 @@ export default async function ProductPage({ params }: PageProps) {
         ]}
       />
 
-      <section className="mx-auto max-w-6xl px-4 py-10">
-        <div className="atomic-buy">
-          <div className="atomic-buy__glow" aria-hidden="true" />
-          <div className="atomic-buy__header">
-            <div className="atomic-buy__headerMain">
-              <div className="atomic-buy__kicker">USA Gummies</div>
-              <h1 className="atomic-buy__headerTitle">{product.title}</h1>
-            </div>
-            <div className="atomic-buy__headerSub">{summaryCopy}</div>
+      <HeroSection />
+      <ScarcityBar />
+
+      {/* Product gallery — multi-angle photography for SEO image
+       * search and shoppers who want to see more before buying. */}
+      <section className="bg-[var(--lp-cream)] border-b-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[1200px] px-5 py-12 sm:px-8 sm:py-16">
+          <div className="mb-8 text-center">
+            <p className="lp-label mb-2 text-[var(--lp-red)]">★ Every Angle ★</p>
+            <h2 className="lp-display text-[clamp(1.8rem,4vw,2.6rem)] text-[var(--lp-ink)]">
+              See it from
+              <br />
+              <span className="lp-script text-[var(--lp-red)]">every side.</span>
+            </h2>
           </div>
-
-          <div className="atomic-buy__grid">
-            <div id="product-details" className="atomic-buy__details">
-              <ul className="atomic-buy__bullets">
-                {DETAIL_BULLETS.map((bullet) => (
-                  <li key={bullet} className="atomic-buy__bullet">
-                    <span className="atomic-buy__bulletDot" aria-hidden="true" />
-                    <span>{bullet}</span>
-                  </li>
-                ))}
-              </ul>
-              <div className="atomic-buy__chips">
-                <span className="atomic-buy__chip">Made in USA</span>
-                <span className="atomic-buy__chip">No artificial dyes</span>
-                <span className="atomic-buy__chip">All natural</span>
-                <span className="atomic-buy__chip">{FREE_SHIPPING_PHRASE}</span>
-              </div>
-              <div className="atomic-buy__ingredients">
-                Ingredients &amp; allergen info: <Link href="/ingredients">ingredients</Link>. Guide:{" "}
-                <Link href="/no-artificial-dyes-gummy-bears">No Artificial Dyes Gummy Bears</Link>.
-              </div>
-            </div>
-
-            <div className="atomic-buy__media">
-              <ProductGallery
-                title={product.title}
-                featured={product.featuredImage ?? null}
-                images={productImages}
-              />
-            </div>
-
-            <div id="product-bundles" className="atomic-buy__bundle">
-              <BagSlider variant="full" defaultQty={5} />
-            </div>
-          </div>
+          <ProductGallery
+            title={product.title}
+            featured={product.featuredImage ?? null}
+            images={productImages}
+          />
         </div>
       </section>
 
-      {/* ── REVIEWS ── */}
-      <section className="bg-[var(--surface-strong)]">
-        <div className="mx-auto max-w-6xl px-4 py-10 lg:py-14">
+      <ThreePromises />
+      <GuaranteeBlock />
+
+      {/* Reviews — full review wall with verified-buyer rating. */}
+      <section
+        id="product-reviews"
+        className="bg-[var(--lp-cream-soft)] border-y-2 border-[var(--lp-ink)]"
+      >
+        <div className="mx-auto max-w-[1200px] px-5 py-14 sm:px-8 sm:py-20">
+          <div className="mb-8 text-center">
+            <p className="lp-label mb-2 text-[var(--lp-red)]">★ Verified Buyers ★</p>
+            <h2 className="lp-display text-[clamp(2rem,5vw,3.4rem)] text-[var(--lp-ink)]">
+              What folks are
+              <br />
+              <span className="lp-script text-[var(--lp-red)]">saying.</span>
+            </h2>
+          </div>
           <ReviewsSection />
         </div>
       </section>
 
-      {/* ── PRODUCT FAQ ── */}
-      <section className="bg-white">
-        <div className="mx-auto max-w-3xl px-4 py-10 lg:py-14">
-          <div className="text-center mb-6">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-              Common questions
-            </div>
-            <h2 className="mt-1 text-2xl font-black text-[var(--text)] sm:text-3xl">
-              Product FAQ
+      {/* Product-specific FAQ — distinct from the brand FAQ above. */}
+      <section className="bg-[var(--lp-cream)]">
+        <div className="mx-auto max-w-3xl px-5 py-14 sm:px-8 sm:py-20">
+          <div className="mb-6 text-center">
+            <p className="lp-label mb-2 text-[var(--lp-red)]">★ Product FAQ ★</p>
+            <h2 className="lp-display text-[clamp(1.8rem,4vw,2.6rem)] text-[var(--lp-ink)]">
+              About this
+              <br />
+              <span className="lp-script text-[var(--lp-red)]">bag.</span>
             </h2>
           </div>
           <ProductFaqAccordion />
         </div>
       </section>
 
-      {/* ── TRUST & QUALITY ── */}
-      <section className="bg-[var(--surface-strong)]">
-        <div className="mx-auto max-w-4xl px-4 py-10 lg:py-14">
-          <div className="text-center mb-6">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-              Quality promise
-            </div>
-            <h2 className="mt-1 text-2xl font-black text-[var(--text)] sm:text-3xl">
-              Why USA Gummies
-            </h2>
-          </div>
-          <TrustBar variant="full" />
-          <div className="mt-4 flex justify-center">
-            <GuaranteeBadge />
-          </div>
-        </div>
-      </section>
+      <FaqAccordion />
 
-      {/* ── BUNDLE UPSELL ── */}
-      <section className="bg-white">
-        <div className="mx-auto max-w-4xl px-4 py-10 lg:py-14">
-          <div className="text-center mb-6">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--muted)]">
-              Save more
-            </div>
-            <h2 className="mt-1 text-2xl font-black text-[var(--text)] sm:text-3xl">
-              Bundle &amp; save
+      {/* Second purchase opportunity at the bottom — bundle savings
+       * panel for shoppers who scrolled all the way through. */}
+      <section
+        id="product-bundles"
+        className="bg-[var(--lp-cream-soft)] border-t-2 border-[var(--lp-ink)]"
+      >
+        <div className="mx-auto max-w-[1200px] px-5 py-14 sm:px-8 sm:py-20">
+          <div className="mb-8 text-center">
+            <p className="lp-label mb-2 text-[var(--lp-red)]">★ Bundle &amp; Save ★</p>
+            <h2 className="lp-display text-[clamp(2rem,5vw,3.4rem)] text-[var(--lp-ink)]">
+              Lower the
+              <br />
+              <span className="lp-script text-[var(--lp-red)]">per-bag price.</span>
             </h2>
-            <p className="mt-2 text-sm text-[var(--muted)]">
-              Lower the per-bag price with bundles. {FREE_SHIPPING_PHRASE}.
+            <p className="lp-sans mx-auto mt-3 max-w-[42ch] text-[var(--lp-ink)]/85">
+              Add bags, watch the price drop. {FREE_SHIPPING_PHRASE}.{" "}
+              <Link href="/ingredients" className="underline underline-offset-4">
+                Ingredients &amp; allergen info
+              </Link>
+              .
             </p>
           </div>
-          <BagSlider variant="full" defaultQty={5} />
+          <div
+            className="mx-auto max-w-[600px] border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-5 shadow-[6px_6px_0_var(--lp-red)] sm:p-7"
+          >
+            <BagSlider variant="full" defaultQty={5} />
+          </div>
         </div>
       </section>
 
+      <StickyBuyBar />
       <BagSlider variant="sticky" defaultQty={5} />
 
       <ProductJsonLd
@@ -283,7 +282,9 @@ export default async function ProductPage({ params }: PageProps) {
         priceAmount={priceAmount}
         brandName="USA Gummies"
         siteUrl={resolveSiteUrl()}
-        availability={bundleVariants?.availableForSale === false ? "OutOfStock" : "InStock"}
+        availability={
+          bundleVariants?.availableForSale === false ? "OutOfStock" : "InStock"
+        }
         aggregateRating={
           reviewAggregate
             ? {
