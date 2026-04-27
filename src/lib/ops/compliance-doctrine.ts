@@ -153,7 +153,7 @@ export const COMPLIANCE_DOCTRINE: DoctrineObligation[] = [
     action:
       "Renew FFR via https://www.access.fda.gov/oaa/ — both the Ashford warehouse AND the Powers co-packer facility on our registration.",
     dateSource: "FDA FFR portal for facility FEI #",
-    owner: "Drew",
+    owner: "Ben",
     penaltyIfMissed:
       "Registration canceled → FDA issues Import Alert; product can't enter commerce",
     reference: "https://www.fda.gov/food/online-registration-food-facilities",
@@ -212,7 +212,7 @@ export const COMPLIANCE_DOCTRINE: DoctrineObligation[] = [
     action:
       "Request updated COI from Powers each renewal; store in /Legal/Vendor Insurance Notion folder.",
     dateSource: "Powers Confections insurance broker",
-    owner: "Drew",
+    owner: "Ben",
     penaltyIfMissed:
       "Retailer audits without current COI → product pull; contract-breach exposure",
   },
@@ -225,7 +225,7 @@ export const COMPLIANCE_DOCTRINE: DoctrineObligation[] = [
     action:
       "Request updated COI from Belmark each renewal; store in /Legal/Vendor Insurance Notion folder.",
     dateSource: "Belmark Insurance broker",
-    owner: "Drew",
+    owner: "Ben",
     penaltyIfMissed:
       "Supply-chain contract breach exposure in any claim involving packaging",
   },

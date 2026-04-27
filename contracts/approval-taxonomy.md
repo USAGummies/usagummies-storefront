@@ -2,8 +2,10 @@
 
 **Status:** CANONICAL
 **Source:** Notion blueprint §15.3
-**Version:** 1.3 — 2026-04-25
+**Version:** 1.4 — 2026-04-27 (Phase 29 Drew sweep — "drew owns nothing" doctrine)
 **Governing file:** Also defined in code at `src/lib/ops/control-plane/taxonomy.ts`. Code and this doc must stay in lockstep.
+
+**Doctrinal correction (Ben 2026-04-27):** Drew is not an approver. All approval slugs that previously named Drew (`qbo.po.draft`, `inventory.commit`, `run.plan.commit`, `inventory.adjustment.large`) have been reassigned. Drew remains a fulfillment node for samples + East Coast destinations per CLAUDE.md, but does not own approval lanes.
 
 ---
 
@@ -12,8 +14,8 @@
 | Class | Name | Meaning | Who approves |
 |---|---|---|---|
 | `A` | Autonomous | Observe / Prepare. No approval. | N/A |
-| `B` | Single approval | Commit after one human approval. | Ben for sales/commercial; Rene for finance; Drew for operations |
-| `C` | Dual approval | High-impact commit requires two humans. | Ben + Rene for money; Ben + Drew for supply commitments |
+| `B` | Single approval | Commit after one human approval. | Ben for sales/commercial + operations; Rene for finance |
+| `C` | Dual approval | High-impact commit requires two humans. | Ben + Rene for money and supply commitments |
 | `D` | Red-Line / prohibited | Never autonomous. Manual only. | Human must initiate and execute |
 
 ## Operating shorthand
@@ -54,7 +56,7 @@ One approver. Request lands in `#ops-approvals` with tap-to-approve UX.
 | `gmail.send` | Send outreach email | Ben |
 | `hubspot.deal.stage.move` | Move a live deal stage | Ben |
 | `qbo.invoice.draft` | Create QBO invoice draft (not send) | Rene |
-| `qbo.po.draft` | Create QBO PO draft (not send) | Drew |
+| `qbo.po.draft` | Create QBO PO draft (not send) | Ben |
 | `shipment.create` | Create sample/order shipment | Ben |
 | `content.publish` | Publish blog or social post | Ben |
 | `division.activate` | Activate a latent division. Downstream automation (flipping `divisions.json`, creating the channel, writing the agent contract) is still manual — see [`activation-triggers.md`](activation-triggers.md) §"What this actually automates." | Ben |
@@ -71,7 +73,7 @@ One approver. Request lands in `#ops-approvals` with tap-to-approve UX.
 | `qbo.bill.create` | Create a QBO bill from vendor invoice intake | Rene |
 | `qbo.bill.approve-for-payment` | Mark a QBO bill approved for the next payment run | Rene |
 | `receipt.review.promote` | Acknowledge a captured receipt + OCR suggestion as Rene-reviewed. NOT a QBO write — an eligible packet still flows through a separate Class B `qbo.bill.create` later. Approval transitions the in-repo review packet from `draft` → `rene-approved`; canonical receipt fields and QBO state are untouched. | Rene |
-| `vendor.master.create` | Create a new vendor master (QBO vendor + Notion dossier + Drive) | Rene (Drew may originate supply-vendors) |
+| `vendor.master.create` | Create a new vendor master (QBO vendor + Notion dossier + Drive) | Rene |
 | `invoice.write-off.draft` | Draft a bad-debt write-off on overdue invoice under Rene-only threshold | Rene |
 | `ar.hold.set` | Set AR-hold flag on a customer/company — blocks new orders across Shopify B2B, Faire, direct | Rene |
 | `ar.hold.clear` | Clear the AR-hold flag on a customer/company | Rene |
@@ -92,7 +94,7 @@ Two approvers. Request remains pending until both approve; any reject terminates
 |---|---|---|
 | `qbo.invoice.send` | Send invoice (money request) | Ben + Rene |
 | `payment.release` | Approve vendor payment / ACH | Ben + Rene |
-| `inventory.commit` | Commit inventory buy | Ben + Drew |
+| `inventory.commit` | Commit inventory buy | Ben + Rene |
 | `vendor.financial.commit` | Major vendor financial commitment (new copacker, agency retainer) | Ben + Rene |
 | `pricing.change` | Structural pricing change (wholesale tier, MSRP) | Ben + Rene |
 | `invoice.write-off.execute` | Execute a bad-debt write-off (above Rene-only threshold) | Ben + Rene |
@@ -100,8 +102,8 @@ Two approvers. Request remains pending until both approve; any reject terminates
 | `credit-limit.expand` | Expand a retailer credit limit above the tier default | Ben + Rene |
 | `qbo.period.close.final` | Final monthly period close lock | Ben + Rene |
 | `ad.spend.launch` | Launch a paid-media campaign with single-campaign budget > $500 | Ben + Rene |
-| `run.plan.commit` | Commit a production run with Powers (cash impact + lot) | Ben + Drew |
-| `inventory.adjustment.large` | Cycle-count adjustment > 50 units | Ben + Drew |
+| `run.plan.commit` | Commit a production run with Powers (cash impact + lot) | Ben + Rene |
+| `inventory.adjustment.large` | Cycle-count adjustment > 50 units | Ben + Rene |
 
 ## Class D — Red-Line / prohibited
 

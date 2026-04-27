@@ -8,7 +8,7 @@
 
 ## Where the build is right now
 
-**Test suite:** 1,754 green (116 files). **Workflow blueprint:** v1.48. **Latest baseline:** `1ee5916 feat(stack-readiness): Phase 28L.3`.
+**Test suite:** 1,757 green (117 files). **Workflow blueprint:** v1.49. **Latest baseline:** `40227c4 feat(agent-health): Phase 28L.4`.
 
 **Active build directive (Ben 2026-04-27):** "build the entire system tested." Working through Phase 28L → 29 → 30 → 31 autonomously. See workflow-blueprint.md §"Top P0 build items" for the full queue.
 
@@ -29,8 +29,8 @@
 | Phase 28L.2 — Session handoff doc | DONE (this file) | this session |
 | Phase 28L.3 — Stack-readiness dashboard | DONE | this session |
 | Phase 28L.4 — Agent health surface | DONE | this session |
-| Phase 29 — Drew doctrine sweep | NEXT | — |
-| Phase 30.1-30.4 — AP packet UI, Reorder triggers, Inbox triage closed-loop, Reply composer + Pipeline enrich tests | QUEUED | — |
+| Phase 29 — Drew doctrine sweep | DONE | this session |
+| Phase 30.1-30.4 — AP packet UI, Reorder triggers, Inbox triage closed-loop, Reply composer + Pipeline enrich tests | NEXT | — |
 | Phase 31.1 — USPTO/FDA tracking | QUEUED | — |
 | Phase 31.2 — External vendor portal | QUEUED | — |
 
@@ -66,7 +66,7 @@ These are immutable. If the user asks to relax one, push back and reference this
 2. **Every state transition writes an audit envelope.** No silent writes.
 3. **Class A/B/C/D approval taxonomy is the authority.** Class C and D writes never go autonomous. Slack-approval click is the authorization.
 4. **The `interviewer` agent runs first on under-specified non-trivial requests.** Ask 3-5 questions with defaults; never block longer than that.
-5. **Drew owns nothing** (2026-04-27 correction). Approver / handler refs to Drew need reassignment — sweep pending in Phase 29.
+5. **Drew owns nothing** (2026-04-27 correction). Phase 29 sweep DONE — taxonomy / compliance-doctrine / divisions / ops + inventory-specialist agent contracts all reassigned to Ben (or Ben+Rene Class C). New doctrine-lock test in `src/lib/ops/__tests__/drew-doctrine.test.ts` enforces the invariant.
 6. **Orders → Ben (Ashford WA), samples → Drew, `#shipping` is the single source of truth** for label PDFs (v1.0 SHIPPING PROTOCOL pinned 2026-04-10).
 7. **No QBO writes without registered taxonomy slug + Class B/C approval.**
 

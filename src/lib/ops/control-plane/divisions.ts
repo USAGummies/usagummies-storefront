@@ -55,11 +55,11 @@ const DIVISIONS: readonly Division[] = Object.freeze([
     id: "production-supply-chain",
     name: "Production & Supply Chain",
     state: "active",
-    humanOwner: "Drew",
+    humanOwner: "Ben",
     primaryAiLayer: "Ops / vendor / PO agent",
     primarySystems: ["QBO POs", "vendor email threads", "ShipStation", "inventory records"],
     visibleSlackChannels: ["operations"],
-    notes: "Vendors, POs, samples, inventory, freight, production coordination.",
+    notes: "Vendors, POs, samples, inventory, freight, production coordination. Per Ben 2026-04-27 doctrinal correction \"drew owns nothing\", Ben owns the division; Drew remains a fulfillment node for samples + East Coast destinations only.",
   },
   {
     id: "research-intelligence",

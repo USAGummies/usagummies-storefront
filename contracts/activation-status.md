@@ -45,7 +45,7 @@
 | Contract | Scope | Owner | Runtime path (planned) |
 |---|---|---|---|
 | [agents/reconciliation-specialist.md](agents/reconciliation-specialist.md) | Thursday weekly reconcile prep | Rene | Subset of Finance Exception Agent — promote to standalone if scope grows |
-| [agents/inventory-specialist.md](agents/inventory-specialist.md) | Per-SKU cover-day scan | Drew | Subset of Ops Agent (now that Shopify on-hand cross-ref is wired into Ops Agent directly) — promote to standalone if Drew needs a dedicated cover-day forecast surface. |
+| [agents/inventory-specialist.md](agents/inventory-specialist.md) | Per-SKU cover-day scan | Ben | Subset of Ops Agent (now that Shopify on-hand cross-ref is wired into Ops Agent directly) — promote to standalone if a dedicated cover-day forecast surface is needed. |
 | [agents/r1-consumer.md](agents/r1-consumer.md) … [r7-press.md](agents/r7-press.md) | On-demand research per stream | Ben | 7 separate LLM-driven runtimes (Feedly Pro / Muck Rack / SerpAPI / USPTO TESS / SEC EDGAR / Finbox). Note-capture infra live via POST /api/ops/research/note; Librarian synthesis live. Individual LLM agents blocked on Ben's tool-stack decision. |
 | [agents/platform-specialist.md](agents/platform-specialist.md) | Connector smoke + secret rotation | Ben | Extends the existing platform health cron |
 
@@ -98,9 +98,9 @@ The no-fabrication rule means every missing data point surfaces with an explicit
 
 Per [`agents/README.md`](agents/README.md) rule 5:
 
-> Monday activation gate: Ben, Rene, or Drew (owner per division) must approve the corresponding contracts in `#ops-approvals` before the agent is turned on.
+> Monday activation gate: Ben or Rene (owner per division) must approve the corresponding contracts in `#ops-approvals` before the agent is turned on.
 
-The 2 new agents (Finance Exception Agent, Ops Agent) are wired but require Rene's + Drew's acknowledgment before the cron is left running unsupervised. Smoke-test their output once (via POST with `post=false`) before the first live post.
+The 2 new agents (Finance Exception Agent, Ops Agent) are wired but require Ben's + Rene's acknowledgment before the cron is left running unsupervised. Smoke-test their output once (via POST with `post=false`) before the first live post.
 
 ## Open questions
 

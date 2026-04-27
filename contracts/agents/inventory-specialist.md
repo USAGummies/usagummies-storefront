@@ -1,9 +1,9 @@
 # Agent Contract — Inventory Specialist (S-07)
 
 **Status:** CANONICAL (day-one, in-the-loop)
-**Version:** 1.0 — 2026-04-20
+**Version:** 1.1 — 2026-04-27 (Phase 29 Drew sweep — owner reassigned to Ben; Class C dual approvers Ben+Rene)
 **Division:** `production-supply-chain`
-**Human owner:** Drew (primary); Ben (commercial promise-to-ship)
+**Human owner:** Ben (primary); Rene (Class C second approver)
 **Schema:** [`/contracts/governance.md`](../governance.md) §3
 
 ---
@@ -45,31 +45,31 @@ One job: keep **Shopify Admin inventory accurate** and **available-to-promise ho
 
 | Action slug | Class | Approver | Notes |
 |---|---|---|---|
-| `qbo.po.draft` | **B** | Drew | Draft a PO to Albanese / Belmark / Powers when cover < threshold. |
-| `inventory.adjustment.large` | **C** | Ben + Drew | Cycle-count variance > 50 units. |
-| `inventory.commit` | **C** | Ben + Drew | Commit a production run buy per Canon. |
-| `run.plan.commit` | **C** | Ben + Drew | Commit a Powers production run. |
-| `hubspot.task.create` | **A** | none | Task Drew on cycle count, Ben on commercial ATP decisions. |
+| `qbo.po.draft` | **B** | Ben | Draft a PO to Albanese / Belmark / Powers when cover < threshold. |
+| `inventory.adjustment.large` | **C** | Ben + Rene | Cycle-count variance > 50 units. |
+| `inventory.commit` | **C** | Ben + Rene | Commit a production run buy per Canon. |
+| `run.plan.commit` | **C** | Ben + Rene | Commit a Powers production run. |
+| `hubspot.task.create` | **A** | none | Task Ben on cycle count + commercial ATP decisions. |
 | `slack.post.audit` | **A** | none | Mirror daily cover report + alerts to `#operations` + `#ops-audit`. |
 | `open-brain.capture` | **A** | none | Per-SKU cover vector + trailing sell-through for trend analysis. |
-| Modifying Shopify inventory directly | **A** (small count adj) / **C** (> 50 units) | Drew (small) / Ben + Drew (large) | Small fixes (e.g., damaged unit write-off of 1–5 units) flow through Class A cycle-count note; large adjustments are Class C. |
+| Modifying Shopify inventory directly | **A** (small count adj) / **C** (> 50 units) | Ben (small) / Ben + Rene (large) | Small fixes (e.g., damaged unit write-off of 1–5 units) flow through Class A cycle-count note; large adjustments are Class C. |
 | Selling / promising inventory that doesn't exist | — | **PROHIBITED** | ATP gate refuses; post `warning` to `#sales`. |
-| Allocating to Amazon FBA without Drew approval | — | **PROHIBITED** (Class C `inventory.commit` required) | FBA transfers are commits. |
+| Allocating to Amazon FBA without Ben approval | — | **PROHIBITED** (Class C `inventory.commit` required) | FBA transfers are commits. |
 
 ## Prohibited
 
 - **Promising ATP you don't have.** If Shopify ATP can't fulfill (incoming Faire + direct B2B + Amazon FBM orders collectively exceed on-hand), refuse the next order + post `warning` to `#sales` + `#operations` with the shortfall detail.
-- **Auto-allocating inventory to Amazon FBA.** FBA inbound is a Class C `inventory.commit` decision (Ben + Drew).
+- **Auto-allocating inventory to Amazon FBA.** FBA inbound is a Class C `inventory.commit` decision (Ben + Rene).
 - **Skipping a cycle-count variance > 2%.** Monthly cycle count is mandatory per Canon; any > 2% variance triggers `warning` to `#operations` and a re-count.
 - **Fabricating a cover-day number.** Every cover figure cites Shopify Admin `retrievedAt` + the trailing-4-week sell-through window.
-- **Promising a ship date Drew hasn't confirmed.** Production run delivery dates come from Drew's confirmation, not from an inferred vendor lead time.
+- **Promising a ship date Ben hasn't confirmed.** Production run delivery dates come from Ben's confirmation (sourced from Powers / Albanese / Belmark vendor responses), not from an inferred vendor lead time.
 
 ## Heartbeat
 
 `cron` + event:
 - Daily 14:30 UTC (7:30 AM PDT / 6:30 AM PST) → cover-day scan per SKU; post digest to `#operations`
 - Weekly Monday 15:00 UTC (8 AM PDT / 7 AM PST) → trailing sell-through + 30/60/90-day demand projection
-- Monthly (first Monday) → cycle count prompt to Drew with the 5-SKU rotation
+- Monthly (first Monday) → cycle count prompt to Ben with the 5-SKU rotation
 - Event: Shopify order paid → ATP decrement check; if pushes a SKU below floor, pre-emptive `warning` to `#operations`
 - Event: Amazon settlement posted with FBA decrement → ATP update
 - Event: goods-receipt at Ashford confirmed → ATP increment
@@ -85,15 +85,15 @@ One job: keep **Shopify Admin inventory accurate** and **available-to-promise ho
 - **Division surface:** `#operations` for daily cover digest + cycle-count prompts + run-proposal drafts.
 - **Severity tier policy:**
   - All SKUs cover ≥ 30 days = `info`.
-  - Any SKU cover 14–29 days = `action` to `#operations` with Drew mention + HubSpot task.
+  - Any SKU cover 14–29 days = `action` to `#operations` with Ben mention + HubSpot task.
   - Any SKU cover 7–13 days = `warning` to `#operations` + `#ops-alerts` + PO draft staged.
-  - Any SKU cover < 7 days = `critical` to `#ops-alerts` + Ben + Drew DM; pause new paid listings/promos on that SKU.
+  - Any SKU cover < 7 days = `critical` to `#ops-alerts` + Ben DM; pause new paid listings/promos on that SKU.
   - Cycle-count variance > 5% = `critical` (cross-check with damage log + shipment log).
   - ATP overcommit detected (sum of open orders > on-hand + in-transit) = `critical` to `#sales` + `#operations`.
 
 ## Escalation
 
-- Cover < 7 days with no in-transit run confirmed → `critical` + Ben + Drew propose emergency production timeline.
+- Cover < 7 days with no in-transit run confirmed → `critical` + Ben proposes emergency production timeline (Rene loops in for Class C `run.plan.commit`).
 - Shopify Admin unreachable > 1h during business hours → `warning` + fallback to ShipStation pick queue as rough ATP proxy (explicitly degraded).
 - FBA inbound shipment delayed > 3 days past Amazon-confirmed arrival → `warning` to `#operations`.
 
@@ -101,7 +101,7 @@ One job: keep **Shopify Admin inventory accurate** and **available-to-promise ho
 
 - **green** — all SKUs cover ≥ 14 days, cycle-count variance ≤ 2% last month, zero ATP overcommits in last 7 days.
 - **yellow** — any SKU cover 7–13 days without a PO draft staged OR cycle-count variance 2–5%.
-- **red** — any SKU cover < 7 days without escalation OR ATP overcommit shipped → auto-pause pending Ben + Drew review.
+- **red** — any SKU cover < 7 days without escalation OR ATP overcommit shipped → auto-pause pending Ben review (and Rene if Class C action follows).
 
 ## Graduation
 
@@ -111,9 +111,9 @@ Stays in-the-loop indefinitely on Class B (PO draft) and Class C (inventory comm
 
 | Violation | Action |
 |---|---|
-| Promised ATP that wasn't there (ship failed) | Immediate pause + Drew + Ben postmortem + contract revision. |
+| Promised ATP that wasn't there (ship failed) | Immediate pause + Ben postmortem + contract revision. |
 | Cycle-count variance > 5% not escalated | Correction logged; 2+ in 30d = RED. |
-| PO drafted autonomously (not Class B through Drew) | Immediate pause. |
+| PO drafted autonomously (not Class B through Ben) | Immediate pause. |
 | Cover < 7 days went unsurfaced | Correction logged; 2+ in 30d = RED. |
 
 ## Weekly KPI
@@ -127,8 +127,9 @@ Stays in-the-loop indefinitely on Class B (PO draft) and Class C (inventory comm
 
 - Related pipelines: P-OPS-01 Inventory low threshold, P-OPS-02 Production run plan, P-OPS-03 Goods receipt, P-OPS-09 Cycle count (Canon §7).
 - Sibling: [`/contracts/agents/sample-order-dispatch.md`](./sample-order-dispatch.md) S-08 — enforces origin rule at ship time; this specialist guards ATP upstream.
-- Reorder-point + cover-day thresholds are Ben+Drew decisions (Canon D.107 / §19.11 J.19 production-run trigger rule).
+- Reorder-point + cover-day thresholds are Ben + Rene decisions (Canon D.107 / §19.11 J.19 production-run trigger rule). Ben sources the operational input (vendor lead times, sell-through), Rene approves the financial commitment.
 
 ## Version history
 
+- **1.1 — 2026-04-27** — Phase 29 Drew sweep: owner reassigned from Drew to Ben across the contract. Class C dual approvers updated to `Ben + Rene` per the doctrinal correction "drew owns nothing" (2026-04-27). Drew remains a fulfillment node for samples + East Coast destinations only (per CLAUDE.md), not an approver.
 - **1.0 — 2026-04-20** — First canonical publication. Pending Ben+Drew ratification of per-SKU reorder-point thresholds (J.19 / D.107).

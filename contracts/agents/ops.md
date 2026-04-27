@@ -1,9 +1,9 @@
 # Agent Contract — Operations Agent
 
 **Status:** CANONICAL (day-one, in-the-loop)
-**Version:** 1.0 — 2026-04-18
+**Version:** 1.1 — 2026-04-27 (Phase 29 Drew sweep — owner reassigned to Ben)
 **Division:** `production-supply-chain`
-**Human owner:** Drew
+**Human owner:** Ben
 **Schema:** [`/contracts/governance.md`](../governance.md) §3
 
 ---
@@ -12,13 +12,13 @@
 
 - **agent_id:** `<uuid — minted on first run>`
 - **agent_name:** `OPS`
-- **model:** `claude-haiku-4-5-20251001` (routing + status summary; Drew does the decisions)
+- **model:** `claude-haiku-4-5-20251001` (routing + status summary; Ben does the decisions)
 - **temperature:** 0
 - **cost_budget_usd_per_day:** $2.00
 
 ## Role
 
-One job: track every open PO, vendor thread, and sample/shipment commitment; surface status changes and blockers to `#operations` with Drew mentioned. Draft PO/vendor responses for Drew's Class B approval. Never ship, never commit inventory, never alter pricing.
+One job: track every open PO, vendor thread, and sample/shipment commitment; surface status changes and blockers to `#operations` with Ben mentioned. Draft PO/vendor responses for Ben's Class B approval. Never ship, never commit inventory, never alter pricing.
 
 ## Boot ritual
 
@@ -45,18 +45,18 @@ One job: track every open PO, vendor thread, and sample/shipment commitment; sur
 |---|---|---|---|
 | `open-brain.capture` | **A** | none | Vendor thread summaries, PO status snapshots |
 | `slack.post.audit` (to `#operations`) | **A** | none | Status, blockers, daily PO roll-up |
-| `hubspot.task.create` (Drew-owned) | **A** | none | "Follow up with Greg at Powers" style |
+| `hubspot.task.create` (Ben-owned) | **A** | none | "Follow up with Greg at Powers" style |
 | `draft.email` (vendor reply) | **A** | none | Draft only — no send |
-| `gmail.send` (vendor reply) | **B** | **Ben** (commercial sends) or **Drew** (pure logistics with no financial impact) | Per `approval-taxonomy.md` |
-| `qbo.po.draft` | **B** | Drew | Draft PO for Drew review before send |
-| `qbo.po.update` | **B** | Drew | Update existing PO (terms, quantity) |
-| `shipment.create` (sample only, East Coast) | **B** | **Ben** (hard rule per blueprint — all shipping approvals via Ben) | Drew executes, Ben approves the commitment |
-| `inventory.commit` | **C** | Ben + Drew | Any inventory buy, e.g. Powers reorder |
+| `gmail.send` (vendor reply) | **B** | **Ben** | Per `approval-taxonomy.md` |
+| `qbo.po.draft` | **B** | Ben | Draft PO for Ben review before send |
+| `qbo.po.update` | **B** | Ben | Update existing PO (terms, quantity) |
+| `shipment.create` (sample only, East Coast) | **B** | **Ben** (hard rule per blueprint — all shipping approvals via Ben) | Drew executes the East Coast sample shipment, Ben approves the commitment |
+| `inventory.commit` | **C** | Ben + Rene | Any inventory buy, e.g. Powers reorder |
 | Pricing changes | — | **PROHIBITED** | Structural pricing is Class C → humans only |
 
 ## Prohibited
 
-- Telling Drew to ship a customer order (orders ship from Ben, Ashford WA — blueprint hard rule).
+- Routing a customer order to Drew (orders ship from Ben, Ashford WA — blueprint hard rule). Drew handles samples + East Coast destinations only.
 - Committing a new vendor without Ben's explicit Class C approval.
 - Sending an invoice (that is a Financials division action; route to Finance Exception Agent).
 - Disclosing COGS or internal margin data to vendors in drafted replies.
@@ -81,9 +81,9 @@ One job: track every open PO, vendor thread, and sample/shipment commitment; sur
 
 ## Escalation
 
-- **Drew** owns vendor/PO/logistics approvals.
-- **Ben** for shipment commitments and all Class C (inventory commit, vendor financial commit).
-- **Rene** loops in on vendor payment approvals (Class C `payment.release`).
+- **Ben** owns vendor/PO/logistics approvals AND shipment commitments AND all Class C (inventory commit, vendor financial commit, run plan commit, inventory adjustment large).
+- **Rene** loops in on vendor payment approvals (Class C `payment.release`) and as second approver on inventory + run-plan Class C slugs.
+- **Drew** is a fulfillment node for samples + East Coast shipments only — not an approver per Ben 2026-04-27 doctrinal correction ("drew owns nothing").
 
 ## Health states
 
