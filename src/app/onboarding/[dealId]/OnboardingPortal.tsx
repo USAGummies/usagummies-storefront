@@ -72,10 +72,18 @@ export function OnboardingPortal({ dealId, deal, contact }: Props) {
   const [tradeRef2Company, setTradeRef2Company] = useState("");
   const [tradeRef2Phone, setTradeRef2Phone] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
+  // Invoice-Me path only: explicit ship + PO acknowledgment so the
+  // customer commits with eyes open. Submitting the form authorizes
+  // USA Gummies to (a) ship the order to the address above on the
+  // strength of this submission, and (b) produce a PO under the
+  // customer's account. Lives separately from the Net 10 terms so
+  // each obligation gets its own conscious tick.
+  const [shipAndPoAcknowledged, setShipAndPoAcknowledged] = useState(false);
   const [signerName, setSignerName] = useState("");
   const [signerTitle, setSignerTitle] = useState("");
 
-  const totalSteps = isPayNow ? 5 : 12;
+  // Pay Now: 5 fields. Invoice Me: 13 fields (12 baseline + ship+PO ack).
+  const totalSteps = isPayNow ? 5 : 13;
   const filledTier1Count = useMemo(() => {
     let n = 0;
     if (legalBusinessName.trim()) n += 1;
@@ -95,10 +103,11 @@ export function OnboardingPortal({ dealId, deal, contact }: Props) {
     if (billingAddress.trim()) n += 1; // optional field, still counts if filled
     if (preferredPayment) n += 1;
     if (termsAccepted) n += 1;
+    if (shipAndPoAcknowledged) n += 1;
     if (signerName.trim()) n += 1;
     if (signerTitle.trim()) n += 1;
     return n;
-  }, [isPayNow, apContactName, apContactEmail, billingAddress, preferredPayment, termsAccepted, signerName, signerTitle]);
+  }, [isPayNow, apContactName, apContactEmail, billingAddress, preferredPayment, termsAccepted, shipAndPoAcknowledged, signerName, signerTitle]);
 
   const filledCount = filledTier1Count + filledTier2Count;
   const progressPct = Math.min(100, Math.round((filledCount / totalSteps) * 100));
@@ -135,6 +144,7 @@ export function OnboardingPortal({ dealId, deal, contact }: Props) {
                 tradeRef2Company: tradeRef2Company.trim() || undefined,
                 tradeRef2Phone: tradeRef2Phone.trim() || undefined,
                 termsAccepted,
+                shipAndPoAcknowledged,
                 signerName: signerName.trim(),
                 signerTitle: signerTitle.trim(),
               }),
@@ -460,6 +470,27 @@ export function OnboardingPortal({ dealId, deal, contact }: Props) {
                 <div className="text-xs text-gray-500 mt-0.5">
                   Invoice is due 10 days from the date issued. Past due balances may be
                   subject to a 1.5% monthly late fee.
+                </div>
+              </div>
+            </label>
+
+            <label className="flex items-start gap-3 p-4 rounded-lg border border-gray-200 hover:border-gray-300 cursor-pointer">
+              <input
+                type="checkbox"
+                required
+                checked={shipAndPoAcknowledged}
+                onChange={(e) => setShipAndPoAcknowledged(e.target.checked)}
+                className="mt-1 w-5 h-5 accent-[#b22234]"
+              />
+              <div>
+                <div className="text-sm font-semibold text-[#0a1e3d]">
+                  I understand that submitting this form ships product and produces a PO *
+                </div>
+                <div className="text-xs text-gray-500 mt-0.5">
+                  By submitting, I authorize USA Gummies to ship the order to the
+                  address above on the strength of this submission and to issue a
+                  purchase order under my company&apos;s account. The invoice
+                  follows on Net 10 terms (above).
                 </div>
               </div>
             </label>

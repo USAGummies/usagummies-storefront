@@ -184,7 +184,9 @@ export async function GET(req: Request) {
  *   tradeRef1Phone          — Tier 2 OPTIONAL
  *   tradeRef2Company        — Tier 2 OPTIONAL
  *   tradeRef2Phone          — Tier 2 OPTIONAL
- *   termsAccepted           — Tier 2 required (checkbox)
+ *   termsAccepted           — Tier 2 required (checkbox; Net 10)
+ *   shipAndPoAcknowledged   — Tier 2 required (checkbox; "submitting
+ *                             ships product + produces a PO")
  *   signerName              — Tier 2 required
  *   signerTitle             — Tier 2 required
  */
@@ -230,6 +232,10 @@ export async function POST(req: Request) {
   let apContactName = "", apContactEmail = "", billingAddress = "";
   let preferredPayment = "", signerName = "", signerTitle = "";
   let termsAccepted = false;
+  // Invoice-Me path only: explicit acknowledgment that submitting
+  // ships product and produces a PO. Captured as a separate gate from
+  // the Net 10 terms so each obligation is consciously ticked.
+  let shipAndPoAcknowledged = false;
   let tradeRef1Company = "", tradeRef1Phone = "", tradeRef2Company = "", tradeRef2Phone = "";
   if (isInvoiceMe) {
     apContactName = typeof b.apContactName === "string" ? b.apContactName.trim() : "";
@@ -237,6 +243,7 @@ export async function POST(req: Request) {
     billingAddress = typeof b.billingAddress === "string" ? b.billingAddress.trim() : "";
     preferredPayment = typeof b.preferredPayment === "string" ? b.preferredPayment.trim() : "";
     termsAccepted = b.termsAccepted === true;
+    shipAndPoAcknowledged = b.shipAndPoAcknowledged === true;
     signerName = typeof b.signerName === "string" ? b.signerName.trim() : "";
     signerTitle = typeof b.signerTitle === "string" ? b.signerTitle.trim() : "";
     // Trade references — explicitly optional per Ben.
@@ -249,6 +256,7 @@ export async function POST(req: Request) {
     if (!apContactEmail) missing.push("apContactEmail");
     if (!preferredPayment) missing.push("preferredPayment");
     if (!termsAccepted) missing.push("termsAccepted");
+    if (!shipAndPoAcknowledged) missing.push("shipAndPoAcknowledged");
     if (!signerName) missing.push("signerName");
     if (!signerTitle) missing.push("signerTitle");
   }
@@ -285,7 +293,8 @@ export async function POST(req: Request) {
       AP contact: ${escapeHtml(apContactName)} — ${escapeHtml(apContactEmail)}<br/>
       ${billingAddress ? `Billing address: ${escapeHtml(billingAddress)}<br/>` : ""}
       Preferred payment: <b>${escapeHtml(preferredPayment)}</b><br/>
-      Terms accepted: <b>YES</b><br/>
+      Terms accepted (Net 10): <b>YES</b><br/>
+      Ship + PO acknowledged: <b>YES</b> — customer authorized us to ship + issue a PO under their account at submission<br/>
       Authorized signer: ${escapeHtml(signerName)}, ${escapeHtml(signerTitle)}<br/>
       ${tradeRef1Company ? `Trade ref 1: ${escapeHtml(tradeRef1Company)} — ${escapeHtml(tradeRef1Phone)}<br/>` : ""}
       ${tradeRef2Company ? `Trade ref 2: ${escapeHtml(tradeRef2Company)} — ${escapeHtml(tradeRef2Phone)}<br/>` : ""}
