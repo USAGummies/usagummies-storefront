@@ -15,6 +15,7 @@ import { ThreePromises } from "@/components/lp/ThreePromises";
 import { GuaranteeBlock } from "@/components/lp/GuaranteeBlock";
 import { FaqAccordion } from "@/components/lp/FaqAccordion";
 import { StickyBuyBar } from "@/components/lp/StickyBuyBar";
+import { ReviewHighlights } from "@/components/reviews/ReviewHighlights";
 
 import { GuideCard } from "@/components/internal-links/GuideCard";
 import { LinkModule } from "@/components/internal-links/LinkModule";
@@ -221,6 +222,26 @@ export default async function ShopPage() {
       <ScarcityBar />
       <ThreePromises />
       <GuaranteeBlock />
+
+      {/* Real customer testimonials — wired 2026-04-26 to address cold-ad
+       * trust gap. Component (ReviewHighlights) and data (REVIEW_HIGHLIGHTS,
+       * 3 verified 5-star reviews) already existed; they were just not
+       * mounted on the shop page. Cold Meta traffic needs explicit social
+       * proof to convert. Positioned after GuaranteeBlock so the trust
+       * stack reads: Three Promises → Guarantee → Verified Reviews. */}
+      <section className="bg-[var(--lp-cream-soft)] border-y-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[1200px] px-5 py-12 sm:px-8 sm:py-16">
+          <div className="mb-6 text-center">
+            <p className="lp-label mb-2 text-[var(--lp-red)]">★ Verified Reviews ★</p>
+            <h2 className="lp-display text-[clamp(1.8rem,4vw,2.6rem)] text-[var(--lp-ink)]">
+              What customers say.
+            </h2>
+          </div>
+          <div className="mx-auto max-w-2xl">
+            <ReviewHighlights variant="light" limit={3} />
+          </div>
+        </div>
+      </section>
 
       {/* Internal-link hub — SEO-valuable cross-links to bag-count guides
        * and related products. Wrapped in an LP-language section so it
