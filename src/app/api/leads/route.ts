@@ -5,6 +5,14 @@ import {
   signInquiryToken,
 } from "@/lib/wholesale/inquiry-token";
 import { appendWholesaleInquiry } from "@/lib/wholesale/inquiries";
+import {
+  createDeal,
+  createNote,
+  isHubSpotConfigured,
+  splitName,
+  upsertContactByEmail,
+  HUBSPOT,
+} from "@/lib/ops/hubspot-client";
 
 type LeadPayload = {
   email?: string;
@@ -209,6 +217,87 @@ export async function POST(req: Request) {
     });
   }
 
+  // Wholesale leads: create the HubSpot contact + deal directly in the
+  // route. Replaces the previous Make.com-bridge dependency. Same
+  // pattern as `/api/booth-order` — `upsertContactByEmail` + `createDeal`
+  // with `payment_method: "invoice_me"` and `dealstage: STAGE_LEAD` so
+  // the operator (Ben) can advance to "PO Received" once the wholesale
+  // inquiry warms up. Fail-soft: HubSpot down / token missing logs +
+  // continues — the public lead-capture submission stays a 200 either
+  // way; the Notion mirror + KV archive are the durable backstops.
+  let hubspotDealId: string | null = null;
+  let hubspotContactId: string | null = null;
+  if (intent === "wholesale" && email && isHubSpotConfigured()) {
+    try {
+      const { firstname, lastname } = splitName(buyerName);
+      const contact = await upsertContactByEmail({
+        email,
+        firstname: firstname || undefined,
+        lastname: lastname || undefined,
+        company: storeName || undefined,
+        phone: phone || undefined,
+        // `location` from the public form is free-form (e.g. "Boise, ID"
+        // or "Idaho"). Don't try to split — just send as `address` so it
+        // surfaces somewhere; the operator dashboard reads it back.
+        address: location || undefined,
+        lifecyclestage: "lead",
+        hs_lead_status: "OPEN",
+        message: interest || undefined,
+      });
+      if (contact?.id) {
+        hubspotContactId = contact.id;
+        const dealName =
+          storeName || buyerName || email
+            ? `Wholesale inquiry — ${storeName || buyerName || email}`
+            : "Wholesale inquiry";
+        hubspotDealId = await createDeal({
+          dealname: dealName,
+          // Wholesale inquiries default to Invoice-Me; the customer
+          // chooses Pay-Now via /booth, not /wholesale.
+          payment_method: "invoice_me",
+          dealstage: HUBSPOT.STAGE_LEAD,
+          onboarding_complete: false,
+          payment_received: false,
+          description: interest || undefined,
+          contactId: contact.id,
+        });
+        // Drop a structured note on the deal mirroring the inquiry
+        // payload so operators see what the customer actually typed,
+        // not just a stage flip. Best-effort; never blocks the response.
+        if (hubspotDealId) {
+          createNote({
+            body: [
+              `<p><b>Wholesale inquiry submitted via /wholesale</b></p>`,
+              `<p>`,
+              storeName ? `<b>Store:</b> ${escapeForNote(storeName)}<br/>` : "",
+              buyerName ? `<b>Buyer:</b> ${escapeForNote(buyerName)}<br/>` : "",
+              `<b>Email:</b> ${escapeForNote(email)}<br/>`,
+              phone ? `<b>Phone:</b> ${escapeForNote(phone)}<br/>` : "",
+              location ? `<b>Location:</b> ${escapeForNote(location)}<br/>` : "",
+              source && source !== "unknown"
+                ? `<b>Source:</b> ${escapeForNote(source)}<br/>`
+                : "",
+              `</p>`,
+              interest
+                ? `<p><b>Interest / notes:</b><br/>${escapeForNote(interest)}</p>`
+                : "",
+            ]
+              .filter(Boolean)
+              .join(""),
+            timestamp: new Date().toISOString(),
+            contactId: contact.id,
+            dealId: hubspotDealId,
+          }).catch(() => {});
+        }
+      }
+    } catch (err) {
+      console.warn(
+        "[leads] HubSpot deal-create failed:",
+        err instanceof Error ? err.message : err,
+      );
+    }
+  }
+
   // Mint a sticky inquiry receipt URL for wholesale submissions when
   // the secret is configured. The URL is what the WholesaleForm
   // redirects to on success — the customer bookmarks it and returns
@@ -230,5 +319,23 @@ export async function POST(req: Request) {
     }
   }
 
-  return json({ ok: true, ...(inquiryUrl ? { inquiryUrl } : {}) });
+  return json({
+    ok: true,
+    ...(inquiryUrl ? { inquiryUrl } : {}),
+    ...(hubspotDealId ? { hubspotDealId } : {}),
+    ...(hubspotContactId ? { hubspotContactId } : {}),
+  });
+}
+
+/**
+ * Minimal HTML escape for the HubSpot note body. Free-form customer
+ * input flows through here, so we can't trust it.
+ */
+function escapeForNote(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }

@@ -118,3 +118,102 @@ describe("POST /api/leads inquiryUrl behavior", () => {
     expect(body.inquiryUrl).toMatch(/^\/wholesale\/inquiry\//);
   });
 });
+
+/**
+ * Phase 1.b — HubSpot deal-create wired directly into /api/leads.
+ *
+ * Locks the contract:
+ *   - When `isHubSpotConfigured()` returns false, the route skips the
+ *     HubSpot branch silently (no error, response stays 200, response
+ *     omits `hubspotDealId` / `hubspotContactId`). This is the
+ *     dev / preview / test default and was the established behavior
+ *     before this phase shipped.
+ *   - When configured, a wholesale submission upserts the contact +
+ *     creates a deal in one round trip (per `createDeal` association),
+ *     stamps `payment_method=invoice_me` + `dealstage=STAGE_LEAD` +
+ *     `onboarding_complete=false` + `payment_received=false`, and
+ *     drops a structured note on the deal.
+ *   - Non-wholesale (intent=newsletter / footer / etc.) NEVER touches
+ *     HubSpot, regardless of configuration.
+ *   - Submissions without email NEVER touch HubSpot — the deal needs
+ *     a contact, and the contact needs an email key.
+ */
+describe("POST /api/leads — HubSpot deal-create", () => {
+  it("does NOT call HubSpot when HUBSPOT_PRIVATE_APP_TOKEN is unset (dev / preview default)", async () => {
+    // Note: we don't mock fetch here — `isHubSpotConfigured()` reads
+    // the env var directly and returns false when unset, which short-
+    // circuits before any fetch call. This locks the silent-skip path.
+    delete process.env.HUBSPOT_PRIVATE_APP_TOKEN;
+    const { POST } = await import("../route");
+    const res = await POST(
+      postJson({
+        email: "shop@retailer.com",
+        intent: "wholesale",
+        source: "wholesale-page",
+        storeName: "Snow Leopard Ventures LLC (TEST)",
+        buyerName: "Test Operator",
+      }),
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      ok: boolean;
+      hubspotDealId?: string;
+      hubspotContactId?: string;
+    };
+    expect(body.ok).toBe(true);
+    expect(body.hubspotDealId).toBeUndefined();
+    expect(body.hubspotContactId).toBeUndefined();
+  });
+
+  it("non-wholesale intents NEVER call HubSpot, even when configured", async () => {
+    process.env.HUBSPOT_PRIVATE_APP_TOKEN = "stub-token";
+    let hubspotCalled = false;
+    const originalFetch = global.fetch;
+    global.fetch = (async (url: unknown) => {
+      const u = String(url);
+      if (u.includes("api.hubapi.com")) hubspotCalled = true;
+      // Pretend webhook + Notion + HubSpot all succeed harmlessly.
+      return new Response(JSON.stringify({ id: "x" }), { status: 200 });
+    }) as typeof global.fetch;
+    try {
+      const { POST } = await import("../route");
+      await POST(
+        postJson({
+          email: "subscriber@example.com",
+          intent: "newsletter",
+          source: "footer",
+        }),
+      );
+      expect(hubspotCalled).toBe(false);
+    } finally {
+      global.fetch = originalFetch;
+      delete process.env.HUBSPOT_PRIVATE_APP_TOKEN;
+    }
+  });
+
+  it("wholesale submission without email skips HubSpot (no contact key)", async () => {
+    process.env.HUBSPOT_PRIVATE_APP_TOKEN = "stub-token";
+    let hubspotCalled = false;
+    const originalFetch = global.fetch;
+    global.fetch = (async (url: unknown) => {
+      const u = String(url);
+      if (u.includes("api.hubapi.com")) hubspotCalled = true;
+      return new Response("{}", { status: 200 });
+    }) as typeof global.fetch;
+    try {
+      const { POST } = await import("../route");
+      const res = await POST(
+        postJson({
+          phone: "555-0100", // phone-only inquiry
+          intent: "wholesale",
+          source: "wholesale-page",
+        }),
+      );
+      expect(res.status).toBe(200);
+      expect(hubspotCalled).toBe(false);
+    } finally {
+      global.fetch = originalFetch;
+      delete process.env.HUBSPOT_PRIVATE_APP_TOKEN;
+    }
+  });
+});
