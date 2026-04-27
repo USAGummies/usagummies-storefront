@@ -10,12 +10,19 @@
  * The links route through Vercel-hosted endpoints which update the
  * registry.json in the repo. Ben's click → public URL → API mutates
  * registry → done. Simple, secure, no extra Slack config.
+ *
+ * Two transports are supported:
+ *   1. Bot token (preferred — chat.postMessage to a specific channel)
+ *   2. Incoming webhook URL (fallback — posts to whichever channel the
+ *      webhook is configured for in Slack)
+ * If both are provided, the bot token wins.
  */
 
 const SLACK_APPROVALS_CHANNEL = "C0ATWJDHS74"; // #ops-approvals
 
 export async function postForApproval({
   slackBotToken,
+  slackWebhookUrl,
   channelId = SLACK_APPROVALS_CHANNEL,
   imageUrl,
   imageId, // unique ID like "comic-americana-12345"
@@ -25,7 +32,9 @@ export async function postForApproval({
   metadata = {},
   baseUrl = "https://www.usagummies.com",
 }) {
-  if (!slackBotToken) throw new Error("slackBotToken required");
+  if (!slackBotToken && !slackWebhookUrl) {
+    throw new Error("slackBotToken or slackWebhookUrl required");
+  }
   if (!imageUrl) throw new Error("imageUrl required");
   if (!imageId) throw new Error("imageId required");
 
@@ -87,20 +96,43 @@ export async function postForApproval({
     },
   ];
 
-  const res = await fetch("https://slack.com/api/chat.postMessage", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${slackBotToken}`,
-      "Content-Type": "application/json; charset=utf-8",
-    },
-    body: JSON.stringify({
-      channel: channelId,
-      text: `New creative for approval: ${imageId}`,
-      blocks,
-      unfurl_links: false,
-    }),
-  });
-  const json = await res.json();
-  if (!json.ok) throw new Error(`Slack postMessage failed: ${json.error}`);
-  return { ts: json.ts, channel: json.channel, message_link: `https://usagummies.slack.com/archives/${json.channel}/p${json.ts.replace(".", "")}` };
+  if (slackBotToken) {
+    // Preferred: bot token + chat.postMessage (gets thread support + ts)
+    const res = await fetch("https://slack.com/api/chat.postMessage", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${slackBotToken}`,
+        "Content-Type": "application/json; charset=utf-8",
+      },
+      body: JSON.stringify({
+        channel: channelId,
+        text: `New creative for approval: ${imageId}`,
+        blocks,
+        unfurl_links: false,
+      }),
+    });
+    const json = await res.json();
+    if (!json.ok) throw new Error(`Slack chat.postMessage failed: ${json.error}`);
+    return {
+      ts: json.ts,
+      channel: json.channel,
+      message_link: `https://usagummies.slack.com/archives/${json.channel}/p${json.ts.replace(".", "")}`,
+    };
+  } else {
+    // Fallback: incoming webhook (no thread ts, but blocks render fine)
+    const res = await fetch(slackWebhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json; charset=utf-8" },
+      body: JSON.stringify({
+        text: `New creative for approval: ${imageId}`,
+        blocks,
+        unfurl_links: false,
+      }),
+    });
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`Slack webhook ${res.status}: ${errText.slice(0, 200)}`);
+    }
+    return { ts: null, channel: null, message_link: "(webhook — no message_link)" };
+  }
 }

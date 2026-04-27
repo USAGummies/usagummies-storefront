@@ -166,7 +166,20 @@ export interface DispatchBriefSlice {
   dispatched: number;
   /** Of those, still sitting on the cart (state = open). */
   stillOpen: number;
+  /** ISO date (YYYY-MM-DD) of the OLDEST open package's ship date.
+   *  null when no open packages or no parseable ship dates. */
+  oldestOpenShipDate: string | null;
+  /** Age in whole days of the oldest open package vs. windowEnd.
+   *  null when oldestOpenShipDate is null. Used to gate the callout. */
+  oldestOpenAgeDays: number | null;
 }
+
+/** Threshold (in days) above which the morning brief callouts the
+ *  oldest open package. Below this, the dispatch line stays compact.
+ *  3 days matches Ben's hard rule on Amazon FBM ≤ 2 business days
+ *  to ship-by — anything older than 3 calendar days is genuinely
+ *  stale and worth a nudge. */
+export const DISPATCH_BRIEF_STALE_DAYS = 3;
 
 /** Minimal shape — matches fields used in the brief. */
 export interface FulfillmentPreflightSlice {
@@ -811,12 +824,37 @@ export function composeDispatchBriefSlice(
   let labelsBought = 0;
   let dispatched = 0;
   let stillOpen = 0;
+  // Oldest open ship date — lex-smallest ISO YYYY-MM-DD across ALL
+  // open rows (not just bought-in-window — a package bought 5 days
+  // ago and still open is the exact thing this signal is for).
+  let oldestOpenShipDate: string | null = null;
   for (const r of rows) {
     const boughtInWindow = inWindow(r.shipDate);
     const dispatchedInWindow = inWindow(r.dispatchedAt);
     if (boughtInWindow) labelsBought += 1;
     if (dispatchedInWindow) dispatched += 1;
     if (boughtInWindow && r.state === "open") stillOpen += 1;
+    if (
+      r.state === "open" &&
+      typeof r.shipDate === "string" &&
+      /^\d{4}-\d{2}-\d{2}$/.test(r.shipDate) &&
+      (!oldestOpenShipDate || r.shipDate < oldestOpenShipDate)
+    ) {
+      oldestOpenShipDate = r.shipDate;
+    }
+  }
+
+  let oldestOpenAgeDays: number | null = null;
+  if (oldestOpenShipDate) {
+    const shipMs = Date.parse(oldestOpenShipDate + "T00:00:00Z");
+    if (Number.isFinite(shipMs)) {
+      // Whole days, floor — a package shipped 2.7 days ago is "2 days
+      // on the cart" today, not "3."
+      oldestOpenAgeDays = Math.max(
+        0,
+        Math.floor((end - shipMs) / (24 * 3600 * 1000)),
+      );
+    }
   }
 
   return {
@@ -826,26 +864,52 @@ export function composeDispatchBriefSlice(
     labelsBought,
     dispatched,
     stillOpen,
+    oldestOpenShipDate,
+    oldestOpenAgeDays,
   };
 }
 
 /**
- * Render the dispatch slice as a single Slack-flavored markdown line.
- * Quiet collapse: returns empty string when there's no activity in
- * the window (so the brief doesn't pad with `0 / 0 / 0` noise).
+ * Render the dispatch slice as one or two Slack-flavored markdown lines.
+ *
+ * Line 1 — `:package: Dispatch (last 24h)` summary. Quiet collapse:
+ * returns empty string when there's no activity in the window AND no
+ * stale open package callout (so the brief doesn't pad with `0/0/0`
+ * noise).
+ *
+ * Line 2 (conditional) — when `oldestOpenAgeDays > DISPATCH_BRIEF_STALE_DAYS`,
+ * appends a `:warning: Oldest open package: N days on the cart`
+ * nudge. This is what unblocks "go drop them off" when a package
+ * has been silently aging in the queue past Ben's hard rule
+ * (Amazon FBM ≤ 2 business days).
  */
 export function renderDispatchBriefMarkdown(slice: DispatchBriefSlice): string {
-  const total = slice.labelsBought + slice.dispatched;
-  if (total === 0 && slice.stillOpen === 0) return "";
-  const parts: string[] = [
-    `*${slice.labelsBought}* bought`,
-    `*${slice.dispatched}* dispatched`,
-  ];
-  if (slice.stillOpen > 0) {
-    parts.push(
-      `*${slice.stillOpen}* still on cart` +
-        (slice.stillOpen === 1 ? " — go drop it off" : " — go drop them off"),
+  const hasActivity =
+    slice.labelsBought > 0 || slice.dispatched > 0 || slice.stillOpen > 0;
+  const stale =
+    slice.oldestOpenAgeDays !== null &&
+    slice.oldestOpenAgeDays > DISPATCH_BRIEF_STALE_DAYS;
+  if (!hasActivity && !stale) return "";
+
+  const lines: string[] = [];
+  if (hasActivity) {
+    const parts: string[] = [
+      `*${slice.labelsBought}* bought`,
+      `*${slice.dispatched}* dispatched`,
+    ];
+    if (slice.stillOpen > 0) {
+      parts.push(
+        `*${slice.stillOpen}* still on cart` +
+          (slice.stillOpen === 1 ? " — go drop it off" : " — go drop them off"),
+      );
+    }
+    lines.push(`:package: *Dispatch (last 24h)*  ${parts.join(" · ")}`);
+  }
+  if (stale && slice.oldestOpenAgeDays !== null) {
+    const dayWord = slice.oldestOpenAgeDays === 1 ? "day" : "days";
+    lines.push(
+      `:warning: *Oldest open package: ${slice.oldestOpenAgeDays} ${dayWord} on the cart* — past the 2-business-day handling promise; print + drop today.`,
     );
   }
-  return `:package: *Dispatch (last 24h)*  ${parts.join(" · ")}`;
+  return lines.join("\n");
 }

@@ -93,8 +93,12 @@ if (!styleProfile) {
 
 const OPENAI_API_KEY = (process.env.OPENAI_API_KEY || "").trim();
 const SLACK_BOT_TOKEN = (process.env.SLACK_BOT_TOKEN || "").trim();
+const SLACK_WEBHOOK = (process.env.SLACK_SUPPORT_WEBHOOK_URL || "").trim();
 if (!OPENAI_API_KEY) { console.error("❌ OPENAI_API_KEY missing"); process.exit(1); }
-if (!SLACK_BOT_TOKEN) { console.error("❌ SLACK_BOT_TOKEN missing"); process.exit(1); }
+if (!SLACK_BOT_TOKEN && !SLACK_WEBHOOK) {
+  console.error("❌ Need SLACK_BOT_TOKEN or SLACK_SUPPORT_WEBHOOK_URL");
+  process.exit(1);
+}
 
 // ---------------------------------------------------------------------------
 // Main
@@ -225,7 +229,8 @@ async function main() {
 
     try {
       const slackResult = await postForApproval({
-        slackBotToken: SLACK_BOT_TOKEN,
+        slackBotToken: SLACK_BOT_TOKEN || undefined,
+        slackWebhookUrl: SLACK_WEBHOOK || undefined,
         imageUrl: r.imageUrl,
         imageId: r.imageId,
         styleProfile: { ...styleProfile, name: styleProfile.name },

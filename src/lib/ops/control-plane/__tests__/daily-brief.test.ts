@@ -1192,3 +1192,171 @@ describe("composeDispatchBriefSlice + renderDispatchBriefMarkdown", () => {
     expect(JSON.stringify(out.blocks)).not.toContain("Dispatch (last 24h)");
   });
 });
+
+/**
+ * Phase 28h — oldest-open-package callout in the morning brief.
+ *
+ * Locks the contract:
+ *   - composeDispatchBriefSlice now also computes `oldestOpenShipDate`
+ *     and `oldestOpenAgeDays` (whole days, floored).
+ *   - oldestOpenShipDate is the lex-smallest YYYY-MM-DD across ALL
+ *     open rows (NOT just bought-in-window — the whole point is to
+ *     surface packages that have been silently aging).
+ *   - oldestOpenAgeDays null when no open rows or no parseable dates.
+ *   - Garbage shipDate values don't crash and don't count.
+ *   - renderDispatchBriefMarkdown gates the callout strictly on
+ *     `oldestOpenAgeDays > DISPATCH_BRIEF_STALE_DAYS` (= 3). Exactly
+ *     3 days does NOT trigger.
+ *   - Day-vs-days copy: 4 days → "days", 1 day → "day" (defensive,
+ *     even though >3 means we'd never see "1 day"; the helper is
+ *     pure and shouldn't crash on a future-tightened threshold).
+ *   - Quiet collapse: zero activity AND no stale callout → empty
+ *     string. Stale callout WITHOUT activity → just the warning line.
+ */
+describe("oldest-open-package callout (Phase 28h)", () => {
+  const NOW_STALE = new Date("2026-04-26T18:00:00Z");
+
+  function row(over: {
+    state: "open" | "dispatched";
+    shipDate: string | null;
+    dispatchedAt?: string | null;
+  }) {
+    return {
+      shipDate: over.shipDate,
+      dispatchedAt: over.dispatchedAt ?? null,
+      state: over.state,
+    } as const;
+  }
+
+  it("oldestOpenShipDate picks the lex-smallest among open rows", async () => {
+    const { composeDispatchBriefSlice } = await import("../daily-brief");
+    const slice = composeDispatchBriefSlice(
+      [
+        row({ state: "open", shipDate: "2026-04-26" }),
+        row({ state: "open", shipDate: "2026-04-22" }), // oldest
+        row({ state: "open", shipDate: "2026-04-25" }),
+        // dispatched rows don't count toward "open"
+        row({
+          state: "dispatched",
+          shipDate: "2026-04-20",
+          dispatchedAt: "2026-04-26T16:00:00Z",
+        }),
+      ],
+      NOW_STALE,
+    );
+    expect(slice.oldestOpenShipDate).toBe("2026-04-22");
+    expect(slice.oldestOpenAgeDays).toBe(4);
+  });
+
+  it("oldestOpenAgeDays is null when no open rows", async () => {
+    const { composeDispatchBriefSlice } = await import("../daily-brief");
+    const slice = composeDispatchBriefSlice(
+      [
+        row({
+          state: "dispatched",
+          shipDate: "2026-04-20",
+          dispatchedAt: "2026-04-26T16:00:00Z",
+        }),
+      ],
+      NOW_STALE,
+    );
+    expect(slice.oldestOpenShipDate).toBeNull();
+    expect(slice.oldestOpenAgeDays).toBeNull();
+  });
+
+  it("garbage shipDate strings don't crash and don't count", async () => {
+    const { composeDispatchBriefSlice } = await import("../daily-brief");
+    const slice = composeDispatchBriefSlice(
+      [
+        row({ state: "open", shipDate: "garbage" }),
+        row({ state: "open", shipDate: null }),
+      ],
+      NOW_STALE,
+    );
+    expect(slice.oldestOpenShipDate).toBeNull();
+    expect(slice.oldestOpenAgeDays).toBeNull();
+  });
+
+  it("renderer adds the callout when age > 3 days", async () => {
+    const { renderDispatchBriefMarkdown, composeDispatchBriefSlice } =
+      await import("../daily-brief");
+    const slice = composeDispatchBriefSlice(
+      [row({ state: "open", shipDate: "2026-04-22" })], // 4 days old
+      NOW_STALE,
+    );
+    const out = renderDispatchBriefMarkdown(slice);
+    expect(out).toMatch(/:warning:/);
+    expect(out).toMatch(/Oldest open package: 4 days on the cart/);
+    expect(out).toMatch(/2-business-day handling promise/);
+  });
+
+  it("renderer does NOT add the callout when age is exactly 3 days (boundary)", async () => {
+    const { renderDispatchBriefMarkdown, composeDispatchBriefSlice } =
+      await import("../daily-brief");
+    const slice = composeDispatchBriefSlice(
+      [row({ state: "open", shipDate: "2026-04-23" })], // 3 days old
+      NOW_STALE,
+    );
+    expect(slice.oldestOpenAgeDays).toBe(3);
+    const out = renderDispatchBriefMarkdown(slice);
+    expect(out).not.toMatch(/:warning:/);
+  });
+
+  it("renderer renders the callout WITHOUT the activity line when no 24h activity but stale", async () => {
+    const { renderDispatchBriefMarkdown, composeDispatchBriefSlice } =
+      await import("../daily-brief");
+    // Open package shipped 5 days ago, no activity in last 24h.
+    const slice = composeDispatchBriefSlice(
+      [row({ state: "open", shipDate: "2026-04-21" })],
+      NOW_STALE,
+    );
+    const out = renderDispatchBriefMarkdown(slice);
+    expect(out).not.toMatch(/Dispatch \(last 24h\)/);
+    expect(out).toMatch(/:warning:/);
+    expect(out).toMatch(/5 days on the cart/);
+  });
+
+  it("renderer combines BOTH lines when there's activity AND stale", async () => {
+    const { renderDispatchBriefMarkdown, composeDispatchBriefSlice } =
+      await import("../daily-brief");
+    const NOW = NOW_STALE;
+    const slice = composeDispatchBriefSlice(
+      [
+        // bought 6h ago, dispatched 2h ago — counts toward both
+        {
+          state: "dispatched" as const,
+          shipDate: "2026-04-26",
+          dispatchedAt: new Date(NOW.getTime() - 2 * 3600 * 1000).toISOString(),
+        },
+        // open and stale
+        row({ state: "open", shipDate: "2026-04-21" }),
+      ],
+      NOW,
+    );
+    const out = renderDispatchBriefMarkdown(slice);
+    expect(out).toMatch(/Dispatch \(last 24h\)/);
+    expect(out).toMatch(/:warning:/);
+    // Two distinct lines.
+    expect(out.split("\n")).toHaveLength(2);
+  });
+
+  it("singular 'day' when age would be exactly 1 (defensive)", async () => {
+    const { renderDispatchBriefMarkdown, DISPATCH_BRIEF_STALE_DAYS } =
+      await import("../daily-brief");
+    expect(DISPATCH_BRIEF_STALE_DAYS).toBe(3);
+    // Synthetic slice: pretend the threshold dropped. Tests the
+    // pluralization helper directly.
+    const slice = {
+      generatedAt: NOW_STALE.toISOString(),
+      windowEnd: NOW_STALE.toISOString(),
+      windowStart: new Date(NOW_STALE.getTime() - 86400000).toISOString(),
+      labelsBought: 0,
+      dispatched: 0,
+      stillOpen: 0,
+      oldestOpenShipDate: "2026-04-25",
+      oldestOpenAgeDays: 1, // below the threshold; renderer should NOT emit
+    };
+    const out = renderDispatchBriefMarkdown(slice);
+    expect(out).toBe("");
+  });
+});
