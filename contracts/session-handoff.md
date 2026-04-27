@@ -8,7 +8,7 @@
 
 ## Where the build is right now
 
-**Test suite:** 1,958 green (131 files). **Workflow blueprint:** v1.59. **Latest baseline:** `6ce2c39 feat(brief): Phase 32.1 signals aggregator`.
+**Test suite:** 1,958 green (131 files). **Workflow blueprint:** v1.60. **Latest baseline:** `cb2cba4 feat(brief): Phase 32.1.b composer signals section`.
 
 **Active build directive (Ben 2026-04-27):** "build the entire system tested." Working through Phase 28L → 29 → 30 → 31 autonomously. See workflow-blueprint.md §"Top P0 build items" for the full queue.
 

@@ -66,6 +66,28 @@ import {
   isPlaidConfigured,
   isPlaidConnected,
 } from "@/lib/finance/plaid";
+import { kv } from "@vercel/kv";
+
+// Phase 32.1.c — operational-signals contributors. All cheap (pure
+// or single KV read) so adding them to the brief route doesn't
+// blow the cold-start budget. Inbox-triage backlog is intentionally
+// deferred — that needs the email-intelligence pipeline's
+// ScannedEmail[] which isn't kept in a hot-readable place yet.
+import { buildAgentHealthRows } from "@/lib/ops/agent-health";
+import { composeBriefSignals } from "@/lib/ops/brief-signals";
+import { forecastCoverDays } from "@/lib/ops/inventory-forecast";
+import {
+  KV_INVENTORY_SNAPSHOT,
+  type InventorySnapshot,
+} from "@/lib/ops/inventory-snapshot";
+import {
+  STACK_SERVICES,
+  checkEnvVars,
+  combineProbeAndEnv,
+  noProbe,
+  type StackServiceRow,
+} from "@/lib/ops/stack-readiness";
+import { buildTrademarkRows } from "@/lib/ops/uspto-trademarks";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -355,6 +377,77 @@ async function composeAndPost(req: Request): Promise<Response> {
     }
   }
 
+  // ---- Operational signals (Phase 32.1.c) ----
+  // Aggregates stack-readiness (env-check only — no live probes,
+  // those are slow), agent-health doctrine, USPTO deadlines, and
+  // inventory reorder candidates into a single section. Every
+  // contributor is fail-soft: an exception in one source pushes a
+  // degradation note but doesn't blank the others. Quiet-collapse
+  // logic lives in the aggregator + composer; if everything's
+  // green, the section is omitted entirely. Skipped on EOD —
+  // signals are a morning-routine artifact.
+  let signals: { lines: string[]; hasCritical: boolean } | undefined;
+  if (kind === "morning") {
+    let stackRows: StackServiceRow[] = [];
+    try {
+      const env = process.env as Record<string, string | undefined>;
+      stackRows = STACK_SERVICES.map((service) => {
+        const envCheck = checkEnvVars(service, env);
+        // Brief-context "probe" is env-only — never make a live HTTP
+        // call here. The dedicated /ops/stack-readiness page does
+        // the live probes; the brief uses the cheap signal.
+        const probe = envCheck.envOk
+          ? noProbe("Env present (live probe deferred to /ops/stack-readiness)")
+          : noProbe("Env vars missing — see /ops/stack-readiness");
+        return combineProbeAndEnv(service, probe, envCheck);
+      });
+    } catch (err) {
+      degradations.push(
+        `signals.stack: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+
+    let agentRows: ReturnType<typeof buildAgentHealthRows> = [];
+    try {
+      agentRows = buildAgentHealthRows();
+    } catch (err) {
+      degradations.push(
+        `signals.agents: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+
+    let trademarkRows: ReturnType<typeof buildTrademarkRows> = [];
+    try {
+      trademarkRows = buildTrademarkRows(undefined, now);
+    } catch (err) {
+      degradations.push(
+        `signals.uspto: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+
+    let inventoryForecast: ReturnType<typeof forecastCoverDays> | undefined;
+    try {
+      const snap =
+        ((await kv.get<InventorySnapshot>(KV_INVENTORY_SNAPSHOT)) ??
+          null) as InventorySnapshot | null;
+      inventoryForecast = forecastCoverDays(snap);
+    } catch {
+      // KV unreachable in dev/test or transient outage. The
+      // reorder-trigger cron + /ops/inventory have their own
+      // surfaces; a missing forecast in the brief just means no
+      // reorder line — not a degradation worth shouting.
+    }
+
+    signals = composeBriefSignals({
+      stackRows,
+      agentRows,
+      trademarkRows,
+      inventoryForecast,
+      // backlogRows omitted — see comment above. Quiet-collapse on
+      // missing inputs is built into the aggregator.
+    });
+  }
+
   const composeInput = {
     kind,
     asOf: now,
@@ -370,6 +463,7 @@ async function composeAndPost(req: Request): Promise<Response> {
     fulfillmentToday,
     salesCommand,
     dispatch,
+    signals,
     degradations,
   } as const;
   let brief = composeDailyBrief(composeInput);
