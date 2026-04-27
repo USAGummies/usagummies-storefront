@@ -8,7 +8,7 @@
 
 ## Where the build is right now
 
-**Test suite:** 1,934 green (130 files). **Workflow blueprint:** v1.57. **Latest baseline:** `c512349 feat(vendor-portal): Phase 31.2.a registry + issue route`.
+**Test suite:** 1,953 green (131 files). **Workflow blueprint:** v1.58. **Latest baseline:** `d80ff17 feat(vendor-portal): Phase 31.2.b/c public page + COI upload`.
 
 **Active build directive (Ben 2026-04-27):** "build the entire system tested." Working through Phase 28L → 29 → 30 → 31 autonomously. See workflow-blueprint.md §"Top P0 build items" for the full queue.
 
