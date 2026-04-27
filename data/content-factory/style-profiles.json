@@ -7,6 +7,8 @@
     "reference_image": "public/brand/ad-assets-round2/comic-libertys-break.png",
     "dimensions": "1024x1024",
     "quality": "high",
+    "default_channels": ["meta-ads", "fb", "ig"],
+    "default_buffer_mode": "queue",
 
     "prompt_prefix": "Bold flat-color vector illustration in the USA Gummies brand vocabulary. Match the reference image exactly for line weight, color palette, character design (especially Liberty's stylized face: oxidized-copper green skin, big round white eyes, classic crown), and composition discipline. Modern American poster aesthetic — Tom Whalen / Mondo / WPA poster vibe.",
 
@@ -35,6 +37,8 @@
     "reference_image": "public/brand/ad-assets-round2/photo-ingredient-macro.png",
     "dimensions": "1024x1024",
     "quality": "high",
+    "default_channels": ["meta-ads", "fb", "ig", "gbp"],
+    "default_buffer_mode": "queue",
 
     "prompt_prefix": "Hyperreal photographic style with Vermeer-painterly depth. Match the reference image exactly for lighting (single soft window light, warm tones), color temperature (warm, slightly desaturated, NOT cool), film grain (very fine, natural), and editorial composition. Premium American food photography — think Bon Appétit, Cherry Bombe, Kinfolk.",
 
@@ -62,6 +66,8 @@
     "reference_image": "public/brand/ad-assets-round2/comic-the-factory.png",
     "dimensions": "1024x1024",
     "quality": "high",
+    "default_channels": ["meta-ads", "fb"],
+    "default_buffer_mode": "queue",
 
     "prompt_prefix": "Bold flat-color vector illustration in the USA Gummies brand vocabulary. Match the reference image exactly for line weight, color palette, and composition discipline. NO Liberty, NO Rushmore, NO military aircraft — the American landscape, infrastructure, and working-class iconography (red barns, vintage tractors, semi-trucks, construction sites, lumber, hard hats, factory smokestacks, locomotives) ARE the heroes. Working-American identity, not patriotic-monument identity.",
 

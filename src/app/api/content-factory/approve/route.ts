@@ -69,6 +69,24 @@ export async function GET(req: NextRequest) {
     await kv.set(indexKey, existing);
   }
 
+  // ──────────────────────────────────────────────────────────────────────
+  // If approved and the style profile lists Buffer-eligible channels,
+  // queue the post in Buffer for distribution to social channels (FB,
+  // IG, Google Business). Failures here don't block the approval — they
+  // just get logged to KV for later inspection.
+  // ──────────────────────────────────────────────────────────────────────
+  if (decision === "approved") {
+    try {
+      const bufferResult = await maybeQueueInBuffer(entry);
+      if (bufferResult) {
+        await kv.set(`content-factory:buffer-result:${id}`, bufferResult);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      await kv.set(`content-factory:buffer-error:${id}`, { error: msg, at: new Date().toISOString() });
+    }
+  }
+
   // Respond with a friendly HTML page so Ben sees confirmation in his browser
   const emoji = decision === "approved" ? "✅" : "❌";
   const color = decision === "approved" ? "#16a34a" : "#dc2626";
@@ -119,4 +137,51 @@ function escapeHtml(s: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
+}
+
+/**
+ * If the approved entry's style profile lists `default_channels` that
+ * include any Buffer-eligible channel (fb, ig, gbp), queue the post in
+ * Buffer. Skips silently if Buffer creds are missing or the profile
+ * doesn't request social channels.
+ */
+async function maybeQueueInBuffer(entry: Record<string, unknown>): Promise<unknown | null> {
+  const apiToken = process.env.BUFFER_API_TOKEN;
+  const orgId = process.env.BUFFER_ORGANIZATION_ID;
+  if (!apiToken || !orgId) return null;
+
+  // Load style profile to find default_channels
+  const profileKey = String(entry.profile || "");
+  if (!profileKey) return null;
+
+  // Read style profiles JSON (bundled with the deploy)
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+  const profilesPath = path.resolve(process.cwd(), "data/content-factory/style-profiles.json");
+  if (!fs.existsSync(profilesPath)) return null;
+  const profiles = JSON.parse(fs.readFileSync(profilesPath, "utf-8"));
+  const profile = profiles[profileKey];
+  if (!profile) return null;
+
+  const requestedChannels = (profile.default_channels || []) as string[];
+  // Buffer-eligible aliases
+  const bufferAliases = requestedChannels.filter((c) => ["fb", "ig", "gbp", "facebook", "instagram", "google-business", "googlebusiness"].includes(c.toLowerCase()));
+  if (!bufferAliases.length) return null;
+
+  const imageUrl = String(entry.image_url || "");
+  if (!imageUrl) return null;
+
+  // Use the concept text as a starter caption — Ben can refine in Buffer
+  const caption = String(entry.concept || "").slice(0, 280) || "USA Gummies — All American Gummy Bears";
+
+  const { publishToBuffer } = await import("@/lib/content-factory/buffer");
+  const result = await publishToBuffer({
+    apiToken,
+    organizationId: orgId,
+    channels: bufferAliases,
+    imageUrl,
+    caption,
+    mode: profile.default_buffer_mode || "queue",
+  });
+  return { ...result, channels: bufferAliases, queued_at: new Date().toISOString() };
 }
