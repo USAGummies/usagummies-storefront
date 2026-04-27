@@ -8,7 +8,7 @@
 
 ## Where the build is right now
 
-**Test suite:** 1,707 green (110 files). **Workflow blueprint:** v1.46. **Latest baseline:** `f68fcc1 feat(customers): Amazon FBM customer registry (Phase 28k)`.
+**Test suite:** 1,729 green (114 files). **Workflow blueprint:** v1.47. **Latest baseline:** `0b4c46b feat(contracts): Phase 28L.1+28L.2 interviewer + session-handoff`.
 
 **Active build directive (Ben 2026-04-27):** "build the entire system tested." Working through Phase 28L → 29 → 30 → 31 autonomously. See workflow-blueprint.md §"Top P0 build items" for the full queue.
 
@@ -27,8 +27,8 @@
 |---|---|---|
 | Phase 28L.1 — Interviewer-agent contract + CLAUDE.md anchor | DONE | this session |
 | Phase 28L.2 — Session handoff doc | DONE (this file) | this session |
-| Phase 28L.3 — Stack-readiness dashboard | NEXT | — |
-| Phase 28L.4 — Agent health surface | QUEUED | — |
+| Phase 28L.3 — Stack-readiness dashboard | DONE | this session |
+| Phase 28L.4 — Agent health surface | NEXT | — |
 | Phase 29 — Drew doctrine sweep | QUEUED | — |
 | Phase 30.1-30.4 — AP packet UI, Reorder triggers, Inbox triage closed-loop, Reply composer + Pipeline enrich tests | QUEUED | — |
 | Phase 31.1 — USPTO/FDA tracking | QUEUED | — |
