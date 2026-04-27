@@ -47,6 +47,7 @@ const SELF_AUTHENTICATED_PREFIXES = [
   "/api/ops/orders/", // ORDER DESK — Order log, fulfillment, samples (isAuthorized)
   "/api/ops/customers/", // CUSTOMERS — Amazon FBM registry; future cross-channel (isAuthorized session + CRON_SECRET)
   "/api/ops/stack-readiness", // STACK READINESS — external service health surface, Phase 28L.3 (isAuthorized session + CRON_SECRET)
+  "/api/ops/uspto/", // USPTO — trademark tracking + deadline surface, Phase 31.1 (isAuthorized session + CRON_SECRET)
   "/api/ops/fulfillment", // FULFILLMENT — Unified ship-today queue (session or CRON_SECRET)
   "/api/ops/shipping/", // SHIPPING — Unified auto-ship pipeline (session or CRON_SECRET)
   "/api/ops/ap-packets", // AP PACKETS — vendor setup reply pipeline (Gmail send with dedup + approval gate). No trailing slash so both /ap-packets and /ap-packets/send match.

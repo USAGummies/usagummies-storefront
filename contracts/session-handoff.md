@@ -8,7 +8,7 @@
 
 ## Where the build is right now
 
-**Test suite:** 1,825 green (123 files). **Workflow blueprint:** v1.53. **Latest baseline:** `434be27 fix(shipping): packing-slip propagation race + fail-loud`.
+**Test suite:** 1,861 green (125 files). **Workflow blueprint:** v1.54. **Latest baseline:** `6ca596c fix(shipping): Phase 28m 2-page label+slip PDF`.
 
 **Active build directive (Ben 2026-04-27):** "build the entire system tested." Working through Phase 28L → 29 → 30 → 31 autonomously. See workflow-blueprint.md §"Top P0 build items" for the full queue.
 
@@ -34,8 +34,8 @@
 | Phase 30.2 — Reorder triggers | DONE | this session |
 | Phase 30.3 — Inbox triage closed-loop | DONE | this session |
 | Phase 30.4 — Reply composer + Pipeline enrich tests | DONE | this session |
-| Phase 31.1 — USPTO/FDA tracking | NEXT | — |
-| Phase 31.2 — External vendor portal | QUEUED | — |
+| Phase 31.1 — USPTO trademark tracking | DONE | this session |
+| Phase 31.2 — External vendor portal | NEXT | — |
 | Phase 31.1 — USPTO/FDA tracking | QUEUED | — |
 | Phase 31.2 — External vendor portal | QUEUED | — |
 
