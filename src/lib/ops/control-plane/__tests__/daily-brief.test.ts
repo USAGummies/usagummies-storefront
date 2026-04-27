@@ -1360,3 +1360,76 @@ describe("oldest-open-package callout (Phase 28h)", () => {
     expect(out).toBe("");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 32.1 — Operational signals section
+// ---------------------------------------------------------------------------
+
+describe("composeDailyBrief() — operational signals (Phase 32.1)", () => {
+  const baseInput = () => ({
+    kind: "morning" as const,
+    asOf: new Date("2026-04-27T16:00:00Z"),
+    activeDivisions: [{ id: "sales", name: "Sales", humanOwner: "Ben" }],
+    pendingApprovals: [],
+    pausedAgents: [] as PausedAgentRecord[],
+    recentAudit: [],
+  });
+
+  it("section is OMITTED when signals.lines is empty (quiet collapse)", () => {
+    const out = composeDailyBrief({
+      ...baseInput(),
+      signals: { lines: [], hasCritical: false },
+    });
+    expect(JSON.stringify(out.blocks)).not.toContain("Operational signals");
+  });
+
+  it("section is OMITTED when signals is undefined (zero-config)", () => {
+    const out = composeDailyBrief(baseInput());
+    expect(JSON.stringify(out.blocks)).not.toContain("Operational signals");
+  });
+
+  it("section renders with the lines when signals are present", () => {
+    const out = composeDailyBrief({
+      ...baseInput(),
+      signals: {
+        lines: [
+          ":warning: *Stack — 1 service degraded:* make-com.",
+          ":scales: *USPTO trademarks:* 1 actionable.",
+        ],
+        hasCritical: false,
+      },
+    });
+    const json = JSON.stringify(out.blocks);
+    expect(json).toContain("Operational signals");
+    expect(json).toContain("Stack — 1 service degraded");
+    expect(json).toContain("USPTO trademarks");
+  });
+
+  it("header gets :rotating_light: prefix when hasCritical=true", () => {
+    const out = composeDailyBrief({
+      ...baseInput(),
+      signals: {
+        lines: [":rotating_light: *Stack — 1 service down:* vercel-kv."],
+        hasCritical: true,
+      },
+    });
+    const json = JSON.stringify(out.blocks);
+    expect(json).toContain(":rotating_light:");
+    expect(json).toContain("Operational signals");
+  });
+
+  it("header has NO :rotating_light: prefix when hasCritical=false", () => {
+    const out = composeDailyBrief({
+      ...baseInput(),
+      signals: {
+        lines: [":envelope: *Inbox triage:* 2 awaiting decision."],
+        hasCritical: false,
+      },
+    });
+    // The header itself shouldn't have the rotating_light, but the
+    // signal line itself might (we look for the header marker).
+    const json = JSON.stringify(out.blocks);
+    expect(json).not.toContain(":rotating_light: *Operational signals*");
+    expect(json).toContain("Operational signals");
+  });
+});

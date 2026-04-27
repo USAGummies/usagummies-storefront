@@ -144,6 +144,23 @@ export interface BriefInput {
    * fulfillmentToday slice already covers labels-bought there.
    */
   dispatch?: DispatchBriefSlice;
+  /**
+   * Phase 32.1 — operational signals aggregated from
+   * stack-readiness + agent-health + USPTO + inbox-triage +
+   * inventory-reorder. Composer renders a single section listing
+   * the lines IF any are non-empty. Quiet-collapse when nothing
+   * is actionable; the section is skipped entirely (no "all
+   * systems nominal" noise). When `signals.hasCritical` is true,
+   * the section header gets a `:rotating_light:` prefix so the
+   * critical signal can't be missed.
+   *
+   * Caller (`/api/ops/daily-brief`) populates this via
+   * `composeBriefSignals` from `src/lib/ops/brief-signals.ts`.
+   */
+  signals?: {
+    lines: string[];
+    hasCritical: boolean;
+  };
   /** Any degradations to call out at the top of the brief. */
   degradations?: string[];
 }
@@ -286,6 +303,23 @@ export function composeDailyBrief(input: BriefInput): BriefOutput {
     type: "section",
     text: { type: "mrkdwn", text: `*Priorities*\n${priorities.join("\n")}` },
   });
+
+  // ---- Operational signals (Phase 32.1) ----
+  // Aggregated from stack-readiness, agent-health, USPTO,
+  // inbox-triage, inventory-reorder. Quiet-collapse: section is
+  // omitted entirely when zero signals fired. Critical signals
+  // (stack-down / agent-red / critical-USPTO / stale-inbox) get a
+  // :rotating_light: header so they can't be missed at a glance.
+  if (input.signals && input.signals.lines.length > 0) {
+    const headerPrefix = input.signals.hasCritical ? ":rotating_light: " : "";
+    blocks.push({
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `*${headerPrefix}Operational signals*\n${input.signals.lines.join("\n")}`,
+      },
+    });
+  }
 
   // ---- Revenue yesterday ----
   if (input.revenueYesterday && input.revenueYesterday.length > 0) {
