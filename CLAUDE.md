@@ -132,6 +132,8 @@ The governing contracts live under [`/contracts/`](contracts/):
 - [`/contracts/approval-taxonomy.md`](contracts/approval-taxonomy.md) — Class A/B/C/D action registry with approvers.
 - [`/contracts/slack-operating.md`](contracts/slack-operating.md) — 9-channel map, thread rules, severity tiers.
 - [`/contracts/viktor.md`](contracts/viktor.md) — canonical Viktor contract (v3.0). Supersedes the old `/VIKTOR_OPERATING_CONTRACT.md`.
+- [`/contracts/agents/interviewer.md`](contracts/agents/interviewer.md) — pre-build spec disambiguation. **Active.** Before producing code/doctrine/external writes for any non-trivial under-specified request, ask 3-5 disambiguation questions with named defaults. Skip when the spec is already crisp. See contract for the under-specified predicate list.
+- [`/contracts/session-handoff.md`](contracts/session-handoff.md) — 1-page "where we are right now" brief. Read this first in every new session. Saves 10-20 minutes of re-orientation.
 - [`/contracts/divisions.json`](contracts/divisions.json) + [`/contracts/channels.json`](contracts/channels.json) — machine-readable division + channel registries.
 
 Canonical spec: [USA GUMMIES 3.0 — RESEARCH BLUEPRINT](https://www.notion.so/3454c0c42c2e81a1b6f4f35e20595c26) §14 + §15. Any behavior that conflicts with that blueprint or with `/contracts/` is a violation to be flagged, not followed.
