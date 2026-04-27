@@ -48,10 +48,21 @@ interface DispatchBoardCounts {
   dispatched: number;
 }
 
+interface DispatchBoardFilterSpec {
+  state?: "all" | "open" | "dispatched";
+  source?: "all" | "amazon" | "shopify" | "manual" | "faire";
+  shipDateFrom?: string;
+  shipDateTo?: string;
+  search?: string;
+}
+
 interface DispatchBoardData {
   ok: boolean;
   generatedAt: string;
   daysBack: number;
+  filterApplied: boolean;
+  filterSpec: DispatchBoardFilterSpec;
+  countsBeforeFilter: DispatchBoardCounts;
   counts: DispatchBoardCounts;
   rows: DispatchBoardRow[];
 }
@@ -61,34 +72,71 @@ const PILL_OPEN_FG = "#7a5300";
 const PILL_DISPATCHED_BG = "#dcf3e0";
 const PILL_DISPATCHED_FG = "#1f6c2e";
 
+const EMPTY_SPEC: DispatchBoardFilterSpec = {};
+
+function buildFilterQuery(spec: DispatchBoardFilterSpec): string {
+  const q = new URLSearchParams();
+  if (spec.state && spec.state !== "all") q.set("state", spec.state);
+  if (spec.source && spec.source !== "all") q.set("source", spec.source);
+  if (spec.shipDateFrom?.trim()) q.set("shipDateFrom", spec.shipDateFrom.trim());
+  if (spec.shipDateTo?.trim()) q.set("shipDateTo", spec.shipDateTo.trim());
+  if (spec.search?.trim()) q.set("search", spec.search.trim());
+  const s = q.toString();
+  return s ? `&${s}` : "";
+}
+
+function specIsEmpty(spec: DispatchBoardFilterSpec): boolean {
+  return (
+    (!spec.state || spec.state === "all") &&
+    (!spec.source || spec.source === "all") &&
+    !spec.shipDateFrom?.trim() &&
+    !spec.shipDateTo?.trim() &&
+    !spec.search?.trim()
+  );
+}
+
 export function DispatchBoardView() {
   const [data, setData] = useState<DispatchBoardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [busyOrder, setBusyOrder] = useState<string | null>(null);
   const [rowError, setRowError] = useState<Record<string, string>>({});
+  const [spec, setSpec] = useState<DispatchBoardFilterSpec>(EMPTY_SPEC);
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    setErr(null);
-    try {
-      const r = await fetch("/api/ops/shipping/dispatch-board?daysBack=14&limit=100", {
-        cache: "no-store",
-      });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const j = (await r.json()) as DispatchBoardData;
-      if (!j.ok) throw new Error("API returned ok:false");
-      setData(j);
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const refresh = useCallback(
+    async (effectiveSpec: DispatchBoardFilterSpec) => {
+      setLoading(true);
+      setErr(null);
+      try {
+        const url =
+          "/api/ops/shipping/dispatch-board?daysBack=14&limit=100" +
+          buildFilterQuery(effectiveSpec);
+        const r = await fetch(url, { cache: "no-store" });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const j = (await r.json()) as DispatchBoardData;
+        if (!j.ok) throw new Error("API returned ok:false");
+        setData(j);
+      } catch (e) {
+        setErr(e instanceof Error ? e.message : String(e));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    void refresh(spec);
+  }, [refresh, spec]);
+
+  const updateSpec = useCallback(
+    (patch: Partial<DispatchBoardFilterSpec>) => {
+      setSpec((prev) => ({ ...prev, ...patch }));
+    },
+    [],
+  );
+
+  const clearFilters = useCallback(() => setSpec(EMPTY_SPEC), []);
 
   const handleAction = useCallback(
     async (
@@ -116,7 +164,7 @@ export function DispatchBoardView() {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const j = (await r.json()) as { ok: boolean; error?: string };
         if (!j.ok) throw new Error(j.error ?? "API returned ok:false");
-        await refresh();
+        await refresh(spec);
       } catch (e) {
         setRowError((prev) => ({
           ...prev,
@@ -153,6 +201,15 @@ export function DispatchBoardView() {
         </p>
       </header>
 
+      <FilterStrip
+        spec={spec}
+        onChange={updateSpec}
+        onClear={clearFilters}
+        disabled={loading}
+        active={data?.filterApplied ?? !specIsEmpty(spec)}
+        countsBeforeFilter={data?.countsBeforeFilter ?? null}
+      />
+
       <div
         style={{
           display: "flex",
@@ -174,7 +231,7 @@ export function DispatchBoardView() {
         />
         <div style={{ flex: 1 }} />
         <button
-          onClick={() => void refresh()}
+          onClick={() => void refresh(spec)}
           disabled={loading}
           style={{
             padding: "6px 14px",
@@ -432,4 +489,164 @@ const btn: React.CSSProperties = {
   border: "1px solid",
   fontSize: 12,
   cursor: "pointer",
+};
+
+interface FilterStripProps {
+  spec: DispatchBoardFilterSpec;
+  onChange: (patch: Partial<DispatchBoardFilterSpec>) => void;
+  onClear: () => void;
+  disabled: boolean;
+  active: boolean;
+  countsBeforeFilter: DispatchBoardCounts | null;
+}
+
+function FilterStrip({
+  spec,
+  onChange,
+  onClear,
+  disabled,
+  active,
+  countsBeforeFilter,
+}: FilterStripProps) {
+  return (
+    <div
+      style={{
+        background: CARD,
+        border: `1px solid ${BORDER}`,
+        borderRadius: 8,
+        padding: 12,
+        marginBottom: 12,
+        display: "flex",
+        flexWrap: "wrap",
+        gap: 12,
+        alignItems: "flex-end",
+      }}
+    >
+      <Field label="State">
+        <select
+          value={spec.state ?? "all"}
+          onChange={(e) =>
+            onChange({
+              state: e.target.value as DispatchBoardFilterSpec["state"],
+            })
+          }
+          disabled={disabled}
+          style={selectStyle}
+        >
+          <option value="all">All</option>
+          <option value="open">Open</option>
+          <option value="dispatched">Dispatched</option>
+        </select>
+      </Field>
+      <Field label="Source">
+        <select
+          value={spec.source ?? "all"}
+          onChange={(e) =>
+            onChange({
+              source: e.target.value as DispatchBoardFilterSpec["source"],
+            })
+          }
+          disabled={disabled}
+          style={selectStyle}
+        >
+          <option value="all">All</option>
+          <option value="amazon">Amazon</option>
+          <option value="shopify">Shopify</option>
+          <option value="manual">Manual</option>
+          <option value="faire">Faire</option>
+        </select>
+      </Field>
+      <Field label="Ship date from">
+        <input
+          type="date"
+          value={spec.shipDateFrom ?? ""}
+          onChange={(e) => onChange({ shipDateFrom: e.target.value })}
+          disabled={disabled}
+          style={inputStyle}
+        />
+      </Field>
+      <Field label="Ship date to">
+        <input
+          type="date"
+          value={spec.shipDateTo ?? ""}
+          onChange={(e) => onChange({ shipDateTo: e.target.value })}
+          disabled={disabled}
+          style={inputStyle}
+        />
+      </Field>
+      <Field label="Search (order # / tracking / recipient)">
+        <input
+          type="text"
+          placeholder="e.g. 112-1234567 or Eric Forst"
+          value={spec.search ?? ""}
+          onChange={(e) => onChange({ search: e.target.value })}
+          disabled={disabled}
+          style={{ ...inputStyle, width: 260 }}
+        />
+      </Field>
+      <button
+        onClick={onClear}
+        disabled={disabled || !active}
+        style={{
+          padding: "6px 12px",
+          borderRadius: 6,
+          border: `1px solid ${BORDER}`,
+          background: active ? CARD : "transparent",
+          color: active ? NAVY : DIM,
+          fontSize: 12,
+          cursor: active && !disabled ? "pointer" : "default",
+          opacity: active ? 1 : 0.5,
+        }}
+      >
+        Clear filters
+      </button>
+      {active && countsBeforeFilter && (
+        <div style={{ color: DIM, fontSize: 11 }}>
+          Filtered from {countsBeforeFilter.total} total
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <span
+        style={{
+          color: DIM,
+          fontSize: 10,
+          textTransform: "uppercase",
+          letterSpacing: 0.5,
+        }}
+      >
+        {label}
+      </span>
+      {children}
+    </label>
+  );
+}
+
+const selectStyle: React.CSSProperties = {
+  padding: "6px 10px",
+  borderRadius: 6,
+  border: `1px solid ${BORDER}`,
+  background: "#fff",
+  color: NAVY,
+  fontSize: 13,
+};
+
+const inputStyle: React.CSSProperties = {
+  padding: "6px 10px",
+  borderRadius: 6,
+  border: `1px solid ${BORDER}`,
+  background: "#fff",
+  color: NAVY,
+  fontSize: 13,
 };

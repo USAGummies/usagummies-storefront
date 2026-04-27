@@ -135,8 +135,37 @@ export interface BriefInput {
    * #ops-daily picture.
    */
   salesCommand?: SalesCommandSlice;
+  /**
+   * Morning-only: dispatch throughput in the previous 24h. Populated
+   * by the daily-brief route from `buildDispatchBoardRows` +
+   * `composeDispatchBriefSlice`. Composer renders ONE line:
+   *   `Dispatch: X bought · Y dispatched · Z still open (last 24h).`
+   * Quiet collapse when zero activity. Skipped on EOD because the
+   * fulfillmentToday slice already covers labels-bought there.
+   */
+  dispatch?: DispatchBriefSlice;
   /** Any degradations to call out at the top of the brief. */
   degradations?: string[];
+}
+
+/**
+ * Last-24h dispatch throughput. Counts come from the dispatch board
+ * projection (`DispatchBoardRow[]`), filtered to the previous 24h
+ * window by ship date / dispatched-at.
+ */
+export interface DispatchBriefSlice {
+  /** ISO timestamp the slice was computed at. */
+  generatedAt: string;
+  /** Window end (exclusive); typically `generatedAt`. */
+  windowEnd: string;
+  /** Window start (inclusive); typically `windowEnd - 24h`. */
+  windowStart: string;
+  /** Labels purchased in the last 24h (regardless of dispatch state). */
+  labelsBought: number;
+  /** Of those, marked dispatched within the window. */
+  dispatched: number;
+  /** Of those, still sitting on the cart (state = open). */
+  stillOpen: number;
 }
 
 /** Minimal shape — matches fields used in the brief. */
@@ -364,6 +393,17 @@ export function composeDailyBrief(input: BriefInput): BriefOutput {
         text: renderSalesCommandMarkdown(input.salesCommand),
       },
     });
+  }
+
+  // ---- Dispatch throughput (morning only) ----
+  // Last 24h: labels bought / dispatched / still open. One line.
+  // Skipped on EOD because the fulfillmentToday slice already covers
+  // labels-bought for that surface.
+  if (input.kind === "morning" && input.dispatch) {
+    const line = renderDispatchBriefMarkdown(input.dispatch);
+    if (line) {
+      blocks.push({ type: "section", text: { type: "mrkdwn", text: line } });
+    }
   }
 
   // ---- Fulfillment today in review (EOD only) ----
@@ -729,4 +769,83 @@ export function renderSalesCommandMarkdown(slice: SalesCommandSlice): string {
  *  queue and a missing source. */
 function formatCount(value: number | null): string {
   return value === null ? "_not wired_" : `*${value}*`;
+}
+
+/**
+ * Project dispatch board rows into a 24-hour `DispatchBriefSlice`.
+ *
+ * Window: `[now - 24h, now)`. A row counts as "bought in window" iff
+ * its `shipDate` is on/within the window; "dispatched in window" iff
+ * its `dispatchedAt` is within the window. We deliberately don't
+ * combine the two predicates — a row purchased pre-window but
+ * dispatched in-window IS counted as "dispatched" but NOT as
+ * "bought," so the throughput numbers reflect what actually happened
+ * during the window without double-counting backfills.
+ *
+ * `stillOpen` is the subset of bought-in-window rows whose state is
+ * "open" — i.e. labels bought yesterday that haven't physically left
+ * yet. That's the "what to nudge" signal for the morning brief.
+ *
+ * Pure: same input → same output. Defensive on null timestamps.
+ */
+export function composeDispatchBriefSlice(
+  rows: ReadonlyArray<{
+    shipDate: string | null;
+    dispatchedAt: string | null;
+    state: "open" | "dispatched";
+  }>,
+  now?: Date,
+): DispatchBriefSlice {
+  const end = (now ?? new Date()).getTime();
+  const start = end - 24 * 3600 * 1000;
+  const windowEndIso = new Date(end).toISOString();
+  const windowStartIso = new Date(start).toISOString();
+
+  const inWindow = (iso: string | null): boolean => {
+    if (!iso) return false;
+    const t = Date.parse(iso);
+    if (!Number.isFinite(t)) return false;
+    return t >= start && t < end;
+  };
+
+  let labelsBought = 0;
+  let dispatched = 0;
+  let stillOpen = 0;
+  for (const r of rows) {
+    const boughtInWindow = inWindow(r.shipDate);
+    const dispatchedInWindow = inWindow(r.dispatchedAt);
+    if (boughtInWindow) labelsBought += 1;
+    if (dispatchedInWindow) dispatched += 1;
+    if (boughtInWindow && r.state === "open") stillOpen += 1;
+  }
+
+  return {
+    generatedAt: windowEndIso,
+    windowEnd: windowEndIso,
+    windowStart: windowStartIso,
+    labelsBought,
+    dispatched,
+    stillOpen,
+  };
+}
+
+/**
+ * Render the dispatch slice as a single Slack-flavored markdown line.
+ * Quiet collapse: returns empty string when there's no activity in
+ * the window (so the brief doesn't pad with `0 / 0 / 0` noise).
+ */
+export function renderDispatchBriefMarkdown(slice: DispatchBriefSlice): string {
+  const total = slice.labelsBought + slice.dispatched;
+  if (total === 0 && slice.stillOpen === 0) return "";
+  const parts: string[] = [
+    `*${slice.labelsBought}* bought`,
+    `*${slice.dispatched}* dispatched`,
+  ];
+  if (slice.stillOpen > 0) {
+    parts.push(
+      `*${slice.stillOpen}* still on cart` +
+        (slice.stillOpen === 1 ? " — go drop it off" : " — go drop them off"),
+    );
+  }
+  return `:package: *Dispatch (last 24h)*  ${parts.join(" · ")}`;
 }

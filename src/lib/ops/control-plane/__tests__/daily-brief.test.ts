@@ -1051,3 +1051,144 @@ describe("POST /api/ops/daily-brief", () => {
     }
   });
 });
+
+/**
+ * Phase 28d — daily-brief dispatch slice.
+ *
+ * Locks the contract:
+ *   - composeDispatchBriefSlice counts labels bought / dispatched /
+ *     still-open within the last 24h. Pure: same input → same output.
+ *   - Rows with null timestamps don't crash; they just don't count.
+ *   - dispatched count comes from `dispatchedAt` in window, regardless
+ *     of whether the row was bought in the same window.
+ *   - renderDispatchBriefMarkdown returns "" on zero activity (quiet
+ *     collapse). Returns a single-line :package: prefix otherwise.
+ *   - composeDailyBrief: morning + dispatch present → line appears.
+ *     EOD with dispatch → NEVER renders. Morning + zero activity
+ *     → no line.
+ */
+describe("composeDispatchBriefSlice + renderDispatchBriefMarkdown", () => {
+  const NOW = new Date("2026-04-26T18:00:00Z");
+  const inWindow = (hoursAgo: number) =>
+    new Date(NOW.getTime() - hoursAgo * 3600 * 1000).toISOString();
+
+  it("counts labels bought / dispatched / still open in window", async () => {
+    const { composeDispatchBriefSlice } = await import("../daily-brief");
+    const slice = composeDispatchBriefSlice(
+      [
+        // Bought 6h ago, dispatched 2h ago → counts as both bought + dispatched
+        { shipDate: inWindow(6), dispatchedAt: inWindow(2), state: "dispatched" },
+        // Bought 12h ago, still open → bought + still-open
+        { shipDate: inWindow(12), dispatchedAt: null, state: "open" },
+        // Bought 30h ago (out of window), dispatched 6h ago → ONLY dispatched
+        { shipDate: inWindow(30), dispatchedAt: inWindow(6), state: "dispatched" },
+        // Bought 30h ago, still open → NOT counted (out of window)
+        { shipDate: inWindow(30), dispatchedAt: null, state: "open" },
+      ],
+      NOW,
+    );
+    expect(slice.labelsBought).toBe(2);
+    expect(slice.dispatched).toBe(2);
+    expect(slice.stillOpen).toBe(1);
+  });
+
+  it("rows with null / unparseable timestamps don't crash and don't count", async () => {
+    const { composeDispatchBriefSlice } = await import("../daily-brief");
+    const slice = composeDispatchBriefSlice(
+      [
+        { shipDate: null, dispatchedAt: null, state: "open" },
+        { shipDate: "garbage", dispatchedAt: "also garbage", state: "open" },
+      ],
+      NOW,
+    );
+    expect(slice.labelsBought).toBe(0);
+    expect(slice.dispatched).toBe(0);
+    expect(slice.stillOpen).toBe(0);
+  });
+
+  it("renderDispatchBriefMarkdown returns empty string on zero activity", async () => {
+    const { renderDispatchBriefMarkdown, composeDispatchBriefSlice } =
+      await import("../daily-brief");
+    const slice = composeDispatchBriefSlice([], NOW);
+    expect(renderDispatchBriefMarkdown(slice)).toBe("");
+  });
+
+  it("renderDispatchBriefMarkdown emits a single-line :package: header on activity", async () => {
+    const { renderDispatchBriefMarkdown, composeDispatchBriefSlice } =
+      await import("../daily-brief");
+    const slice = composeDispatchBriefSlice(
+      [
+        // bought 6h ago, dispatched 2h ago → counts toward both
+        { shipDate: inWindow(6), dispatchedAt: inWindow(2), state: "dispatched" },
+        // bought 8h ago, still open → counts toward bought + stillOpen
+        { shipDate: inWindow(8), dispatchedAt: null, state: "open" },
+      ],
+      NOW,
+    );
+    const out = renderDispatchBriefMarkdown(slice);
+    expect(out).toMatch(/^:package:/);
+    expect(out).toMatch(/\*2\* bought/);
+    expect(out).toMatch(/\*1\* dispatched/);
+    expect(out).toMatch(/\*1\* still on cart/);
+  });
+
+  it("composeDailyBrief renders the dispatch line on morning + dispatch present", async () => {
+    const { composeDailyBrief, composeDispatchBriefSlice } = await import(
+      "../daily-brief"
+    );
+    const slice = composeDispatchBriefSlice(
+      [
+        { shipDate: inWindow(6), dispatchedAt: inWindow(2), state: "dispatched" },
+      ],
+      NOW,
+    );
+    const out = composeDailyBrief({
+      kind: "morning",
+      asOf: NOW,
+      activeDivisions: [],
+      pendingApprovals: [],
+      pausedAgents: [] as PausedAgentRecord[],
+      recentAudit: [],
+      dispatch: slice,
+    });
+    // Section blocks carry the brief content; `text` is the meta header only.
+    expect(JSON.stringify(out.blocks)).toContain("Dispatch (last 24h)");
+  });
+
+  it("composeDailyBrief NEVER renders the dispatch line on EOD", async () => {
+    const { composeDailyBrief, composeDispatchBriefSlice } = await import(
+      "../daily-brief"
+    );
+    const slice = composeDispatchBriefSlice(
+      [{ shipDate: inWindow(6), dispatchedAt: null, state: "open" }],
+      NOW,
+    );
+    const out = composeDailyBrief({
+      kind: "eod",
+      asOf: NOW,
+      activeDivisions: [],
+      pendingApprovals: [],
+      pausedAgents: [] as PausedAgentRecord[],
+      recentAudit: [],
+      dispatch: slice,
+    });
+    expect(JSON.stringify(out.blocks)).not.toContain("Dispatch (last 24h)");
+  });
+
+  it("composeDailyBrief on morning + zero-activity slice renders no dispatch line", async () => {
+    const { composeDailyBrief, composeDispatchBriefSlice } = await import(
+      "../daily-brief"
+    );
+    const slice = composeDispatchBriefSlice([], NOW);
+    const out = composeDailyBrief({
+      kind: "morning",
+      asOf: NOW,
+      activeDivisions: [],
+      pendingApprovals: [],
+      pausedAgents: [] as PausedAgentRecord[],
+      recentAudit: [],
+      dispatch: slice,
+    });
+    expect(JSON.stringify(out.blocks)).not.toContain("Dispatch (last 24h)");
+  });
+});

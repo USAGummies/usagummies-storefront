@@ -21,12 +21,23 @@ import { NextResponse } from "next/server";
 
 import {
   composeDailyBrief,
+  composeDispatchBriefSlice,
   type ARPosition,
   type BriefKind,
+  type DispatchBriefSlice,
   type FulfillmentPreflightSlice,
   type FulfillmentTodayBriefSlice,
   type RevenueLine,
 } from "@/lib/ops/control-plane/daily-brief";
+import {
+  getRecentShipments,
+  isShipStationConfigured,
+} from "@/lib/ops/shipstation-client";
+import {
+  bulkLookupArtifacts,
+  type ShippingArtifactRecord,
+} from "@/lib/ops/shipping-artifacts";
+import { buildDispatchBoardRows } from "@/lib/ops/shipping-dispatch-board";
 import { computeFulfillmentPreflight } from "@/lib/ops/fulfillment-preflight";
 import { computeFulfillmentTodaySlice } from "@/lib/ops/fulfillment-today";
 import {
@@ -280,6 +291,50 @@ async function composeAndPost(req: Request): Promise<Response> {
     }
   }
 
+  // Morning brief only: dispatch throughput in the previous 24h.
+  // Reads the dispatch-board projection (ShipStation recent shipments
+  // + shipping artifact stamps) and returns a one-line `:package:`
+  // summary per Phase 28d. Skipped on EOD — fulfillmentToday already
+  // covers labels-bought there.
+  let dispatch: DispatchBriefSlice | undefined;
+  // Skip silently when ShipStation isn't configured — that's a
+  // local-dev / test environment, not a production degradation.
+  // Mirrors the salesCommand pattern: failures push to `degradations`,
+  // but missing-config doesn't.
+  if (kind === "morning" && isShipStationConfigured()) {
+    try {
+      const since = new Date(now.getTime() - 26 * 3600 * 1000)
+        .toISOString()
+        .slice(0, 10);
+      const ssRes = await getRecentShipments({
+        shipDateStart: since,
+        includeVoided: false,
+        pageSize: 200,
+      });
+      if (ssRes.ok) {
+        const pairs = ssRes.shipments
+          .filter((s) => s.orderNumber)
+          .map((s) => ({ orderNumber: s.orderNumber as string }));
+        const artifactMap = await bulkLookupArtifacts(pairs);
+        const lookupMap = new Map<string, ShippingArtifactRecord>();
+        for (const [orderNumber, record] of artifactMap.entries()) {
+          lookupMap.set(orderNumber, record);
+          lookupMap.set(`${record.source}:${orderNumber}`, record);
+        }
+        const view = buildDispatchBoardRows(ssRes.shipments, lookupMap, {
+          excludeVoided: true,
+        });
+        dispatch = composeDispatchBriefSlice(view.rows, now);
+      } else {
+        degradations.push(`dispatch-board: ${ssRes.error}`);
+      }
+    } catch (err) {
+      degradations.push(
+        `dispatch-board: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
   // EOD brief only: today's fulfillment activity (labels bought,
   // voided, freight-comp queue transitions since midnight PT).
   let fulfillmentToday: FulfillmentTodayBriefSlice | undefined;
@@ -314,6 +369,7 @@ async function composeAndPost(req: Request): Promise<Response> {
     preflight,
     fulfillmentToday,
     salesCommand,
+    dispatch,
     degradations,
   } as const;
   let brief = composeDailyBrief(composeInput);

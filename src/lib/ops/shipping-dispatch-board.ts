@@ -172,6 +172,150 @@ export function buildDispatchBoardRows(
 }
 
 /**
+ * Filter spec for the dispatch board.
+ *
+ * All fields optional — empty means "no filter on this dimension."
+ * AND semantics: a row must satisfy every active dimension to pass.
+ * Defensive: empty / whitespace / unparseable inputs collapse to
+ * "no filter" (keystroke errors never hide rows).
+ */
+export interface DispatchBoardFilterSpec {
+  /** "all" | "open" | "dispatched". Default: undefined (no filter). */
+  state?: "all" | "open" | "dispatched";
+  /** "all" | "amazon" | "shopify" | "manual" | "faire". */
+  source?: "all" | "amazon" | "shopify" | "manual" | "faire";
+  /** ISO date YYYY-MM-DD. Inclusive lower bound on shipDate. */
+  shipDateFrom?: string;
+  /** ISO date YYYY-MM-DD. Inclusive upper bound on shipDate. */
+  shipDateTo?: string;
+  /** Case-insensitive substring against orderNumber / tracking / recipient. */
+  search?: string;
+}
+
+const ALLOWED_SOURCES_FILTER: ReadonlyArray<DispatchBoardFilterSpec["source"]> =
+  ["all", "amazon", "shopify", "manual", "faire"] as const;
+
+/**
+ * Apply a filter spec to a built `DispatchBoardView`. Returns a NEW
+ * view with `rows` narrowed and `counts` recomputed on the filtered
+ * set — so the dashboard's strip always sums to `rows.length`.
+ *
+ * Bit-identical client/server semantics. The route uses the same
+ * helper before serializing JSON; locked by parity test.
+ */
+export function applyDispatchBoardFilters(
+  view: DispatchBoardView,
+  spec: DispatchBoardFilterSpec,
+): DispatchBoardView {
+  const stateFilter =
+    spec.state && spec.state !== "all" ? spec.state : null;
+  const sourceFilter =
+    spec.source && spec.source !== "all" ? spec.source : null;
+  const fromTrim = spec.shipDateFrom?.trim() ?? "";
+  const toTrim = spec.shipDateTo?.trim() ?? "";
+  const dateFrom = isIsoDate(fromTrim) ? fromTrim : null;
+  const dateTo = isIsoDate(toTrim) ? toTrim : null;
+  const searchTrim = spec.search?.trim().toLowerCase() ?? "";
+
+  const filtered = view.rows.filter((r) => {
+    if (stateFilter && r.state !== stateFilter) return false;
+    if (sourceFilter && r.source !== sourceFilter) return false;
+    if (dateFrom || dateTo) {
+      if (!r.shipDate || !isIsoDate(r.shipDate)) return false;
+      if (dateFrom && r.shipDate < dateFrom) return false;
+      if (dateTo && r.shipDate > dateTo) return false;
+    }
+    if (searchTrim) {
+      const haystack = [
+        r.orderNumber,
+        r.trackingNumber,
+        r.recipient,
+        r.shipToPostalCode,
+      ]
+        .filter(Boolean)
+        .join("\n")
+        .toLowerCase();
+      if (!haystack.includes(searchTrim)) return false;
+    }
+    return true;
+  });
+
+  const counts: DispatchBoardCounts = {
+    total: filtered.length,
+    open: filtered.filter((r) => r.state === "open").length,
+    dispatched: filtered.filter((r) => r.state === "dispatched").length,
+  };
+
+  return { rows: filtered, counts };
+}
+
+/** Returns true iff `spec` would narrow the view (any active dimension). */
+export function dispatchBoardFilterIsActive(
+  spec: DispatchBoardFilterSpec,
+): boolean {
+  if (spec.state && spec.state !== "all") return true;
+  if (spec.source && spec.source !== "all") return true;
+  if (spec.shipDateFrom?.trim() && isIsoDate(spec.shipDateFrom.trim()))
+    return true;
+  if (spec.shipDateTo?.trim() && isIsoDate(spec.shipDateTo.trim())) return true;
+  if (spec.search?.trim()) return true;
+  return false;
+}
+
+/**
+ * Parse the canonical query string into a `DispatchBoardFilterSpec`.
+ * Unknown / whitespace / unparseable values collapse to no filter.
+ */
+export function parseDispatchBoardFilterSpec(
+  query: URLSearchParams,
+): DispatchBoardFilterSpec {
+  const spec: DispatchBoardFilterSpec = {};
+  const stateRaw = query.get("state")?.trim();
+  if (stateRaw === "open" || stateRaw === "dispatched" || stateRaw === "all") {
+    spec.state = stateRaw;
+  }
+  const sourceRaw = query.get("source")?.trim();
+  if (
+    sourceRaw &&
+    (ALLOWED_SOURCES_FILTER as readonly string[]).includes(sourceRaw)
+  ) {
+    spec.source = sourceRaw as DispatchBoardFilterSpec["source"];
+  }
+  const fromRaw = query.get("shipDateFrom")?.trim();
+  if (fromRaw && isIsoDate(fromRaw)) spec.shipDateFrom = fromRaw;
+  const toRaw = query.get("shipDateTo")?.trim();
+  if (toRaw && isIsoDate(toRaw)) spec.shipDateTo = toRaw;
+  const searchRaw = query.get("search")?.trim();
+  if (searchRaw) spec.search = searchRaw;
+  return spec;
+}
+
+/**
+ * Serialize a spec to a query-string. Round-trips with
+ * `parseDispatchBoardFilterSpec`. Defaults / no-filter values are
+ * omitted so URLs stay short.
+ */
+export function dispatchBoardFilterSpecToQuery(
+  spec: DispatchBoardFilterSpec,
+): URLSearchParams {
+  const q = new URLSearchParams();
+  if (spec.state && spec.state !== "all") q.set("state", spec.state);
+  if (spec.source && spec.source !== "all") q.set("source", spec.source);
+  if (spec.shipDateFrom?.trim() && isIsoDate(spec.shipDateFrom.trim())) {
+    q.set("shipDateFrom", spec.shipDateFrom.trim());
+  }
+  if (spec.shipDateTo?.trim() && isIsoDate(spec.shipDateTo.trim())) {
+    q.set("shipDateTo", spec.shipDateTo.trim());
+  }
+  if (spec.search?.trim()) q.set("search", spec.search.trim());
+  return q;
+}
+
+function isIsoDate(s: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(s);
+}
+
+/**
  * Sort: open rows first (most actionable), then dispatched.
  * Within each group: shipDate DESC (most recent first).
  * Within same shipDate: trackingNumber ASC (stable).

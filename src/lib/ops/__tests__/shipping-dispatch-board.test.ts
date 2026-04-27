@@ -17,8 +17,14 @@ import { describe, expect, it } from "vitest";
 import type { ShipStationShipment } from "@/lib/ops/shipstation-client";
 import type { ShippingArtifactRecord } from "@/lib/ops/shipping-artifacts";
 import {
+  applyDispatchBoardFilters,
   buildDispatchBoardRows,
+  dispatchBoardFilterIsActive,
+  dispatchBoardFilterSpecToQuery,
   inferSourceFromOrderNumber,
+  parseDispatchBoardFilterSpec,
+  type DispatchBoardFilterSpec,
+  type DispatchBoardView,
 } from "@/lib/ops/shipping-dispatch-board";
 
 function ship(over: Partial<ShipStationShipment>): ShipStationShipment {
@@ -272,5 +278,211 @@ describe("buildDispatchBoardRows", () => {
     expect(view.rows[0].dispatchedAt).toBeNull();
     // Slack permalink still surfaces from the artifact.
     expect(view.rows[0].slackPermalink).toContain("/p1");
+  });
+});
+
+/**
+ * Phase 28d — filter helpers.
+ *
+ * Locks the contract:
+ *   - Empty / "all" / unparseable spec is "no filter" (no rows hidden).
+ *   - State filter narrows to open or dispatched.
+ *   - Source filter narrows by inferred or artifact-derived source.
+ *   - Date filter inclusive on both ends; rows with null/garbage
+ *     shipDate excluded under any active date filter.
+ *   - Search is case-insensitive substring against orderNumber,
+ *     tracking, recipient, and postalCode.
+ *   - parse / serialize round-trip.
+ *   - dispatchBoardFilterIsActive returns false on no-op specs.
+ */
+describe("applyDispatchBoardFilters", () => {
+  function fixture(): DispatchBoardView {
+    return buildDispatchBoardRows(
+      [
+        ship({
+          shipmentId: 1,
+          orderNumber: "112-1111111-1111111",
+          trackingNumber: "T1",
+          shipToName: "Alice Anderson",
+          shipDate: "2026-04-26",
+        }),
+        ship({
+          shipmentId: 2,
+          orderNumber: "1077",
+          trackingNumber: "T2",
+          shipToName: "Bob Builder",
+          shipDate: "2026-04-25",
+        }),
+        ship({
+          shipmentId: 3,
+          orderNumber: "1078",
+          trackingNumber: "T3",
+          shipToName: "Carol Cat",
+          shipDate: "2026-04-24",
+        }),
+      ],
+      new Map<string, ShippingArtifactRecord>([
+        [
+          "shopify:1077",
+          artifact({
+            orderNumber: "1077",
+            source: "shopify",
+            dispatchedAt: "2026-04-26T18:00:00Z",
+          }),
+        ],
+      ]),
+    );
+  }
+
+  it("empty spec is a no-op", () => {
+    const v = fixture();
+    const out = applyDispatchBoardFilters(v, {});
+    expect(out.rows).toHaveLength(3);
+    expect(out.counts).toEqual(v.counts);
+  });
+
+  it('state="open" narrows to open rows', () => {
+    const out = applyDispatchBoardFilters(fixture(), { state: "open" });
+    expect(out.rows.every((r) => r.state === "open")).toBe(true);
+    expect(out.counts.dispatched).toBe(0);
+    expect(out.counts.open).toBe(2);
+  });
+
+  it('state="dispatched" narrows to dispatched rows', () => {
+    const out = applyDispatchBoardFilters(fixture(), { state: "dispatched" });
+    expect(out.rows.every((r) => r.state === "dispatched")).toBe(true);
+    expect(out.counts.open).toBe(0);
+    expect(out.counts.dispatched).toBe(1);
+  });
+
+  it("source filter narrows by inferred source", () => {
+    const out = applyDispatchBoardFilters(fixture(), { source: "amazon" });
+    expect(out.rows).toHaveLength(1);
+    expect(out.rows[0].source).toBe("amazon");
+  });
+
+  it("date range is inclusive on both ends", () => {
+    const out = applyDispatchBoardFilters(fixture(), {
+      shipDateFrom: "2026-04-25",
+      shipDateTo: "2026-04-26",
+    });
+    expect(out.rows).toHaveLength(2);
+    expect(out.rows.map((r) => r.trackingNumber).sort()).toEqual(["T1", "T2"]);
+  });
+
+  it("rows with null shipDate excluded under any active date filter", () => {
+    const v: DispatchBoardView = {
+      rows: [
+        {
+          orderNumber: "X",
+          source: null,
+          recipient: null,
+          shipToPostalCode: null,
+          carrierService: null,
+          trackingNumber: "TX",
+          shipmentCost: null,
+          shipDate: null,
+          slackPermalink: null,
+          state: "open",
+          dispatchedAt: null,
+          dispatchedBy: null,
+        },
+      ],
+      counts: { total: 1, open: 1, dispatched: 0 },
+    };
+    const out = applyDispatchBoardFilters(v, { shipDateFrom: "2026-01-01" });
+    expect(out.rows).toHaveLength(0);
+  });
+
+  it("search is case-insensitive substring across orderNumber / tracking / recipient", () => {
+    const out1 = applyDispatchBoardFilters(fixture(), { search: "alice" });
+    expect(out1.rows).toHaveLength(1);
+    expect(out1.rows[0].recipient).toBe("Alice Anderson");
+
+    const out2 = applyDispatchBoardFilters(fixture(), { search: "T2" });
+    expect(out2.rows).toHaveLength(1);
+    expect(out2.rows[0].trackingNumber).toBe("T2");
+
+    const out3 = applyDispatchBoardFilters(fixture(), { search: "1078" });
+    expect(out3.rows).toHaveLength(1);
+    expect(out3.rows[0].orderNumber).toBe("1078");
+  });
+
+  it("AND semantics across multiple dimensions", () => {
+    const out = applyDispatchBoardFilters(fixture(), {
+      state: "open",
+      source: "shopify",
+    });
+    expect(out.rows).toHaveLength(1);
+    expect(out.rows[0].orderNumber).toBe("1078");
+  });
+
+  it("counts on the filtered view sum to filtered rows", () => {
+    const out = applyDispatchBoardFilters(fixture(), { state: "open" });
+    expect(out.counts.total).toBe(out.rows.length);
+    expect(out.counts.open + out.counts.dispatched).toBe(out.rows.length);
+  });
+
+  it("whitespace / unparseable values collapse to no filter", () => {
+    const out = applyDispatchBoardFilters(fixture(), {
+      shipDateFrom: "   ",
+      shipDateTo: "not-a-date",
+      search: "   ",
+    });
+    expect(out.rows).toHaveLength(3);
+  });
+});
+
+describe("dispatchBoardFilterIsActive", () => {
+  it("false on empty spec", () => {
+    expect(dispatchBoardFilterIsActive({})).toBe(false);
+  });
+  it('false on state="all"', () => {
+    expect(dispatchBoardFilterIsActive({ state: "all" })).toBe(false);
+  });
+  it('false on whitespace search', () => {
+    expect(dispatchBoardFilterIsActive({ search: "   " })).toBe(false);
+  });
+  it("true on populated state / source / search / dates", () => {
+    expect(dispatchBoardFilterIsActive({ state: "open" })).toBe(true);
+    expect(dispatchBoardFilterIsActive({ source: "amazon" })).toBe(true);
+    expect(dispatchBoardFilterIsActive({ search: "abc" })).toBe(true);
+    expect(
+      dispatchBoardFilterIsActive({ shipDateFrom: "2026-04-26" }),
+    ).toBe(true);
+  });
+});
+
+describe("parse + serialize filter spec", () => {
+  it("round-trips a full spec", () => {
+    const spec: DispatchBoardFilterSpec = {
+      state: "open",
+      source: "amazon",
+      shipDateFrom: "2026-04-25",
+      shipDateTo: "2026-04-26",
+      search: "Eric",
+    };
+    const q = dispatchBoardFilterSpecToQuery(spec);
+    const parsed = parseDispatchBoardFilterSpec(new URLSearchParams(q));
+    expect(parsed).toEqual(spec);
+  });
+
+  it("ignores unknown / unparseable values", () => {
+    const parsed = parseDispatchBoardFilterSpec(
+      new URLSearchParams(
+        "state=destroy&source=instagram&shipDateFrom=garbage&search=",
+      ),
+    );
+    expect(parsed).toEqual({});
+  });
+
+  it('serializer omits "all" / empty / unparseable', () => {
+    const q = dispatchBoardFilterSpecToQuery({
+      state: "all",
+      source: "all",
+      shipDateFrom: "garbage",
+      search: "   ",
+    });
+    expect(q.toString()).toBe("");
   });
 });

@@ -23,7 +23,12 @@ import { NextResponse } from "next/server";
 import { isAuthorized } from "@/lib/ops/abra-auth";
 import { getRecentShipments } from "@/lib/ops/shipstation-client";
 import { bulkLookupArtifacts } from "@/lib/ops/shipping-artifacts";
-import { buildDispatchBoardRows } from "@/lib/ops/shipping-dispatch-board";
+import {
+  applyDispatchBoardFilters,
+  buildDispatchBoardRows,
+  dispatchBoardFilterIsActive,
+  parseDispatchBoardFilterSpec,
+} from "@/lib/ops/shipping-dispatch-board";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -87,13 +92,24 @@ export async function GET(req: Request): Promise<Response> {
     excludeVoided: !includeVoided,
   });
 
+  // Apply caller-supplied filter spec on the projected view.
+  // Filtering happens AFTER projection so `view.counts.total` (pre-
+  // filter) and `filtered.counts.total` (post-filter) are both
+  // available to the client.
+  const spec = parseDispatchBoardFilterSpec(url.searchParams);
+  const filterApplied = dispatchBoardFilterIsActive(spec);
+  const filtered = filterApplied ? applyDispatchBoardFilters(view, spec) : view;
+
   return NextResponse.json({
     ok: true,
     generatedAt: new Date().toISOString(),
     daysBack,
     limit,
     includeVoided,
-    counts: view.counts,
-    rows: view.rows,
+    filterApplied,
+    filterSpec: spec,
+    countsBeforeFilter: view.counts,
+    counts: filtered.counts,
+    rows: filtered.rows,
   });
 }
