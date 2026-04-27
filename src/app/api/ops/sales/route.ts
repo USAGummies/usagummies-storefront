@@ -35,6 +35,15 @@ import {
   readWholesaleInquiries,
 } from "@/lib/ops/sales-command-readers";
 import { readAllChannelsLast7d } from "@/lib/ops/revenue-kpi-readers";
+import {
+  getRecentShipments,
+  isShipStationConfigured,
+} from "@/lib/ops/shipstation-client";
+import {
+  bulkLookupArtifacts,
+  type ShippingArtifactRecord,
+} from "@/lib/ops/shipping-artifacts";
+import { buildDispatchBoardRows } from "@/lib/ops/shipping-dispatch-board";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -90,6 +99,54 @@ export async function GET(req: Request): Promise<Response> {
     readWholesaleInquiries(),
   ]);
 
+  // Phase 28f — fetch the dispatch-board rows for the new tile on
+  // /ops/sales. Mirrors the daily-brief route's pattern: skip silently
+  // when ShipStation isn't configured (mark the tile not_wired with
+  // a specific reason), surface a transient error if the call fails.
+  let dispatchRows:
+    | ReadonlyArray<{
+        state: "open" | "dispatched";
+        shipDate: string | null;
+        dispatchedAt: string | null;
+      }>
+    | undefined;
+  let dispatchNotWiredReason: string | undefined;
+  if (isShipStationConfigured()) {
+    try {
+      const since = new Date(now.getTime() - 14 * 24 * 3600 * 1000)
+        .toISOString()
+        .slice(0, 10);
+      const ssRes = await getRecentShipments({
+        shipDateStart: since,
+        includeVoided: false,
+        pageSize: 200,
+      });
+      if (ssRes.ok) {
+        const pairs = ssRes.shipments
+          .filter((s) => s.orderNumber)
+          .map((s) => ({ orderNumber: s.orderNumber as string }));
+        const artifactMap = await bulkLookupArtifacts(pairs);
+        const lookupMap = new Map<string, ShippingArtifactRecord>();
+        for (const [orderNumber, record] of artifactMap.entries()) {
+          lookupMap.set(orderNumber, record);
+          lookupMap.set(`${record.source}:${orderNumber}`, record);
+        }
+        const view = buildDispatchBoardRows(ssRes.shipments, lookupMap, {
+          excludeVoided: true,
+        });
+        dispatchRows = view.rows;
+      } else {
+        dispatchNotWiredReason = `ShipStation read failed: ${ssRes.error}`;
+      }
+    } catch (err) {
+      dispatchNotWiredReason = `ShipStation read threw: ${
+        err instanceof Error ? err.message : String(err)
+      }`;
+    }
+  } else {
+    dispatchNotWiredReason = "ShipStation not configured.";
+  }
+
   const report = buildSalesCommandCenter(
     {
       faireInvites,
@@ -102,6 +159,8 @@ export async function GET(req: Request): Promise<Response> {
       agingItems: aging.items,
       agingMissing: aging.missing,
       revenueChannels,
+      dispatchRows,
+      dispatchNotWiredReason,
     },
     { now },
   );

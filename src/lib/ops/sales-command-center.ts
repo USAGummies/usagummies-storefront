@@ -145,6 +145,18 @@ export interface SalesCommandCenterInput {
    *  `readAllChannelsLast7d(now)`. The aggregator passes these to
    *  `composeRevenueKpi` which assembles the scorecard report. */
   revenueChannels?: ChannelRevenueState[];
+  /** Phase 28f — dispatch board summary input. Caller fetches via
+   *  the dispatch-board projection (same pipeline as `/api/ops/shipping/dispatch-board`)
+   *  and passes the row list here. Optional: when omitted, the
+   *  report's `dispatchSummary` section is `not_wired`. */
+  dispatchRows?: ReadonlyArray<{
+    state: "open" | "dispatched";
+    shipDate: string | null;
+    dispatchedAt: string | null;
+  }>;
+  /** Reason to use when `dispatchRows` is omitted (e.g. ShipStation
+   *  not configured). Defaults to "ShipStation not configured." */
+  dispatchNotWiredReason?: string;
 }
 
 export interface SectionTodaysRevenueActions {
@@ -216,7 +228,31 @@ export interface SalesCommandCenterReport {
   aging: SectionAging;
   /** Phase 4 — Weekly Revenue KPI Scorecard (read-only). */
   kpiScorecard: RevenueKpiReport;
+  /** Phase 28f — dispatch summary tile (open vs dispatched-24h). */
+  dispatchSummary: SectionDispatchSummary;
   blockers: SectionBlockers;
+}
+
+/**
+ * Phase 28f — Dispatch summary tile for /ops/sales.
+ *
+ * Surfaces "X open · Y dispatched (last 24h)" so the operator can see
+ * shipping throughput at a glance from the home dashboard. Cross-links
+ * to the full `/ops/shipping/dispatch` board for action.
+ *
+ * `oldestOpenIso` is the ship_date of the OLDEST open row — the
+ * "what's been sitting on the cart longest" signal. null when no
+ * open rows or when ship_date can't be parsed.
+ */
+export interface SectionDispatchSummary {
+  /** Open packages — labels bought but not yet marked dispatched. */
+  openCount: SourceState<number>;
+  /** Dispatched in the last 24h (rolling). */
+  dispatchedLast24h: SourceState<number>;
+  /** ISO ship_date of the oldest open package; null when none. */
+  oldestOpenShipDate: string | null;
+  /** Deep link to the full dispatch board. Always set. */
+  deepLink: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -538,6 +574,10 @@ export function buildSalesCommandCenter(
       { channels: input.revenueChannels ?? [] },
       { now: options.now ?? new Date(generatedAt) },
     ),
+    dispatchSummary: buildDispatchSummary(
+      input,
+      options.now ?? new Date(generatedAt),
+    ),
     blockers: {
       missingEnv: Array.isArray(input.missingEnv) ? [...input.missingEnv] : [],
       notes,
@@ -575,5 +615,70 @@ function buildAgingSection(input: SalesCommandCenterInput): SectionAging {
     counts,
     missingTimestamps: missingSorted,
     link: { href: "/ops/sales", label: "Open Sales Command" },
+  };
+}
+
+/**
+ * Pure projection: dispatch board rows → SectionDispatchSummary.
+ *
+ * Defensive on null/garbage timestamps. The "dispatched in the last
+ * 24h" window is `[now - 24h, now)` — same window the morning brief
+ * uses, so the two surfaces always agree.
+ *
+ * `oldestOpenShipDate` is the lexicographically smallest valid ISO
+ * `YYYY-MM-DD` among open rows. Lex order matches chronological for
+ * fixed-width ISO dates, so no Date parsing required.
+ *
+ * When `input.dispatchRows` is omitted, both counts are `not_wired`
+ * and the reason defaults to "ShipStation not configured." Callers
+ * (`/api/ops/sales` route) override the reason when they know what's
+ * actually missing (e.g. ShipStation API error).
+ */
+function buildDispatchSummary(
+  input: SalesCommandCenterInput,
+  now: Date,
+): SectionDispatchSummary {
+  const deepLink = "/ops/shipping/dispatch";
+  if (!input.dispatchRows) {
+    const reason =
+      input.dispatchNotWiredReason ?? "ShipStation not configured.";
+    return {
+      openCount: sourceNotWired(reason),
+      dispatchedLast24h: sourceNotWired(reason),
+      oldestOpenShipDate: null,
+      deepLink,
+    };
+  }
+
+  const end = now.getTime();
+  const start = end - 24 * 3600 * 1000;
+  let openCount = 0;
+  let dispatchedLast24h = 0;
+  let oldestOpenShipDate: string | null = null;
+
+  for (const r of input.dispatchRows) {
+    if (r.state === "open") {
+      openCount += 1;
+      if (
+        r.shipDate &&
+        /^\d{4}-\d{2}-\d{2}$/.test(r.shipDate) &&
+        (!oldestOpenShipDate || r.shipDate < oldestOpenShipDate)
+      ) {
+        oldestOpenShipDate = r.shipDate;
+      }
+    }
+    if (r.dispatchedAt) {
+      const t = Date.parse(r.dispatchedAt);
+      if (Number.isFinite(t) && t >= start && t < end) {
+        dispatchedLast24h += 1;
+      }
+    }
+  }
+
+  return {
+    openCount: sourceWired(openCount),
+    dispatchedLast24h: sourceWired(dispatchedLast24h),
+    oldestOpenShipDate,
+    deepLink,
   };
 }

@@ -40,6 +40,7 @@ import {
   getShippingArtifact,
   markDispatched,
 } from "@/lib/ops/shipping-artifacts";
+import { recordDispatchAudit } from "@/lib/ops/shipping-dispatch-audit";
 import { permalinkToMessageTs } from "@/lib/ops/slack-file-upload";
 
 export const runtime = "nodejs";
@@ -98,6 +99,18 @@ export async function POST(req: Request): Promise<Response> {
 
   if (action === "clear") {
     const result = await clearDispatched({ source, orderNumber });
+    if (result.ok && result.before) {
+      // Audit: only emit when there was actually a stamp to clear.
+      await recordDispatchAudit({
+        action: "shipping.dispatch.clear",
+        surface: "ops-dashboard",
+        source,
+        orderNumber,
+        actorRef: dispatchedBy,
+        before: result.before,
+        after: null,
+      });
+    }
     return NextResponse.json({
       ok: true,
       action: "clear",
@@ -118,6 +131,7 @@ export async function POST(req: Request): Promise<Response> {
   // First-time mark posts a thread reply mirroring the Slack reaction
   // handler. Re-marks (where `before` is non-null) are silent so the
   // channel doesn't accumulate duplicate dispatch confirmations.
+  let postedThreadReply = false;
   if (result.ok && !result.before) {
     try {
       const artifact = await getShippingArtifact(source, orderNumber);
@@ -133,10 +147,24 @@ export async function POST(req: Request): Promise<Response> {
             `by ${dispatchedBy} at ${formatStamp(result.after)}.`,
           threadTs: messageTs,
         });
+        postedThreadReply = true;
       }
     } catch {
       /* best-effort — never block the dashboard click on Slack */
     }
+  }
+
+  if (result.ok) {
+    await recordDispatchAudit({
+      action: "shipping.dispatch.mark",
+      surface: "ops-dashboard",
+      source,
+      orderNumber,
+      actorRef: dispatchedBy,
+      before: result.before,
+      after: result.after,
+      postedThreadReply,
+    });
   }
 
   return NextResponse.json({

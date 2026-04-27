@@ -28,6 +28,7 @@ import {
   findArtifactBySlackTs,
   markDispatched,
 } from "@/lib/ops/shipping-artifacts";
+import { recordDispatchAudit } from "@/lib/ops/shipping-dispatch-audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -287,6 +288,19 @@ async function handleReaction(
       source: record.source,
       orderNumber: record.orderNumber,
     });
+    // Audit: only emit when the stamp was actually present — clearing
+    // an already-clear record is a no-op and shouldn't pollute the trail.
+    if (cleared.ok && cleared.before) {
+      await recordDispatchAudit({
+        action: "shipping.dispatch.clear",
+        surface: "slack-reaction",
+        source: record.source,
+        orderNumber: record.orderNumber,
+        actorRef: event.user ?? null,
+        before: cleared.before,
+        after: null,
+      });
+    }
     return NextResponse.json({
       ok: true,
       handled: "reaction_removed",
@@ -305,6 +319,7 @@ async function handleReaction(
   // Only post the dispatched-confirmation thread reply on first-time
   // marks. Slack delivers reaction_added even when a different user
   // adds the same emoji — we want one (and only one) reply per shipment.
+  let postedThreadReply = false;
   if (result.ok && !result.before) {
     try {
       await postMessage({
@@ -315,9 +330,22 @@ async function handleReaction(
           ` at ${formatStamp(result.after)}.`,
         threadTs: messageTs,
       });
+      postedThreadReply = true;
     } catch {
       /* best-effort */
     }
+  }
+  if (result.ok) {
+    await recordDispatchAudit({
+      action: "shipping.dispatch.mark",
+      surface: "slack-reaction",
+      source: record.source,
+      orderNumber: record.orderNumber,
+      actorRef: event.user ?? null,
+      before: result.before,
+      after: result.after,
+      postedThreadReply,
+    });
   }
   return NextResponse.json({
     ok: true,

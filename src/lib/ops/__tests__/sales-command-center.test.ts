@@ -756,3 +756,150 @@ describe("composeSalesCommandSlice — revenueKpi one-liner", () => {
     expect(slice.revenueKpi!.text).not.toMatch(/\$/);
   });
 });
+
+/**
+ * Phase 28f — dispatchSummary section.
+ *
+ * Locks the contract:
+ *   - When `dispatchRows` is omitted: both counts are not_wired with
+ *     a reason. Default reason "ShipStation not configured." can be
+ *     overridden via `dispatchNotWiredReason`.
+ *   - When provided: openCount counts state==="open"; dispatchedLast24h
+ *     counts rows whose dispatchedAt is in [now-24h, now); both
+ *     counters are independent (a row dispatched at 11pm yesterday
+ *     counts toward dispatched but is no longer "open").
+ *   - oldestOpenShipDate is the lex-smallest ISO date among open rows;
+ *     null when none. Lex order matches chronological for fixed-width
+ *     YYYY-MM-DD, no Date parsing required.
+ *   - Garbage shipDate / dispatchedAt values don't crash and don't count.
+ *   - deepLink always present and points to /ops/shipping/dispatch.
+ */
+describe("buildSalesCommandCenter — dispatchSummary section", () => {
+  const NOW_DISPATCH = new Date("2026-04-26T18:00:00Z");
+  const inWindow = (hoursAgo: number) =>
+    new Date(NOW_DISPATCH.getTime() - hoursAgo * 3600 * 1000).toISOString();
+
+  it("not_wired with default reason when dispatchRows omitted", () => {
+    const r = buildSalesCommandCenter(emptyInput(), { now: NOW_DISPATCH });
+    expect(r.dispatchSummary.openCount.status).toBe("not_wired");
+    expect(r.dispatchSummary.dispatchedLast24h.status).toBe("not_wired");
+    if (r.dispatchSummary.openCount.status === "not_wired") {
+      expect(r.dispatchSummary.openCount.reason).toMatch(
+        /ShipStation not configured/,
+      );
+    }
+    expect(r.dispatchSummary.deepLink).toBe("/ops/shipping/dispatch");
+  });
+
+  it("not_wired uses caller-supplied reason when dispatchNotWiredReason is set", () => {
+    const r = buildSalesCommandCenter(
+      {
+        ...emptyInput(),
+        dispatchNotWiredReason: "ShipStation read failed: timeout",
+      },
+      { now: NOW_DISPATCH },
+    );
+    if (r.dispatchSummary.openCount.status === "not_wired") {
+      expect(r.dispatchSummary.openCount.reason).toBe(
+        "ShipStation read failed: timeout",
+      );
+    } else {
+      throw new Error("expected not_wired");
+    }
+  });
+
+  it("counts open rows + dispatched-last-24h independently", () => {
+    const r = buildSalesCommandCenter(
+      {
+        ...emptyInput(),
+        dispatchRows: [
+          // open, shipped today
+          { state: "open", shipDate: "2026-04-26", dispatchedAt: null },
+          // open, shipped 3 days ago — oldest open
+          { state: "open", shipDate: "2026-04-23", dispatchedAt: null },
+          // dispatched 2h ago — counts toward dispatchedLast24h, NOT open
+          {
+            state: "dispatched",
+            shipDate: "2026-04-25",
+            dispatchedAt: inWindow(2),
+          },
+          // dispatched 30h ago — out of 24h window, doesn't count
+          {
+            state: "dispatched",
+            shipDate: "2026-04-24",
+            dispatchedAt: inWindow(30),
+          },
+        ],
+      },
+      { now: NOW_DISPATCH },
+    );
+    if (
+      r.dispatchSummary.openCount.status !== "wired" ||
+      r.dispatchSummary.dispatchedLast24h.status !== "wired"
+    ) {
+      throw new Error("expected wired");
+    }
+    expect(r.dispatchSummary.openCount.value).toBe(2);
+    expect(r.dispatchSummary.dispatchedLast24h.value).toBe(1);
+    expect(r.dispatchSummary.oldestOpenShipDate).toBe("2026-04-23");
+  });
+
+  it("oldestOpenShipDate is null when no open rows", () => {
+    const r = buildSalesCommandCenter(
+      {
+        ...emptyInput(),
+        dispatchRows: [
+          {
+            state: "dispatched",
+            shipDate: "2026-04-25",
+            dispatchedAt: inWindow(2),
+          },
+        ],
+      },
+      { now: NOW_DISPATCH },
+    );
+    expect(r.dispatchSummary.oldestOpenShipDate).toBeNull();
+  });
+
+  it("garbage shipDate / dispatchedAt don't crash and don't count", () => {
+    const r = buildSalesCommandCenter(
+      {
+        ...emptyInput(),
+        dispatchRows: [
+          { state: "open", shipDate: "garbage", dispatchedAt: null },
+          { state: "open", shipDate: null, dispatchedAt: null },
+          {
+            state: "dispatched",
+            shipDate: "2026-04-25",
+            dispatchedAt: "also garbage",
+          },
+        ],
+      },
+      { now: NOW_DISPATCH },
+    );
+    if (
+      r.dispatchSummary.openCount.status !== "wired" ||
+      r.dispatchSummary.dispatchedLast24h.status !== "wired"
+    ) {
+      throw new Error("expected wired");
+    }
+    expect(r.dispatchSummary.openCount.value).toBe(2);
+    expect(r.dispatchSummary.dispatchedLast24h.value).toBe(0);
+    expect(r.dispatchSummary.oldestOpenShipDate).toBeNull();
+  });
+
+  it("empty rows array is valid (zero counts, both wired)", () => {
+    const r = buildSalesCommandCenter(
+      { ...emptyInput(), dispatchRows: [] },
+      { now: NOW_DISPATCH },
+    );
+    if (
+      r.dispatchSummary.openCount.status !== "wired" ||
+      r.dispatchSummary.dispatchedLast24h.status !== "wired"
+    ) {
+      throw new Error("expected wired");
+    }
+    expect(r.dispatchSummary.openCount.value).toBe(0);
+    expect(r.dispatchSummary.dispatchedLast24h.value).toBe(0);
+  });
+});

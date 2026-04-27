@@ -146,6 +146,16 @@ interface Report {
       reason?: string;
     }>;
   };
+  dispatchSummary: {
+    openCount:
+      | { status: "wired"; value: number }
+      | { status: "not_wired" | "error"; reason: string };
+    dispatchedLast24h:
+      | { status: "wired"; value: number }
+      | { status: "not_wired" | "error"; reason: string };
+    oldestOpenShipDate: string | null;
+    deepLink: string;
+  };
   blockers: {
     missingEnv: string[];
     notes: Array<{
@@ -266,6 +276,7 @@ export function SalesCommandCenterView() {
           <RetailProofSection report={data} />
           <AwaitingBenSection report={data} />
           <KpiScorecardSection report={data} />
+          <DispatchSummarySection report={data} />
           <AgingSection report={data} />
           <BlockersSection report={data} />
         </>
@@ -679,6 +690,85 @@ function KpiScorecardSection({ report }: { report: Report }) {
           </li>
         ))}
       </ul>
+    </Section>
+  );
+}
+
+function DispatchSummarySection({ report }: { report: Report }) {
+  const ds = report.dispatchSummary;
+  const tile = (
+    s:
+      | { status: "wired"; value: number }
+      | { status: "not_wired" | "error"; reason: string },
+    label: string,
+    accent: string,
+  ) => {
+    const isWired = s.status === "wired";
+    const value = isWired ? String(s.value) : "—";
+    const subline = !isWired ? s.reason : undefined;
+    return (
+      <div
+        style={{
+          background: "#fff",
+          border: `1px solid ${BORDER}`,
+          borderRadius: 8,
+          padding: "10px 12px",
+          minWidth: 130,
+        }}
+      >
+        <div
+          style={{
+            fontSize: 22,
+            fontWeight: 700,
+            color: isWired ? accent : DIM,
+            lineHeight: 1.1,
+          }}
+        >
+          {value}
+        </div>
+        <div style={{ fontSize: 11, color: DIM, marginTop: 4 }}>{label}</div>
+        {subline && (
+          <div style={{ fontSize: 10, color: DIM, marginTop: 2, fontStyle: "italic" }}>
+            {subline}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const oldestNote = ds.oldestOpenShipDate
+    ? `Oldest open package shipped ${ds.oldestOpenShipDate}`
+    : null;
+
+  return (
+    <Section title="Dispatch (open vs. last 24h)">
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+          gap: 10,
+          marginBottom: 10,
+        }}
+      >
+        {tile(ds.openCount, "Open packages", "#c7a062")}
+        {tile(ds.dispatchedLast24h, "Dispatched (last 24h)", NAVY)}
+      </div>
+      {oldestNote && (
+        <div style={{ fontSize: 12, color: DIM, marginBottom: 8 }}>
+          {oldestNote}
+        </div>
+      )}
+      <a
+        href={ds.deepLink}
+        style={{
+          display: "inline-block",
+          fontSize: 12,
+          color: NAVY,
+          textDecoration: "underline",
+        }}
+      >
+        Open Dispatch Board →
+      </a>
     </Section>
   );
 }
