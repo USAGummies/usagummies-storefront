@@ -1,0 +1,6 @@
+{
+  "_comment": "Approved image registry. Updated by /api/content-factory/approve when Ben clicks Approve in Slack. Each entry: { id, profile, concept, image_path, image_url, generated_at, approved_at, approved_by, used_in_campaigns: [] }. Use this registry to query for approved images when launching a new campaign — do NOT regenerate images that are already approved.",
+  "approved": [],
+  "rejected": [],
+  "pending": []
+}

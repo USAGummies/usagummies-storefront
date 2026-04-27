@@ -1,0 +1,88 @@
+{
+  "_comment": "Locked style profiles for the USA Gummies Content Factory. Each profile defines the style anchor (reference image), the prompt scaffolding, and the forbidden list. The generator (scripts/content-factory/generate.mjs) loads one profile per generation. Edit this file to refine styles — committing changes propagates to next generation.",
+
+  "comic-americana": {
+    "name": "Comic Americana",
+    "description": "Bold flat-color vector illustration. Liberty / Rushmore / B-17 / shuttle / locomotive icon vocabulary. Modern American poster (Tom Whalen / Mondo / WPA). Best for: top-of-funnel awareness, patriotic/heritage messaging, retail-shelf-style hero ads.",
+    "reference_image": "public/brand/ad-assets-round2/comic-libertys-break.png",
+    "dimensions": "1024x1024",
+    "quality": "high",
+
+    "prompt_prefix": "Bold flat-color vector illustration in the USA Gummies brand vocabulary. Match the reference image exactly for line weight, color palette, character design (especially Liberty's stylized face: oxidized-copper green skin, big round white eyes, classic crown), and composition discipline. Modern American poster aesthetic — Tom Whalen / Mondo / WPA poster vibe.",
+
+    "color_palette": "ONLY these colors: pale teal sky, warm sage/olive hills, brick red/cranberry, golden yellow accents, cream/off-white, oxidized-copper green (Liberty), charcoal/black line work.",
+
+    "composition": "Solid brick-red foreground band at bottom (~15-20% of image height) — clear of detail for ad copy overlays. Sky takes upper third. Generous negative space upper-left for headline overlay.",
+
+    "forbidden": [
+      "photographic elements",
+      "painterly style",
+      "gradients",
+      "real human faces",
+      "children of any age",
+      "competitor brand names or logos",
+      "gummy bears with faces or expressions",
+      "text or copy overlays beyond brand wordmarks",
+      "realistic lighting effects",
+      "AI artifacts (extra fingers, distorted hands, melded objects)",
+      "stock photo clichés"
+    ]
+  },
+
+  "photo-editorial": {
+    "name": "Photo Editorial",
+    "description": "Hyperreal photographic, Vermeer-painterly depth, slight film grain, warm color temperature, premium food editorial. Best for: mid-funnel consideration, ingredient stories, craft/heritage angle.",
+    "reference_image": "public/brand/ad-assets-round2/photo-ingredient-macro.png",
+    "dimensions": "1024x1024",
+    "quality": "high",
+
+    "prompt_prefix": "Hyperreal photographic style with Vermeer-painterly depth. Match the reference image exactly for lighting (single soft window light, warm tones), color temperature (warm, slightly desaturated, NOT cool), film grain (very fine, natural), and editorial composition. Premium American food photography — think Bon Appétit, Cherry Bombe, Kinfolk.",
+
+    "color_palette": "Warm earth tones, cream and off-white, deep red accents, natural wood, golden honey lighting, occasional dye-bright gummy color (red, orange, yellow, green) as the focal element. Avoid cool blues, neon, or oversaturated digital colors.",
+
+    "composition": "Subject occupies right-third of frame. Generous negative space left-third for headline/copy overlay. Shallow depth of field with the bag/product/ingredient in sharp focus, background softly blurred. Natural surfaces (wood, linen, stone) under the subject. Solid brick-red foreground band at bottom (~15-20% of image height) — clear of detail.",
+
+    "forbidden": [
+      "illustration or vector style",
+      "flat colors or cel shading",
+      "thick line work",
+      "Liberty / Rushmore / military mascots (those are reserved for comic-americana)",
+      "real human faces or children",
+      "competitor brand logos or products",
+      "gummy bears with faces or expressions",
+      "text overlays beyond bag's own label",
+      "Photoshop-obvious tricks (HDR, saturation push, sky replacement)",
+      "AI artifacts"
+    ]
+  },
+
+  "comic-working-class": {
+    "name": "Comic Working-Class Americana",
+    "description": "Same comic vocabulary as comic-americana but tilted toward blue-collar/heartland scenes (farms, trucks, trades, factories). Liberty rarely appears — the AMERICAN LANDSCAPE is the protagonist. Best for: top-of-funnel awareness targeting tradespeople, farmers, truckers, military households.",
+    "reference_image": "public/brand/ad-assets-round2/comic-the-factory.png",
+    "dimensions": "1024x1024",
+    "quality": "high",
+
+    "prompt_prefix": "Bold flat-color vector illustration in the USA Gummies brand vocabulary. Match the reference image exactly for line weight, color palette, and composition discipline. NO Liberty, NO Rushmore, NO military aircraft — the American landscape, infrastructure, and working-class iconography (red barns, vintage tractors, semi-trucks, construction sites, lumber, hard hats, factory smokestacks, locomotives) ARE the heroes. Working-American identity, not patriotic-monument identity.",
+
+    "color_palette": "ONLY these colors: pale teal sky, warm sage/olive hills, brick red/cranberry, golden yellow wheat/lumber accents, cream/off-white, dark forest green, charcoal/black line work.",
+
+    "composition": "Solid brick-red foreground band at bottom (~15-20% of image height) — clear of detail for ad copy overlays. Sky takes upper third. Generous negative space upper-left for headline overlay. Buildings / equipment positioned on the right or center; landscape on the left.",
+
+    "forbidden": [
+      "Statue of Liberty",
+      "Mt. Rushmore",
+      "B-17 bombers, fighter jets, missiles, military hardware",
+      "photographic elements",
+      "painterly style",
+      "gradients",
+      "real human faces (silhouette-level worker figures with hard hats are OK — match the factory illustration's worker style exactly)",
+      "children",
+      "competitor brand names or logos",
+      "gummy bears with faces or expressions",
+      "text overlays beyond brand wordmarks already on bags/crates",
+      "realistic lighting effects",
+      "AI artifacts"
+    ]
+  }
+}
