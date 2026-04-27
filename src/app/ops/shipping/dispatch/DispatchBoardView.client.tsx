@@ -414,6 +414,8 @@ export function DispatchBoardView() {
         </table>
       </div>
 
+      <DispatchAuditFeed />
+
       <p style={{ marginTop: 16, color: DIM, fontSize: 12 }}>
         ←{" "}
         <a href="/ops/shipping" style={{ color: NAVY }}>
@@ -421,6 +423,172 @@ export function DispatchBoardView() {
         </a>
       </p>
     </div>
+  );
+}
+
+interface DispatchFeedRow {
+  id: string;
+  timestampIso: string;
+  action: "mark" | "clear";
+  source: string;
+  orderNumber: string;
+  orderNumberShort: string;
+  surface: "slack-reaction" | "ops-dashboard" | "unknown";
+  actorRef: string | null;
+  postedThreadReply: boolean;
+  result: "ok" | "error";
+  errorMessage: string | null;
+}
+
+function DispatchAuditFeed() {
+  const [rows, setRows] = useState<DispatchFeedRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    setErr(null);
+    try {
+      const r = await fetch(
+        "/api/ops/shipping/dispatch-audit-feed?limit=20",
+        { cache: "no-store" },
+      );
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const j = (await r.json()) as {
+        ok: boolean;
+        entries?: DispatchFeedRow[];
+        error?: string;
+      };
+      if (!j.ok) throw new Error(j.error ?? "API returned ok:false");
+      setRows(j.entries ?? []);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  return (
+    <section
+      style={{
+        marginTop: 24,
+        background: CARD,
+        border: `1px solid ${BORDER}`,
+        borderRadius: 8,
+        padding: 16,
+      }}
+    >
+      <header
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: 12,
+        }}
+      >
+        <h2 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: NAVY }}>
+          Recent dispatch activity
+        </h2>
+        <button
+          onClick={() => void refresh()}
+          disabled={loading}
+          style={{
+            padding: "4px 10px",
+            borderRadius: 6,
+            border: `1px solid ${BORDER}`,
+            background: "transparent",
+            color: NAVY,
+            fontSize: 11,
+            cursor: loading ? "wait" : "pointer",
+          }}
+        >
+          {loading ? "…" : "↻"}
+        </button>
+      </header>
+      {err && (
+        <div
+          style={{
+            padding: 8,
+            borderRadius: 6,
+            background: "#fde8e6",
+            color: "#9a1c1c",
+            marginBottom: 8,
+            fontSize: 12,
+          }}
+        >
+          {err}
+        </div>
+      )}
+      {!loading && !err && rows.length === 0 && (
+        <div style={{ color: DIM, fontSize: 12, padding: "8px 0" }}>
+          No dispatch transitions in the audit log yet.
+        </div>
+      )}
+      {rows.length > 0 && (
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.id} style={{ borderTop: `1px solid ${BORDER}` }}>
+                <td
+                  style={{
+                    padding: "6px 8px",
+                    width: 28,
+                    textAlign: "center",
+                    fontSize: 14,
+                  }}
+                  title={row.action === "mark" ? "Marked dispatched" : "Cleared dispatch"}
+                >
+                  {row.action === "mark" ? "📦" : "↩️"}
+                </td>
+                <td style={{ padding: "6px 8px" }}>
+                  <code style={{ color: NAVY }}>{row.orderNumberShort}</code>
+                  <span style={{ color: DIM, marginLeft: 6 }}>
+                    {row.source}
+                  </span>
+                  {row.errorMessage && (
+                    <div style={{ color: "#9a1c1c", fontSize: 11, marginTop: 2 }}>
+                      {row.errorMessage}
+                    </div>
+                  )}
+                </td>
+                <td style={{ padding: "6px 8px", color: DIM }}>
+                  {row.actorRef ? (
+                    <span>
+                      by{" "}
+                      <code style={{ color: NAVY }}>{row.actorRef}</code>
+                    </span>
+                  ) : (
+                    "—"
+                  )}
+                </td>
+                <td style={{ padding: "6px 8px", color: DIM }}>
+                  {row.surface === "slack-reaction"
+                    ? ":white_check_mark: react"
+                    : row.surface === "ops-dashboard"
+                      ? "dashboard"
+                      : "—"}
+                </td>
+                <td
+                  style={{
+                    padding: "6px 8px",
+                    color: DIM,
+                    textAlign: "right",
+                    whiteSpace: "nowrap",
+                  }}
+                  title={row.timestampIso}
+                >
+                  {formatRelative(row.timestampIso)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </section>
   );
 }
 
