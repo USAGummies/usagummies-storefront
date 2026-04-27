@@ -479,7 +479,26 @@ async function autoShipOrder(
           // per shipment without cluttering the channel scroll.
           // Best-effort: a packing-slip-upload failure does NOT
           // roll back the label-shipped state.
-          if (customPackingSlipPdf && uploadRes.messageTs) {
+          if (customPackingSlipPdf) {
+            // Phase 27 — also upload the packing slip as a thread
+            // reply under the label post, so #shipping has both PDFs
+            // per shipment without cluttering the channel scroll.
+            //
+            // **Hard rule (Phase 28i + Amy Catalano regression
+            // 2026-04-27):** the packing slip MUST land in #shipping
+            // alongside the label. A `messageTs=undefined` (Slack
+            // history-propagation race) used to silently drop the
+            // slip — Ben got a label with no slip, no warning. NOT
+            // ACCEPTABLE. The rule now: post the slip regardless.
+            // If we have a messageTs → thread reply (preferred). If
+            // not → post as a fresh channel message with a loud
+            // "thread reply failed" header so Ben can see something
+            // went sideways but still has the slip in hand.
+            //
+            // Best-effort: a packing-slip-upload failure (the slip
+            // genuinely couldn't be sent) still does NOT roll back
+            // the label-shipped state.
+            const fallbackComment = `:warning: *Packing slip ${order.orderNumber} — fallback post (no parent ts)*\nLabel was uploaded but the channel-message ts didn't resolve in time; posting slip as a fresh message so it's not lost. Auto-ship continues.`;
             try {
               await uploadBufferToSlack({
                 channelId: destChannel,
@@ -487,9 +506,26 @@ async function autoShipOrder(
                 buffer: customPackingSlipPdf,
                 mimeType: "application/pdf",
                 title: `Packing slip ${order.orderNumber}`,
-                comment: formatPackingSlipComment(order.orderNumber),
+                comment: uploadRes.messageTs
+                  ? formatPackingSlipComment(order.orderNumber)
+                  : fallbackComment,
                 threadTs: uploadRes.messageTs,
               });
+              if (!uploadRes.messageTs) {
+                // Loud audit so we can find these in the trail.
+                await recordAudit(
+                  "slack.packing-slip.posted-untreaded",
+                  order.orderNumber,
+                  source,
+                  true,
+                  {
+                    reason:
+                      "messageTs unresolved after backoff — slip posted as fresh channel message rather than dropped",
+                    labelDriveLink,
+                    packingSlipDriveLink,
+                  },
+                );
+              }
             } catch (psErr) {
               await recordAudit(
                 "slack.packing-slip.upload-failed",
@@ -499,7 +535,7 @@ async function autoShipOrder(
                 {
                   error:
                     psErr instanceof Error ? psErr.message : String(psErr),
-                  parentMessageTs: uploadRes.messageTs,
+                  parentMessageTs: uploadRes.messageTs ?? null,
                 },
               );
             }

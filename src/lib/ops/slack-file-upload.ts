@@ -140,12 +140,45 @@ const CELL_BORDER: Partial<ExcelJS.Borders> = {
  * pre-fix behavior. We do NOT reject the upload result — the file
  * already landed in Slack.
  */
-async function resolveChannelMessageTs(opts: {
+/**
+ * Backoff schedule (ms) for `resolveChannelMessageTs`.
+ *
+ * **Why retry at all:** Slack returns 200 from `files.completeUploadExternal`
+ * the instant the upload commits, but the file's index entry in
+ * `conversations.history` is eventually-consistent. In practice the
+ * propagation usually settles within ~1s, but we've observed live
+ * misses (Amy Catalano order 111-1502722-7838646, 2026-04-27 11:30
+ * PT) where the very next `conversations.history` call returned
+ * messages that *don't yet contain the just-uploaded file*. Result:
+ * `messageTs=undefined` → no thread reply → Ben gets a label with
+ * no packing slip. Same class as the Phase 28i regression but a
+ * different mechanism (28i was a wrong permalink shape; this one is
+ * a propagation race).
+ *
+ * **Why this schedule:** start with a fast retry (no upfront cost
+ * if the file is already indexed), then back off so we don't burn
+ * conversations.history requests if Slack is lagging more than a
+ * second. Total worst-case wall: 100 + 600 + 1500 = 2.2s. The
+ * auto-ship route's overall budget is 30s; a 2-3s spend on
+ * resolution is the right trade vs silently dropping the packing
+ * slip thread.
+ *
+ * Exported for tests.
+ */
+export const RESOLVE_CHANNEL_TS_BACKOFF_MS: readonly number[] = [
+  0, 600, 1500,
+];
+
+async function sleep(ms: number): Promise<void> {
+  if (ms <= 0) return;
+  await new Promise((r) => setTimeout(r, ms));
+}
+
+async function resolveChannelMessageTsOnce(opts: {
   token: string;
   channelId: string;
   fileId: string;
 }): Promise<string | undefined> {
-  if (!opts.fileId) return undefined;
   try {
     const url =
       `https://slack.com/api/conversations.history?channel=${encodeURIComponent(opts.channelId)}&limit=50`;
@@ -174,6 +207,20 @@ async function resolveChannelMessageTs(opts: {
   } catch {
     return undefined;
   }
+}
+
+async function resolveChannelMessageTs(opts: {
+  token: string;
+  channelId: string;
+  fileId: string;
+}): Promise<string | undefined> {
+  if (!opts.fileId) return undefined;
+  for (const delay of RESOLVE_CHANNEL_TS_BACKOFF_MS) {
+    await sleep(delay);
+    const ts = await resolveChannelMessageTsOnce(opts);
+    if (ts) return ts;
+  }
+  return undefined;
 }
 
 function inferNumFmt(header: string): string | null {
