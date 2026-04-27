@@ -37,6 +37,15 @@ vi.mock("@vercel/kv", () => {
         map.set(k, v);
         return "OK";
       }),
+      // Minimal scan: returns ALL matching keys in one page (cursor 0)
+      // since the in-memory store is tiny in tests. Real Vercel KV
+      // behaves identically when the entire match-set fits in `count`.
+      scan: vi.fn(async (_cursor: number, opts: { match?: string }) => {
+        const pat = opts.match ?? "*";
+        const re = new RegExp(`^${pat.replace(/\*/g, ".*")}$`);
+        const keys = Array.from(map.keys()).filter((k) => re.test(k));
+        return [0, keys];
+      }),
       __store: map,
     },
   };
@@ -326,6 +335,122 @@ describe("shipping-artifacts", () => {
       const out = await splitLabelAndPackingSlip(Buffer.from("not-a-pdf"));
       expect(out.labelOnly).toBeNull();
       expect(out.packingSlipOnly).toBeNull();
+    });
+  });
+
+  /**
+   * Phase 28 — dispatch-confirmation flow.
+   *
+   * Locks the contract:
+   *   - markDispatched stamps dispatchedAt + dispatchedBy on the
+   *     existing artifact record (or creates a bare record).
+   *   - Re-marking returns `before !== null` so callers can avoid
+   *     double-posting "Dispatched" thread replies.
+   *   - clearDispatched nulls out the stamp.
+   *   - findArtifactBySlackTs maps a (channel, ts) tuple back to the
+   *     stored record by matching the slackPermalink path.
+   */
+  describe("dispatch markers", () => {
+    beforeEach(() => {
+      // unset env so persistLabelArtifacts uses the fail-soft branch
+      // (no Drive write needed for these tests).
+      for (const k of ENV_KEYS) delete process.env[k];
+    });
+
+    it("markDispatched stamps a fresh record (before=null on first mark)", async () => {
+      const { markDispatched, getShippingArtifact } = await import(
+        "../shipping-artifacts"
+      );
+      const result = await markDispatched({
+        source: "amazon",
+        orderNumber: "112-9999999-1234567",
+        dispatchedBy: "U0AUQRVPUN4",
+      });
+      expect(result.ok).toBe(true);
+      expect(result.before).toBeNull();
+      expect(result.after).toBeTypeOf("string");
+      const stored = await getShippingArtifact("amazon", "112-9999999-1234567");
+      expect(stored?.dispatchedAt).toBe(result.after);
+      expect(stored?.dispatchedBy).toBe("U0AUQRVPUN4");
+    });
+
+    it("markDispatched is idempotent — re-marking returns the prior stamp", async () => {
+      const { markDispatched } = await import("../shipping-artifacts");
+      const first = await markDispatched({
+        source: "amazon",
+        orderNumber: "112-IDEMP-7777777",
+        dispatchedBy: "U_FIRST",
+        dispatchedAt: "2026-04-27T10:00:00.000Z",
+      });
+      expect(first.before).toBeNull();
+      const second = await markDispatched({
+        source: "amazon",
+        orderNumber: "112-IDEMP-7777777",
+        dispatchedBy: "U_SECOND",
+        dispatchedAt: "2026-04-27T11:00:00.000Z",
+      });
+      // Re-mark: `before` is the prior stamp, `after` is the new one.
+      expect(second.before).toBe("2026-04-27T10:00:00.000Z");
+      expect(second.after).toBe("2026-04-27T11:00:00.000Z");
+    });
+
+    it("clearDispatched nulls out a previously-set stamp", async () => {
+      const { markDispatched, clearDispatched, getShippingArtifact } =
+        await import("../shipping-artifacts");
+      await markDispatched({
+        source: "shopify",
+        orderNumber: "1077",
+        dispatchedBy: "U_X",
+      });
+      const cleared = await clearDispatched({
+        source: "shopify",
+        orderNumber: "1077",
+      });
+      expect(cleared.ok).toBe(true);
+      expect(cleared.before).toBeTypeOf("string");
+      const stored = await getShippingArtifact("shopify", "1077");
+      expect(stored?.dispatchedAt).toBeNull();
+      expect(stored?.dispatchedBy).toBeNull();
+    });
+
+    it("clearDispatched on a never-set record is a no-op (before=null)", async () => {
+      const { clearDispatched } = await import("../shipping-artifacts");
+      const cleared = await clearDispatched({
+        source: "amazon",
+        orderNumber: "ghost-order",
+      });
+      expect(cleared.ok).toBe(true);
+      expect(cleared.before).toBeNull();
+    });
+
+    it("findArtifactBySlackTs resolves (channel, ts) to the stored record", async () => {
+      const { attachSlackPermalink, findArtifactBySlackTs } = await import(
+        "../shipping-artifacts"
+      );
+      // Persist a permalink via the public attach helper. The helper
+      // creates a bare record when no record exists yet, so this is
+      // sufficient for the lookup test.
+      await attachSlackPermalink({
+        source: "amazon",
+        orderNumber: "112-LOOKUP-1234567",
+        slackPermalink:
+          "https://usagummies.slack.com/archives/C0AS4635HFG/p1745000000123456",
+      });
+      const found = await findArtifactBySlackTs({
+        channelId: "C0AS4635HFG",
+        messageTs: "1745000000.123456",
+      });
+      expect(found?.orderNumber).toBe("112-LOOKUP-1234567");
+      expect(found?.source).toBe("amazon");
+    });
+
+    it("findArtifactBySlackTs returns null when no permalink matches", async () => {
+      const { findArtifactBySlackTs } = await import("../shipping-artifacts");
+      const found = await findArtifactBySlackTs({
+        channelId: "C0AS4635HFG",
+        messageTs: "9999999999.999999",
+      });
+      expect(found).toBeNull();
     });
   });
 });

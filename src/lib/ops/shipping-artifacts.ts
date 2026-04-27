@@ -69,6 +69,15 @@ export interface ShippingArtifactRecord {
   persistedAt: string;
   /** When Drive isn't configured / failed, why. Surfaced for observability. */
   driveError: string | null;
+  /**
+   * ISO timestamp when the package physically left the warehouse.
+   * Set by the Slack `:white_check_mark:` reaction handler. null until
+   * the operator marks it shipped. Re-marking is idempotent (overwrites
+   * with the latest stamp); un-reacting clears it.
+   */
+  dispatchedAt?: string | null;
+  /** Slack user ID who reacted to mark dispatched. null when unset. */
+  dispatchedBy?: string | null;
 }
 
 const KV_PREFIX = "shipping:artifacts:";
@@ -366,6 +375,161 @@ export async function attachSlackPermalink(opts: {
   } catch {
     /* non-fatal */
   }
+}
+
+/**
+ * Stamp `dispatchedAt` + `dispatchedBy` on the artifact record.
+ *
+ * Wired to the Slack `:white_check_mark:` reaction listener in
+ * `/api/ops/slack/events` — when an operator reacts to a label post in
+ * `#shipping`, the listener resolves the (source, orderNumber) tuple
+ * from the artifact registry and calls this. Idempotent: re-marking
+ * overwrites with the new stamp instead of erroring.
+ *
+ * Returns `{ ok, before, after }` so callers can detect first-time
+ * marks vs. re-marks (e.g. to avoid double-posting "Dispatched" thread
+ * replies on duplicate reaction events).
+ */
+export async function markDispatched(opts: {
+  source: string;
+  orderNumber: string;
+  dispatchedBy: string | null;
+  /** Override timestamp — defaults to `new Date().toISOString()`. */
+  dispatchedAt?: string;
+}): Promise<{
+  ok: boolean;
+  before: string | null;
+  after: string;
+  record: ShippingArtifactRecord | null;
+}> {
+  const dispatchedAt = opts.dispatchedAt ?? new Date().toISOString();
+  try {
+    const key = kvKey(opts.source, opts.orderNumber);
+    const existing = await kv.get<string | ShippingArtifactRecord>(key);
+    let record: ShippingArtifactRecord;
+    if (existing && typeof existing === "object" && "orderNumber" in existing) {
+      record = existing as ShippingArtifactRecord;
+    } else if (typeof existing === "string") {
+      try {
+        record = JSON.parse(existing) as ShippingArtifactRecord;
+      } catch {
+        record = bareRecord(opts.source, opts.orderNumber);
+      }
+    } else {
+      record = bareRecord(opts.source, opts.orderNumber);
+    }
+    const before = record.dispatchedAt ?? null;
+    record.dispatchedAt = dispatchedAt;
+    record.dispatchedBy = opts.dispatchedBy;
+    await kv.set(key, JSON.stringify(record), { ex: KV_TTL_SECONDS });
+    return { ok: true, before, after: dispatchedAt, record };
+  } catch {
+    return { ok: false, before: null, after: dispatchedAt, record: null };
+  }
+}
+
+/**
+ * Clear `dispatchedAt` (un-mark dispatched). Wired to the Slack
+ * `reaction_removed` event so removing the `:white_check_mark:` reaction
+ * reverts the dispatch state.
+ */
+export async function clearDispatched(opts: {
+  source: string;
+  orderNumber: string;
+}): Promise<{ ok: boolean; before: string | null }> {
+  try {
+    const key = kvKey(opts.source, opts.orderNumber);
+    const existing = await kv.get<string | ShippingArtifactRecord>(key);
+    if (!existing) return { ok: true, before: null };
+    let record: ShippingArtifactRecord;
+    if (typeof existing === "object" && "orderNumber" in existing) {
+      record = existing as ShippingArtifactRecord;
+    } else if (typeof existing === "string") {
+      try {
+        record = JSON.parse(existing) as ShippingArtifactRecord;
+      } catch {
+        return { ok: true, before: null };
+      }
+    } else {
+      return { ok: true, before: null };
+    }
+    const before = record.dispatchedAt ?? null;
+    record.dispatchedAt = null;
+    record.dispatchedBy = null;
+    await kv.set(key, JSON.stringify(record), { ex: KV_TTL_SECONDS });
+    return { ok: true, before };
+  } catch {
+    return { ok: false, before: null };
+  }
+}
+
+/**
+ * Look up an artifact record by Slack permalink. Used by the
+ * reaction-handler path: Slack tells us a (channel, ts) pair, we need
+ * to map that back to the (source, orderNumber) we persisted via
+ * `attachSlackPermalink`.
+ *
+ * Slack permalinks embed the message ts in the path segment after `/p`
+ * — e.g. `…/archives/C0AS4635HFG/p1745000000123456` corresponds to
+ * `1745000000.123456`. We accept either the full permalink OR the
+ * `(channel, ts)` tuple. Naive scan: 60-day TTL caps the working set
+ * to ~2-3k records, which fits comfortably in a single `kv.scan`.
+ *
+ * Returns null if no match — callers treat that as "not one of ours,
+ * ignore the reaction".
+ */
+export async function findArtifactBySlackTs(opts: {
+  channelId: string;
+  messageTs: string;
+}): Promise<ShippingArtifactRecord | null> {
+  // The permalink format Slack returns from files.completeUploadExternal:
+  //   https://<workspace>.slack.com/archives/<channelId>/p<digits>
+  // where <digits> is messageTs with the decimal removed. We compare
+  // against the stored permalink rather than ts directly — a stored
+  // record with no permalink can't have been the source of a reaction
+  // on a Slack message anyway.
+  const tsCompact = opts.messageTs.replace(".", "");
+  // Best-effort: pull all artifact keys via scan.
+  try {
+    let cursor: string | number = 0;
+    const matchKey = `${KV_PREFIX}*`;
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const scanResult = (await kv.scan(cursor, {
+        match: matchKey,
+        count: 200,
+      })) as unknown as [string | number, string[]];
+      const [next, keys] = scanResult;
+      for (const key of keys) {
+        const v = await kv.get<string | ShippingArtifactRecord>(key);
+        if (!v) continue;
+        let rec: ShippingArtifactRecord;
+        if (typeof v === "object" && "orderNumber" in v) {
+          rec = v as ShippingArtifactRecord;
+        } else if (typeof v === "string") {
+          try {
+            rec = JSON.parse(v) as ShippingArtifactRecord;
+          } catch {
+            continue;
+          }
+        } else {
+          continue;
+        }
+        if (!rec.slackPermalink) continue;
+        if (
+          rec.slackPermalink.includes(`/${opts.channelId}/p${tsCompact}`) ||
+          rec.slackPermalink.includes(`/${opts.channelId}/p${tsCompact.split("?")[0]}`)
+        ) {
+          return rec;
+        }
+      }
+      if (Number(next) === 0 || next === "0") break;
+      cursor = next;
+    }
+  } catch {
+    /* fall through */
+  }
+  return null;
 }
 
 function bareRecord(source: string, orderNumber: string): ShippingArtifactRecord {

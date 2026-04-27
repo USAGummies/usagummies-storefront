@@ -23,12 +23,25 @@ import { NextResponse } from "next/server";
 import { getChannel } from "@/lib/ops/control-plane/channels";
 import { postMessage, verifySlackSignature } from "@/lib/ops/control-plane/slack";
 import type { ChannelId } from "@/lib/ops/control-plane/types";
+import {
+  clearDispatched,
+  findArtifactBySlackTs,
+  markDispatched,
+} from "@/lib/ops/shipping-artifacts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const SAMPLE_TRIGGER_REGEX = /\bsample\s*(request|dispatch)\b/i;
 const DISPATCH_TRIGGER_REGEX = /^\/?dispatch\s+(shopify|amazon|hubspot|manual)\b/i;
+
+/**
+ * Reactions that count as "this package physically left the warehouse."
+ * Single canonical reaction (`:white_check_mark:`) — we deliberately
+ * don't accept synonyms so the dispatched-vs-not state stays
+ * unambiguous on the message.
+ */
+const DISPATCH_REACTION = "white_check_mark";
 
 interface SlackMessageEvent {
   type: string;
@@ -41,9 +54,22 @@ interface SlackMessageEvent {
   bot_id?: string;
 }
 
+interface SlackReactionEvent {
+  type: "reaction_added" | "reaction_removed";
+  user?: string;
+  reaction?: string;
+  item?: {
+    type?: string;
+    channel?: string;
+    ts?: string;
+  };
+  item_user?: string;
+  event_ts?: string;
+}
+
 interface SlackEventCallback {
   type: "event_callback";
-  event?: SlackMessageEvent;
+  event?: SlackMessageEvent | SlackReactionEvent;
   team_id?: string;
   api_app_id?: string;
   event_id?: string;
@@ -97,26 +123,33 @@ export async function POST(req: Request): Promise<Response> {
 
   if (body.type === "event_callback") {
     const event = (body as SlackEventCallback).event;
-    if (event && event.type === "message") {
+    if (event?.type === "message") {
+      const msg = event as SlackMessageEvent;
       // Skip our own bot replies + edits + threaded replies so we
       // don't infinite-loop on our own responses.
-      if (event.subtype || event.bot_id || event.thread_ts) {
+      if (msg.subtype || msg.bot_id || msg.thread_ts) {
         return NextResponse.json({ ok: true, skipped: "non-new-message" });
       }
 
-      const text = event.text ?? "";
-      const inOperationsChannel = isChannel(event.channel, "operations");
-      const inSalesChannel = isChannel(event.channel, "sales");
+      const text = msg.text ?? "";
+      const inOperationsChannel = isChannel(msg.channel, "operations");
+      const inSalesChannel = isChannel(msg.channel, "sales");
 
       if (inOperationsChannel && SAMPLE_TRIGGER_REGEX.test(text)) {
-        return handleSampleTrigger(event);
+        return handleSampleTrigger(msg);
       }
       if (
         (inOperationsChannel || inSalesChannel) &&
         DISPATCH_TRIGGER_REGEX.test(text)
       ) {
-        return handleDispatchTrigger(event, text);
+        return handleDispatchTrigger(msg, text);
       }
+    }
+    if (
+      event?.type === "reaction_added" ||
+      event?.type === "reaction_removed"
+    ) {
+      return handleReaction(event as SlackReactionEvent);
     }
   }
 
@@ -208,4 +241,106 @@ async function handleDispatchTrigger(
     /* best-effort */
   }
   return NextResponse.json({ ok: true, handled: "dispatch", channel: channelName });
+}
+
+/**
+ * `:white_check_mark:` reaction handler — the "I dropped this off"
+ * button. Resolves the (channel, ts) tuple back to the shipping
+ * artifact record we persisted at label-buy time, then stamps
+ * dispatchedAt / dispatchedBy on it.
+ *
+ * Hard rules:
+ *   - Only `:white_check_mark:` counts. Other emoji are ignored
+ *     (no fuzzy matching — keep the dispatch state unambiguous).
+ *   - Only reactions in `#shipping` count. The same emoji elsewhere
+ *     is just a normal Slack reaction.
+ *   - Only reactions on bot-posted label messages count. The artifact
+ *     lookup is by `slackPermalink`, which we only set on label
+ *     uploads — so reactions on random messages return null and exit.
+ *   - First-time mark posts a thread reply; re-marks (duplicate
+ *     reaction events) are idempotent and don't re-post.
+ *   - `reaction_removed` clears `dispatchedAt` so an accidental
+ *     reaction can be undone by un-reacting.
+ */
+async function handleReaction(
+  event: SlackReactionEvent,
+): Promise<Response> {
+  if (event.reaction !== DISPATCH_REACTION) {
+    return NextResponse.json({ ok: true, skipped: "non-dispatch-reaction" });
+  }
+  const channelId = event.item?.channel;
+  const messageTs = event.item?.ts;
+  if (!channelId || !messageTs) {
+    return NextResponse.json({ ok: true, skipped: "incomplete-reaction" });
+  }
+  const shipping = getChannel("shipping");
+  if (!shipping || shipping.slackChannelId !== channelId) {
+    return NextResponse.json({ ok: true, skipped: "non-shipping-channel" });
+  }
+  const record = await findArtifactBySlackTs({ channelId, messageTs });
+  if (!record) {
+    return NextResponse.json({ ok: true, skipped: "no-matching-artifact" });
+  }
+
+  if (event.type === "reaction_removed") {
+    const cleared = await clearDispatched({
+      source: record.source,
+      orderNumber: record.orderNumber,
+    });
+    return NextResponse.json({
+      ok: true,
+      handled: "reaction_removed",
+      orderNumber: record.orderNumber,
+      hadStamp: Boolean(cleared.before),
+    });
+  }
+
+  // reaction_added
+  const result = await markDispatched({
+    source: record.source,
+    orderNumber: record.orderNumber,
+    dispatchedBy: event.user ?? null,
+  });
+
+  // Only post the dispatched-confirmation thread reply on first-time
+  // marks. Slack delivers reaction_added even when a different user
+  // adds the same emoji — we want one (and only one) reply per shipment.
+  if (result.ok && !result.before) {
+    try {
+      await postMessage({
+        channel: shipping.name,
+        text:
+          `:package: *Dispatched* — physically left WA Warehouse ` +
+          (event.user ? `by <@${event.user}>` : "") +
+          ` at ${formatStamp(result.after)}.`,
+        threadTs: messageTs,
+      });
+    } catch {
+      /* best-effort */
+    }
+  }
+  return NextResponse.json({
+    ok: true,
+    handled: "reaction_added",
+    orderNumber: record.orderNumber,
+    firstMark: !result.before,
+  });
+}
+
+function formatStamp(iso: string): string {
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso;
+    // Pacific time, since Ben/Drew/warehouse all live there for ops purposes.
+    return d.toLocaleString("en-US", {
+      timeZone: "America/Los_Angeles",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+  } catch {
+    return iso;
+  }
 }
