@@ -8,7 +8,7 @@
 
 ## Where the build is right now
 
-**Test suite:** 1,757 green (117 files). **Workflow blueprint:** v1.49. **Latest baseline:** `40227c4 feat(agent-health): Phase 28L.4`.
+**Test suite:** 1,772 green (118 files). **Workflow blueprint:** v1.50. **Latest baseline:** `c81f1cb chore(doctrine): Phase 29 Drew sweep`.
 
 **Active build directive (Ben 2026-04-27):** "build the entire system tested." Working through Phase 28L → 29 → 30 → 31 autonomously. See workflow-blueprint.md §"Top P0 build items" for the full queue.
 
@@ -30,7 +30,10 @@
 | Phase 28L.3 — Stack-readiness dashboard | DONE | this session |
 | Phase 28L.4 — Agent health surface | DONE | this session |
 | Phase 29 — Drew doctrine sweep | DONE | this session |
-| Phase 30.1-30.4 — AP packet UI, Reorder triggers, Inbox triage closed-loop, Reply composer + Pipeline enrich tests | NEXT | — |
+| Phase 30.1 — AP packet dashboard UI | ALREADY-SHIPPED (acknowledged) | prior |
+| Phase 30.2 — Reorder triggers | DONE | this session |
+| Phase 30.3 — Inbox triage closed-loop | NEXT | — |
+| Phase 30.4 — Reply composer + Pipeline enrich tests | QUEUED | — |
 | Phase 31.1 — USPTO/FDA tracking | QUEUED | — |
 | Phase 31.2 — External vendor portal | QUEUED | — |
 
