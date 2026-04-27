@@ -49,6 +49,9 @@
 | Halal | Gelatin source unspecified, not certified |
 | Kosher | Not certified |
 | Layton Utah | Hallucinated location — never use |
+| Free freight / free shipping on a master carton (1 MC) | **Trade-show-only offer. Expired after Reunion 2026 closed.** Never re-extend in cold outreach. Free freight only at 3+ pallet MOQ per §6 (Ben ruling 2026-04-27). |
+| "Show pricing as a welcome offer" / "honor the show pricing" | Same — show pricing was show-only. Don't re-extend. |
+| "Freight on us" on any sub-pallet quantity | Same — only at 3+ pallets. |
 
 ## 5. Case pack (LOCKED)
 

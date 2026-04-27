@@ -61,6 +61,11 @@ const BLOCKED = [
   { re: /100\s*(master\s*cartons?|MCs?)\s*(\/|per|=)\s*(3,?600|3600)\s*bags/i, label: "Wrong pallet size — canonical is 25 MCs / 900 bags" },
   { re: /three\s*(different\s*)?flavors|four\s*(different\s*)?flavors|six\s*(different\s*)?flavors|seven\s*(different\s*)?flavors/i, label: "Wrong flavor count — canonical is 5 flavors" },
   { re: /\bapple\s+(gummy|gummies|flavor)/i, label: "Use 'green apple' (never just 'apple') per canonical spec" },
+  // Free-freight show-only language — Ben's 4/27 ruling
+  { re: /free\s+(freight|shipping)\s+on\s+(any\s+)?(master\s+carton|first\s+(MC|master)|MC\s+order|your\s+first\s+order)/i, label: "Blocked 'free freight/shipping on master carton/first MC' — trade-show-only offer, expired. Free freight only at 3+ pallets per canonical spec." },
+  { re: /freight\s+on\s+us[, ]/i, label: "Blocked 'freight on us' — trade-show-only language. Use canonical tiers." },
+  { re: /show\s+pricing\s+(as\s+a\s+welcome|locked|extended|honor)/i, label: "Blocked 'show pricing as welcome offer' — The Reunion show pricing was show-only and has expired." },
+  { re: /welcome\s+offer\s+on\s+your\s+first\s+master\s+carton/i, label: "Blocked 'welcome offer on first MC' — not a real tier per canonical spec." },
 ];
 
 // ---------------------------------------------------------- Required tokens

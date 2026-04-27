@@ -70,6 +70,7 @@ import {
   type ShippingArtifactRecord,
 } from "@/lib/ops/shipping-artifacts";
 import { buildPackingSlipPdfBuffer } from "@/lib/ops/packing-slip-pdf";
+import { recordAmazonOrderShipped } from "@/lib/ops/amazon-customers";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -569,6 +570,31 @@ async function autoShipOrder(
     packingSlipDriveLink,
     driveError,
   });
+
+  // Phase 28k — Amazon customer registry. Fire-and-forget upsert
+  // for Amazon source orders only; failures don't roll back the
+  // shipment audit. The registry gives /ops/customers/amazon a way
+  // to answer "who has bought from us, and how many times?"
+  if (source === "amazon") {
+    try {
+      await recordAmazonOrderShipped({
+        orderNumber: order.orderNumber,
+        shippedAt: new Date().toISOString(),
+        shipToName: order.shipTo.name,
+        shipToCity: order.shipTo.city,
+        shipToState: order.shipTo.state,
+        shipToPostalCode: order.shipTo.postalCode,
+        bags,
+        shippingCostUsd: labelRes.label.cost,
+        // Amazon order revenue isn't passed through ShipStation today;
+        // we leave it null and a future SP-API enrichment can backfill.
+        revenueUsd: null,
+        trackingNumber: labelRes.label.trackingNumber,
+      });
+    } catch {
+      /* fail-soft — registry is downstream observability */
+    }
+  }
 
   return {
     orderNumber: order.orderNumber,
