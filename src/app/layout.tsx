@@ -46,65 +46,84 @@ const CLARITY_ID = process.env.NEXT_PUBLIC_CLARITY_ID?.trim() || "w9qsgk41dp";
 
 function GoogleAnalytics() {
   if (!GA4_ID) return null;
+  // Switched 2026-04-26 from <Script strategy="afterInteractive"> to plain
+  // <script async> + <script dangerouslySetInnerHTML>: see MetaPixel comment.
+  // Next.js's afterInteractive scripts were silently failing to execute on
+  // the live site, causing zero pixel/GA4/Apollo events to fire site-wide.
   return (
     <>
-      <Script
-        src={`https://www.googletagmanager.com/gtag/js?id=${GA4_ID}`}
-        strategy="afterInteractive"
+      <script async src={`https://www.googletagmanager.com/gtag/js?id=${GA4_ID}`} />
+      <script
+        id="ga4-init"
+        dangerouslySetInnerHTML={{
+          __html: `
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', '${GA4_ID}', {
+              send_page_view: true,
+              linker: {
+                domains: ['usagummies.com', 'www.usagummies.com', 'usa-gummies.myshopify.com'],
+                decorate_forms: true,
+                accept_incoming: true,
+              },
+            });
+            ${GOOGLE_ADS_ID ? `gtag('config', '${GOOGLE_ADS_ID}', { allow_enhanced_conversions: true });` : ""}
+            ${GOOGLE_ADS_CONVERSION_SEND_TO ? `window.__usaGadsConversionId = '${GOOGLE_ADS_CONVERSION_SEND_TO}';` : ""}
+          `,
+        }}
       />
-      <Script id="ga4-init" strategy="afterInteractive">
-        {`
-          window.dataLayer = window.dataLayer || [];
-          function gtag(){dataLayer.push(arguments);}
-          gtag('js', new Date());
-          gtag('config', '${GA4_ID}', {
-            send_page_view: true,
-            linker: {
-              domains: ['usagummies.com', 'www.usagummies.com', 'usa-gummies.myshopify.com'],
-              decorate_forms: true,
-              accept_incoming: true,
-            },
-          });
-          ${GOOGLE_ADS_ID ? `gtag('config', '${GOOGLE_ADS_ID}', { allow_enhanced_conversions: true });` : ""}
-          ${GOOGLE_ADS_CONVERSION_SEND_TO ? `window.__usaGadsConversionId = '${GOOGLE_ADS_CONVERSION_SEND_TO}';` : ""}
-        `}
-      </Script>
     </>
   );
 }
 
 function MicrosoftClarity() {
   if (!CLARITY_ID) return null;
+  // Switched 2026-04-26 to plain <script> — see MetaPixel comment.
   return (
-    <Script id="clarity-init" strategy="afterInteractive">
-      {`
-        (function(c,l,a,r,i,t,y){
-          c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
-          t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
-          y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
-        })(window, document, "clarity", "script", "${CLARITY_ID}");
-      `}
-    </Script>
+    <script
+      id="clarity-init"
+      dangerouslySetInnerHTML={{
+        __html: `
+          (function(c,l,a,r,i,t,y){
+            c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+            t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+            y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+          })(window, document, "clarity", "script", "${CLARITY_ID}");
+        `,
+      }}
+    />
   );
 }
 
 function MetaPixel() {
+  // NOTE: Switched 2026-04-26 from <Script strategy="afterInteractive"> to a
+  // plain <script dangerouslySetInnerHTML> after diagnosing that Next.js's
+  // afterInteractive Scripts were not executing on the live site (pixel,
+  // GA4, and Apollo all silently failed). The plain inline <script> renders
+  // directly into the SSR HTML and executes synchronously when the parser
+  // reaches it — no Next.js runtime dependency. Pixel last_fired_time was
+  // stuck at 2026-04-24 because of this. CSP also patched in next.config.ts
+  // to allow connect.facebook.net and *.facebook.com.
   return (
     <>
-      <Script id="meta-pixel" strategy="afterInteractive">
-        {`
-          !function(f,b,e,v,n,t,s)
-          {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-          n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-          if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-          n.queue=[];t=b.createElement(e);t.async=!0;
-          t.src=v;s=b.getElementsByTagName(e)[0];
-          s.parentNode.insertBefore(t,s)}(window, document,'script',
-          'https://connect.facebook.net/en_US/fbevents.js');
-          fbq('init', '${META_PIXEL_ID}');
-          fbq('track', 'PageView');
-        `}
-      </Script>
+      <script
+        id="meta-pixel"
+        dangerouslySetInnerHTML={{
+          __html: `
+            !function(f,b,e,v,n,t,s)
+            {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+            n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+            if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+            n.queue=[];t=b.createElement(e);t.async=!0;
+            t.src=v;s=b.getElementsByTagName(e)[0];
+            s.parentNode.insertBefore(t,s)}(window, document,'script',
+            'https://connect.facebook.net/en_US/fbevents.js');
+            fbq('init', '${META_PIXEL_ID}');
+            fbq('track', 'PageView');
+          `,
+        }}
+      />
       <noscript>
         <img
           height="1"
