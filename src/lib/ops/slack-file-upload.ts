@@ -114,6 +114,68 @@ const CELL_BORDER: Partial<ExcelJS.Borders> = {
 };
 
 /** Infer Excel number format string from header label */
+/**
+ * After `files.completeUploadExternal` succeeds, query
+ * `conversations.history` for the channel-message that carries our
+ * just-uploaded file and return its `ts`. This is the message-ts
+ * downstream callers need to thread replies under (Phase 28a's
+ * packing-slip thread reply, dispatch confirmations, etc.).
+ *
+ * Why this exists: `files.completeUploadExternal` returns
+ * `file.permalink` shaped as `…/files/<userId>/<fileId>/<filename>`,
+ * NOT the channel-message permalink `…/archives/<channel>/p<digits>`.
+ * `permalinkToMessageTs` parses the latter shape only, so for live
+ * uploads it always returned undefined — silently breaking every
+ * downstream "thread under the upload" path.
+ *
+ * Implementation: we already have `channels:history`, not `files:read`,
+ * so `conversations.history` is the cheaper scope. Bounded scan: 50
+ * most-recent messages in the channel. The file just landed; if it's
+ * older than 50 messages something's gone very wrong upstream and
+ * threading under it isn't the priority anyway.
+ *
+ * Fail-soft: any error / no match → return undefined. Callers fall
+ * back to the (always-undefined) `permalinkToMessageTs(file.permalink)`
+ * and the thread-reply branch becomes a no-op, which is the
+ * pre-fix behavior. We do NOT reject the upload result — the file
+ * already landed in Slack.
+ */
+async function resolveChannelMessageTs(opts: {
+  token: string;
+  channelId: string;
+  fileId: string;
+}): Promise<string | undefined> {
+  if (!opts.fileId) return undefined;
+  try {
+    const url =
+      `https://slack.com/api/conversations.history?channel=${encodeURIComponent(opts.channelId)}&limit=50`;
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${opts.token}` },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return undefined;
+    const data = (await res.json()) as {
+      ok: boolean;
+      messages?: Array<{
+        ts?: string;
+        files?: Array<{ id?: string }>;
+      }>;
+    };
+    if (!data.ok || !Array.isArray(data.messages)) return undefined;
+    for (const msg of data.messages) {
+      if (!msg.ts || !Array.isArray(msg.files)) continue;
+      for (const f of msg.files) {
+        if (f?.id === opts.fileId) {
+          return msg.ts;
+        }
+      }
+    }
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function inferNumFmt(header: string): string | null {
   const h = header.toLowerCase();
   if (/\bpercent\b|%/.test(h)) return "0.00%";
@@ -417,11 +479,31 @@ export async function uploadFileToSlack(opts: {
         expiresAt: Date.now() + (2 * 60 * 60 * 1000),
       });
     }
+    // Resolve the actual channel-message ts for the uploaded file.
+    // `file.permalink` from `files.completeUploadExternal` is the
+    // FILE permalink (e.g. `…/files/<userId>/<fileId>/<filename>`),
+    // not the channel-message permalink (`…/archives/<channel>/p<digits>`).
+    // `permalinkToMessageTs` regex doesn't match the file format, so
+    // it returns undefined for every live upload — which silently
+    // breaks every downstream caller that needs to thread under the
+    // upload (the auto-ship route's packing-slip thread reply, etc.).
+    //
+    // Fix: ask `conversations.history` for recent messages in the
+    // channel and find the one that carries our just-uploaded file.
+    // We use the bot's existing `channels:history` scope rather than
+    // `files:read` (which the bot doesn't have).
+    const fileId = file?.id || urlData.file_id;
+    const messageTs =
+      (await resolveChannelMessageTs({
+        token,
+        channelId: opts.channelId,
+        fileId,
+      })) ?? permalinkToMessageTs(file?.permalink);
     return {
       ok: true,
-      fileId: file?.id || urlData.file_id,
+      fileId,
       permalink: file?.permalink,
-      messageTs: permalinkToMessageTs(file?.permalink),
+      messageTs,
     };
   } catch (err) {
     return {
@@ -576,11 +658,22 @@ export async function uploadBufferToSlack(opts: {
       };
     }
     const file = completeData.files?.[0];
+    // Resolve channel-message ts via conversations.history (file.permalink
+    // is the file URL, not the message URL — see resolveChannelMessageTs
+    // doc upstream). Threading replies under a buffer upload (e.g. the
+    // auto-ship route's packing-slip thread reply) requires this ts.
+    const fileId = file?.id || urlData.file_id;
+    const messageTs =
+      (await resolveChannelMessageTs({
+        token,
+        channelId: opts.channelId,
+        fileId,
+      })) ?? permalinkToMessageTs(file?.permalink);
     return {
       ok: true,
-      fileId: file?.id || urlData.file_id,
+      fileId,
       permalink: file?.permalink,
-      messageTs: permalinkToMessageTs(file?.permalink),
+      messageTs,
     };
   } catch (err) {
     return {
