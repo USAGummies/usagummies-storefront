@@ -8,7 +8,7 @@
 
 ## Where the build is right now
 
-**Test suite:** 1,912 green (128 files). **Workflow blueprint:** v1.56. **Latest baseline:** `237c96a feat(vendor-portal): Phase 31.2 HMAC token`.
+**Test suite:** 1,934 green (130 files). **Workflow blueprint:** v1.57. **Latest baseline:** `c512349 feat(vendor-portal): Phase 31.2.a registry + issue route`.
 
 **Active build directive (Ben 2026-04-27):** "build the entire system tested." Working through Phase 28L → 29 → 30 → 31 autonomously. See workflow-blueprint.md §"Top P0 build items" for the full queue.
 
@@ -37,8 +37,8 @@
 | Phase 31.1 — USPTO trademark tracking | DONE | this session |
 | Phase 31.2 — Vendor portal token (security primitive) | DONE | this session |
 | Phase 31.2.a — Vendor registry + issue route | DONE | this session |
-| Phase 31.2.b — Public `/vendor/[token]` page | NEXT | — |
-| Phase 31.2.c — COI upload route + Drive write | QUEUED | — |
+| Phase 31.2.b — Public `/vendor/[token]` page | DONE | this session |
+| Phase 31.2.c — COI upload route + Drive write | DONE | this session |
 | Phase 31.1 — USPTO/FDA tracking | QUEUED | — |
 | Phase 31.2 — External vendor portal | QUEUED | — |
 
