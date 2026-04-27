@@ -43,8 +43,12 @@
 // surface for review than to silently over-pack.
 
 const SKU_BAGS_PER_UNIT: Record<string, number> = {
-  // Amazon FBM
+  // Amazon FBM — current live SKU is 1-pack; 2/3-pack added pre-emptively
+  // so a future variant launch doesn't silently undercount via the
+  // bagsPerUnitForSku default-to-1 fallback.
   "USG-FBM-1PK": 1,
+  "USG-FBM-2PK": 2,
+  "USG-FBM-3PK": 3,
   "USG-FBM-5PK": 5,
   "USG-FBM-10PK": 10,
   // Shopify DTC (populate with real variant SKUs as they ship)
@@ -86,7 +90,13 @@ export function totalBagsForItems(
 ): number {
   let total = 0;
   for (const item of items) {
-    const qty = Math.max(0, Math.floor(Number(item.quantity) || 0));
+    const raw = Number(item.quantity);
+    // Defensive: NaN / ±Infinity / non-positive → skip the line.
+    // Amazon never sends those today, but a corrupted order item or
+    // future channel sync bug shouldn't compute infinite bags and
+    // hand undefined behavior to pickPackagingForBags downstream.
+    if (!Number.isFinite(raw)) continue;
+    const qty = Math.max(0, Math.floor(raw));
     if (qty === 0) continue;
     total += qty * bagsPerUnitForSku(item.sku);
   }
