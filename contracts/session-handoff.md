@@ -8,7 +8,7 @@
 
 ## Where the build is right now
 
-**Test suite:** 1,799 green (119 files). **Workflow blueprint:** v1.51. **Latest baseline:** `41c860a feat(inventory): Phase 30.2 reorder triggers`.
+**Test suite:** 1,813 green (121 files). **Workflow blueprint:** v1.52. **Latest baseline:** `4d5dda9 feat(inbox): Phase 30.3 triage closed-loop`.
 
 **Active build directive (Ben 2026-04-27):** "build the entire system tested." Working through Phase 28L → 29 → 30 → 31 autonomously. See workflow-blueprint.md §"Top P0 build items" for the full queue.
 
@@ -33,7 +33,9 @@
 | Phase 30.1 — AP packet dashboard UI | ALREADY-SHIPPED (acknowledged) | prior |
 | Phase 30.2 — Reorder triggers | DONE | this session |
 | Phase 30.3 — Inbox triage closed-loop | DONE | this session |
-| Phase 30.4 — Reply composer + Pipeline enrich tests | NEXT | — |
+| Phase 30.4 — Reply composer + Pipeline enrich tests | DONE | this session |
+| Phase 31.1 — USPTO/FDA tracking | NEXT | — |
+| Phase 31.2 — External vendor portal | QUEUED | — |
 | Phase 31.1 — USPTO/FDA tracking | QUEUED | — |
 | Phase 31.2 — External vendor portal | QUEUED | — |
 
