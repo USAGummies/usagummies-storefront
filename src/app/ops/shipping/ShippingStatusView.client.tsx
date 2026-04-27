@@ -265,6 +265,20 @@ export function ShippingStatusView() {
           </div>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <a
+            href="/ops/shipping/dispatch"
+            style={{
+              border: `1px solid ${BORDER}`,
+              borderRadius: 6,
+              padding: "6px 12px",
+              fontSize: 12,
+              color: NAVY,
+              textDecoration: "none",
+              background: CARD,
+            }}
+          >
+            Dispatch Board →
+          </a>
           {lastFetchedAt && (
             <span style={{ fontSize: 12, color: DIM }}>
               Updated {lastFetchedAt.toLocaleTimeString()}
