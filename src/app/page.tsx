@@ -137,7 +137,7 @@ export default async function HomePage() {
     <main>
       <BreadcrumbJsonLd items={[{ name: "Home", href: "/" }]} />
 
-      <HeroSection />
+      <HeroSection review={reviewAggregate} />
       <ScarcityBar />
       <ThreePromises />
       <BombsAway />
