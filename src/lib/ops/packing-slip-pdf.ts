@@ -361,3 +361,80 @@ function formatDate(iso: string): string {
     return iso;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Merge label + packing slip into one 2-page PDF
+// ---------------------------------------------------------------------------
+
+/**
+ * Concatenate the label PDF + packing-slip PDF into a single
+ * **2-page** PDF (page 1 = label, page 2 = packing slip).
+ *
+ * **Doctrinal rule (Ben 2026-04-27, "this needs to be fixed
+ * fucking now"):** when Ben prints the shipping label, it MUST be
+ * a 2-page print — page 1 the label, page 2 the packing slip with
+ * correct quantities and the product name. **One click, both
+ * pages.** No thread reply. No race condition. No silent drops.
+ *
+ * Why this matters:
+ *   - Eliminates the Slack thread-reply propagation race entirely
+ *     (the previous failure mode).
+ *   - Eliminates the "label without slip" possibility — the slip
+ *     is physically in the same PDF as the label.
+ *   - Single Drive write, single Slack post, single source of
+ *     truth.
+ *
+ * Implementation notes:
+ *   - Uses `pdf-lib`'s `PDFDocument.copyPages` — works in Vercel
+ *     serverless (no headless Chrome).
+ *   - The label may itself be multi-page (some carriers include a
+ *     shipper receipt page). We copy ALL pages of the label so
+ *     nothing is lost. The packing slip is always 1 page (built by
+ *     `buildPackingSlipPdfBuffer`).
+ *   - If either input is empty/invalid, throws — the caller MUST
+ *     handle this and decide whether to fall back or fail the buy.
+ *     We never produce a "label-only" PDF and call it "merged" —
+ *     that would be a silent regression of the doctrinal rule.
+ *
+ * Pure async — no I/O, no clock side-effects.
+ */
+export async function mergeLabelAndSlipPdf(
+  labelPdf: Buffer | Uint8Array,
+  slipPdf: Buffer | Uint8Array,
+): Promise<Buffer> {
+  if (!labelPdf || labelPdf.length === 0) {
+    throw new Error("mergeLabelAndSlipPdf: labelPdf is empty");
+  }
+  if (!slipPdf || slipPdf.length === 0) {
+    throw new Error("mergeLabelAndSlipPdf: slipPdf is empty");
+  }
+
+  const merged = await PDFDocument.create();
+  const labelDoc = await PDFDocument.load(labelPdf);
+  const slipDoc = await PDFDocument.load(slipPdf);
+
+  if (labelDoc.getPageCount() === 0) {
+    throw new Error("mergeLabelAndSlipPdf: label PDF has zero pages");
+  }
+  if (slipDoc.getPageCount() === 0) {
+    throw new Error("mergeLabelAndSlipPdf: slip PDF has zero pages");
+  }
+
+  // Copy ALL label pages (some carriers include a shipper receipt
+  // as a second page; preserve that — the operator may still need
+  // it).
+  const labelPages = await merged.copyPages(
+    labelDoc,
+    labelDoc.getPageIndices(),
+  );
+  for (const p of labelPages) merged.addPage(p);
+
+  // Copy the packing slip (always 1 page, built by
+  // `buildPackingSlipPdfBuffer`).
+  const slipPages = await merged.copyPages(slipDoc, slipDoc.getPageIndices());
+  for (const p of slipPages) merged.addPage(p);
+
+  const bytes = await merged.save();
+  return Buffer.from(bytes);
+}
+

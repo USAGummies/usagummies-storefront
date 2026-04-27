@@ -8,7 +8,7 @@
 
 ## Where the build is right now
 
-**Test suite:** 1,813 green (121 files). **Workflow blueprint:** v1.52. **Latest baseline:** `4d5dda9 feat(inbox): Phase 30.3 triage closed-loop`.
+**Test suite:** 1,825 green (123 files). **Workflow blueprint:** v1.53. **Latest baseline:** `434be27 fix(shipping): packing-slip propagation race + fail-loud`.
 
 **Active build directive (Ben 2026-04-27):** "build the entire system tested." Working through Phase 28L → 29 → 30 → 31 autonomously. See workflow-blueprint.md §"Top P0 build items" for the full queue.
 
@@ -64,6 +64,9 @@
 ---
 
 ## Doctrinal hard rules (do NOT relax)
+
+**Print artifact rule (Ben 2026-04-27, "this needs to be fixed fucking now"):**
+Every shipping label print MUST be a 2-page PDF — page 1 the label, page 2 the packing slip with correct quantities + product name. **One click = both pages.** Implementation: `mergeLabelAndSlipPdf` in `src/lib/ops/packing-slip-pdf.ts`, called by the auto-ship route BEFORE the Slack upload. No thread reply on the happy path. No race condition possible. Falling back to label-only is permitted ONLY when merge fails (loud audit `artifact.label.merge-failed`); the slip then posts via the legacy thread-reply path with the Phase 28i+ retry chain.
 
 These are immutable. If the user asks to relax one, push back and reference this doc.
 

@@ -69,7 +69,10 @@ import {
   splitLabelAndPackingSlip,
   type ShippingArtifactRecord,
 } from "@/lib/ops/shipping-artifacts";
-import { buildPackingSlipPdfBuffer } from "@/lib/ops/packing-slip-pdf";
+import {
+  buildPackingSlipPdfBuffer,
+  mergeLabelAndSlipPdf,
+} from "@/lib/ops/packing-slip-pdf";
 import { recordAmazonOrderShipped } from "@/lib/ops/amazon-customers";
 
 export const runtime = "nodejs";
@@ -456,13 +459,59 @@ async function autoShipOrder(
         },
       });
 
+      // **Phase 28m (Ben 2026-04-27):** merge label + packing slip
+      // into a single 2-page PDF so one print = both pages. This
+      // eliminates the entire thread-reply path and its propagation
+      // race. If the merge fails, we fall back to label-only with a
+      // loud audit; the packing-slip-only Drive copy still exists so
+      // Ben can print from there as a manual recovery.
+      let printablePdf: Buffer = labelOnlyBytes;
+      let mergedFilename = `label-${order.orderNumber}.pdf`;
+      let mergedTwoPage = false;
+      if (customPackingSlipPdf) {
+        try {
+          printablePdf = await mergeLabelAndSlipPdf(
+            labelOnlyBytes,
+            customPackingSlipPdf,
+          );
+          mergedFilename = `shipment-${order.orderNumber}.pdf`;
+          mergedTwoPage = true;
+          await recordAudit(
+            "artifact.label.merged-with-slip",
+            order.orderNumber,
+            source,
+            true,
+            {
+              labelBytes: labelOnlyBytes.length,
+              slipBytes: customPackingSlipPdf.length,
+              mergedBytes: printablePdf.length,
+            },
+          );
+        } catch (mergeErr) {
+          await recordAudit(
+            "artifact.label.merge-failed",
+            order.orderNumber,
+            source,
+            false,
+            {
+              error:
+                mergeErr instanceof Error ? mergeErr.message : String(mergeErr),
+              fallback: "posting label-only; slip available via Drive link",
+              packingSlipDriveLink,
+            },
+          );
+        }
+      }
+
       try {
         const uploadRes = await uploadBufferToSlack({
           channelId: destChannel,
-          filename: `label-${order.orderNumber}.pdf`,
-          buffer: labelOnlyBytes,
+          filename: mergedFilename,
+          buffer: printablePdf,
           mimeType: "application/pdf",
-          title: `Label ${order.orderNumber}`,
+          title: mergedTwoPage
+            ? `Shipment ${order.orderNumber} (label + packing slip)`
+            : `Label ${order.orderNumber}`,
           comment,
         });
         if (uploadRes.ok) {
@@ -474,31 +523,32 @@ async function autoShipOrder(
             orderNumber: order.orderNumber,
             slackPermalink: uploadRes.permalink ?? null,
           });
-          // Phase 27 — also upload the packing slip as a thread
-          // reply under the label post, so #shipping has both PDFs
-          // per shipment without cluttering the channel scroll.
-          // Best-effort: a packing-slip-upload failure does NOT
-          // roll back the label-shipped state.
-          if (customPackingSlipPdf) {
-            // Phase 27 — also upload the packing slip as a thread
-            // reply under the label post, so #shipping has both PDFs
-            // per shipment without cluttering the channel scroll.
-            //
-            // **Hard rule (Phase 28i + Amy Catalano regression
-            // 2026-04-27):** the packing slip MUST land in #shipping
-            // alongside the label. A `messageTs=undefined` (Slack
-            // history-propagation race) used to silently drop the
-            // slip — Ben got a label with no slip, no warning. NOT
-            // ACCEPTABLE. The rule now: post the slip regardless.
-            // If we have a messageTs → thread reply (preferred). If
-            // not → post as a fresh channel message with a loud
-            // "thread reply failed" header so Ben can see something
-            // went sideways but still has the slip in hand.
-            //
-            // Best-effort: a packing-slip-upload failure (the slip
-            // genuinely couldn't be sent) still does NOT roll back
-            // the label-shipped state.
-            const fallbackComment = `:warning: *Packing slip ${order.orderNumber} — fallback post (no parent ts)*\nLabel was uploaded but the channel-message ts didn't resolve in time; posting slip as a fresh message so it's not lost. Auto-ship continues.`;
+          // Phase 28m — merged 2-page PDF is the source of truth.
+          // No thread reply needed. The packing-slip-only Drive
+          // copy is preserved for archival / audit-trail purposes;
+          // the operator never needs to fetch it under the
+          // happy path because both pages are already in the
+          // single PDF that just landed in Slack.
+          if (mergedTwoPage) {
+            // Loud audit so we can confirm at a glance that today's
+            // shipment landed as the canonical 2-page artifact.
+            await recordAudit(
+              "slack.shipment.two-page-posted",
+              order.orderNumber,
+              source,
+              true,
+              {
+                bytes: printablePdf.length,
+                permalink: uploadRes.permalink ?? null,
+              },
+            );
+          } else if (customPackingSlipPdf) {
+            // Merge failed (already audited above) BUT the slip
+            // exists. Defensive belt: post the slip as a thread
+            // reply with the existing retry+fallback chain so the
+            // operator still gets it — better in a thread than
+            // missing entirely.
+            const fallbackComment = `:warning: *Packing slip ${order.orderNumber} — fallback (merge failed)*\nLabel + slip merge into 2-page PDF failed; posting slip separately so it's not lost.`;
             try {
               await uploadBufferToSlack({
                 channelId: destChannel,
@@ -511,21 +561,6 @@ async function autoShipOrder(
                   : fallbackComment,
                 threadTs: uploadRes.messageTs,
               });
-              if (!uploadRes.messageTs) {
-                // Loud audit so we can find these in the trail.
-                await recordAudit(
-                  "slack.packing-slip.posted-untreaded",
-                  order.orderNumber,
-                  source,
-                  true,
-                  {
-                    reason:
-                      "messageTs unresolved after backoff — slip posted as fresh channel message rather than dropped",
-                    labelDriveLink,
-                    packingSlipDriveLink,
-                  },
-                );
-              }
             } catch (psErr) {
               await recordAudit(
                 "slack.packing-slip.upload-failed",
