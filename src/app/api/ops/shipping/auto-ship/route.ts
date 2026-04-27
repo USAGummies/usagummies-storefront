@@ -69,6 +69,7 @@ import {
   splitLabelAndPackingSlip,
   type ShippingArtifactRecord,
 } from "@/lib/ops/shipping-artifacts";
+import { buildPackingSlipPdfBuffer } from "@/lib/ops/packing-slip-pdf";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -349,9 +350,52 @@ async function autoShipOrder(
 
     if (pdfBytes) {
       // (1) Split the 2-page PDF once, so Drive + Slack both consume the
-      //     same already-parsed pages.
+      //     same already-parsed pages. We KEEP `labelOnly` (page 1) but
+      //     IGNORE `packingSlipOnly` (page 2) — ShipStation's page 2 is
+      //     blank when items aren't synced into the order, which has been
+      //     the historical default for our channel imports. Instead we
+      //     generate a branded packing slip from the ShipStation order
+      //     summary (which DOES carry items + ship-to) and use that.
       const split = await splitLabelAndPackingSlip(pdfBytes);
       const labelOnlyBytes = split.labelOnly ?? pdfBytes;
+
+      // (1b) Build our own packing-slip PDF from the order summary
+      //      so it always shows order #, items, qty, and ship-to —
+      //      regardless of whether ShipStation was given line items.
+      let customPackingSlipPdf: Buffer | null = null;
+      try {
+        customPackingSlipPdf = await buildPackingSlipPdfBuffer({
+          orderNumber: order.orderNumber,
+          source,
+          orderDate: order.orderDate ?? null,
+          shipDate: new Date().toISOString(),
+          shipTo: order.shipTo,
+          items:
+            order.items.length > 0
+              ? order.items.map((it) => ({
+                  sku: it.sku,
+                  name: it.name,
+                  quantity: it.quantity,
+                }))
+              : [
+                  {
+                    sku: "USG-FBM-1PK",
+                    name: `${bags} × USA Gummies — All American Gummy Bears, 7.5 oz Bag`,
+                    quantity: bags,
+                  },
+                ],
+          carrierService: labelRes.label.service,
+          trackingNumber: labelRes.label.trackingNumber,
+        });
+      } catch (psErr) {
+        await recordAudit(
+          "artifact.packing-slip.generate-failed",
+          order.orderNumber,
+          source,
+          false,
+          { error: psErr instanceof Error ? psErr.message : String(psErr) },
+        );
+      }
 
       // (2) Drive — fail-soft. Records a row in KV either way.
       try {
@@ -361,7 +405,7 @@ async function autoShipOrder(
           trackingNumber: labelRes.label.trackingNumber,
           fullPdf: pdfBytes,
           labelOnlyPdf: split.labelOnly ?? undefined,
-          packingSlipOnlyPdf: split.packingSlipOnly ?? undefined,
+          packingSlipOnlyPdf: customPackingSlipPdf ?? undefined,
         });
         labelDriveLink = artifactRecord.label?.webViewLink ?? null;
         packingSlipDriveLink = artifactRecord.packingSlip?.webViewLink ?? null;
@@ -434,12 +478,12 @@ async function autoShipOrder(
           // per shipment without cluttering the channel scroll.
           // Best-effort: a packing-slip-upload failure does NOT
           // roll back the label-shipped state.
-          if (split.packingSlipOnly && uploadRes.messageTs) {
+          if (customPackingSlipPdf && uploadRes.messageTs) {
             try {
               await uploadBufferToSlack({
                 channelId: destChannel,
                 filename: `packing-slip-${order.orderNumber}.pdf`,
-                buffer: split.packingSlipOnly,
+                buffer: customPackingSlipPdf,
                 mimeType: "application/pdf",
                 title: `Packing slip ${order.orderNumber}`,
                 comment: formatPackingSlipComment(order.orderNumber),
