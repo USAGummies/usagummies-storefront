@@ -8,7 +8,7 @@
 
 ## Where the build is right now
 
-**Test suite:** 1,861 green (125 files). **Workflow blueprint:** v1.54. **Latest baseline:** `6ca596c fix(shipping): Phase 28m 2-page label+slip PDF`.
+**Test suite:** 1,892 green (126 files). **Workflow blueprint:** v1.55. **Latest baseline:** `7a0eb66 feat(uspto): Phase 31.1 trademark deadline tracking`.
 
 **Active build directive (Ben 2026-04-27):** "build the entire system tested." Working through Phase 28L → 29 → 30 → 31 autonomously. See workflow-blueprint.md §"Top P0 build items" for the full queue.
 
@@ -35,7 +35,8 @@
 | Phase 30.3 — Inbox triage closed-loop | DONE | this session |
 | Phase 30.4 — Reply composer + Pipeline enrich tests | DONE | this session |
 | Phase 31.1 — USPTO trademark tracking | DONE | this session |
-| Phase 31.2 — External vendor portal | NEXT | — |
+| Phase 31.2 — Vendor portal token (security primitive) | DONE | this session |
+| Phase 31.2.x — Vendor portal routes + UI | NEXT (downstream of 31.2) | — |
 | Phase 31.1 — USPTO/FDA tracking | QUEUED | — |
 | Phase 31.2 — External vendor portal | QUEUED | — |
 
