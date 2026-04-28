@@ -72,11 +72,33 @@ These rules override all other behavior:
 
 ## Inventory & COGS Model
 
+- **Atomic bag-level inventory (LOCKED 2026-04-27).** All inventory tracked at the single 7.5 oz bag. Cases / master cartons / pallets are commercial + packaging abstractions that decrement bag inventory at order time. **Do NOT create case/carton/pallet inventory SKUs.** See [`/contracts/wholesale-pricing.md`](contracts/wholesale-pricing.md) §1.
 - Current unit cost: $1.52/unit (Powers $50K manufacturing + Belmark $26K packaging = $76K / 50,000 units). This is a PLACEHOLDER until final invoices arrive.
 - Inventory is an ASSET. When goods ship, inventory MOVES to COGS on Income Statement.
 - Revenue channels tracked separately: Amazon, Shopify DTC, Faire, Wholesale, Interbitzin, Glacier, AVG.
 - Amazon is consignment (FBA), not wholesale. Shipping TO Amazon = inventory transfer (still our asset). Revenue recorded when Amazon SELLS units.
 - PO = request from customer (not revenue). Invoice = our billing document (creates revenue + AR in QBO).
+
+## Wholesale Pricing (LOCKED 2026-04-27 — see [`/contracts/wholesale-pricing.md`](contracts/wholesale-pricing.md))
+
+5 line items; designators `B1-B5` are stable identifiers in code, audit logs, QBO line text, Slack notifications, HubSpot deal properties:
+
+- **B1** — Individual case, $3.49/bag, Ben delivers locally. **INTERNAL ONLY** — not in online flow.
+- **B2** — Master carton, $3.49/bag, landed (USA Gummies ships, freight in price). Online.
+- **B3** — Master carton, $3.25/bag, buyer pays freight. Online.
+- **B4** — Pallet, $3.25/bag, landed. Online.
+- **B5** — Pallet, $3.00/bag, buyer pays freight. Online.
+
+Custom freight quote only at 3+ pallets. Online MOQ = master carton.
+
+## Operating Memory — Slack First (LOCKED 2026-04-27 — see [`/contracts/operating-memory.md`](contracts/operating-memory.md))
+
+Slack is the company's running tally board, not just chat:
+
+- Every system-generated report posts to Slack first; email is optional/secondary.
+- Decisions, corrections, drift, and follow-ups all surface in Slack threads.
+- Substantive call transcripts captured to Slack within 24h.
+- Corrections are inputs — Claude Code reads recent Slack corrections on boot to detect drift.
 
 ## Packaging spec (canonical)
 

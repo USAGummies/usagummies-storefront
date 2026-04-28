@@ -21,12 +21,19 @@ Your job: answer using THIS doc + the canonical contracts. **Cite the file path.
 
 ## 1. Build state as of 2026-04-27
 
-- **Workflow blueprint:** v1.60 (`/contracts/workflow-blueprint.md`)
+- **Workflow blueprint:** v1.61 (`/contracts/workflow-blueprint.md`)
 - **Test suite:** 1,958 green across 131 files
-- **Latest baseline commit:** `6c2fafd` (Phase 32.1.c — daily-brief signals wireup)
-- **Active build directive (Ben 2026-04-27):** "build the entire system tested" — Phase 28L → 32.1 closed in a single 15-commit autonomous run.
+- **Latest baseline commit:** `4d3e2ed` (outreach warehouse-location doctrine)
+- **Active build directive (Ben 2026-04-27):** "build the entire system tested" — Phase 28L → 33 closed in a single 18-commit autonomous run.
 
-This session shipped: interviewer doctrine, session-handoff doc, stack-readiness dashboard, agent-health surface, **Drew doctrine sweep** (Drew owns nothing), reorder triggers, inbox triage backlog, pipeline route locks, **2-page label+slip PDF (the print fix)**, USPTO trademark deadline tracking, **vendor portal end-to-end** (HMAC + registry + issue route + public page + COI upload + Drive write), brief-signals aggregator + composer + route. See [`/contracts/workflow-blueprint.md`](./workflow-blueprint.md) §Version history v1.46 → v1.60 for line-by-line detail.
+This session shipped: interviewer doctrine, session-handoff doc, stack-readiness dashboard, agent-health surface, **Drew doctrine sweep** (Drew owns nothing), reorder triggers, inbox triage backlog, pipeline route locks, **2-page label+slip PDF (the print fix)**, USPTO trademark deadline tracking, **vendor portal end-to-end** (HMAC + registry + issue route + public page + COI upload + Drive write), brief-signals aggregator + composer + route, **Viktor briefing + W-8 Rene system Q&A** (this doc).
+
+**Plus, post-call Ben + Rene doctrine landed 2026-04-27 PM:**
+- **Wholesale pricing LOCKED** (5 line items B1-B5, atomic bag inventory) — `/contracts/wholesale-pricing.md` v1.0.
+- **Slack as operating memory LOCKED** — `/contracts/operating-memory.md` v1.0.
+- **Wholesale onboarding flow** — DRAFT pending Ben's interviewer pre-build pass: `/contracts/wholesale-onboarding-flow.md` v0.1.
+
+See [`/contracts/workflow-blueprint.md`](./workflow-blueprint.md) §Version history v1.46 → v1.61 for line-by-line detail.
 
 ---
 
@@ -278,6 +285,80 @@ If Rene sees "Stack — N services down" → that's the page she should look at:
 
 ---
 
+## 10.b Wholesale pricing + onboarding (LOCKED 2026-04-27)
+
+When Rene asks about wholesale prices or wants to onboard a vendor:
+
+### Pricing tiers (LOCKED — `/contracts/wholesale-pricing.md` v1.0)
+
+| Designator | Unit | Price | Freight | Online? |
+|---|---|---|---|---|
+| **B1** | 1 case (6 bags) | $3.49/bag | Ben delivers | NO — internal only |
+| **B2** | Master carton (36 bags) | $3.49/bag | Landed | YES |
+| **B3** | Master carton (36 bags) | $3.25/bag | Buyer pays | YES |
+| **B4** | Pallet (~432 bags) | $3.25/bag | Landed | YES |
+| **B5** | Pallet (~432 bags) | $3.00/bag | Buyer pays | YES |
+
+Custom freight only at 3+ pallets. Online MOQ = master carton. **`B1-B5` are stable identifiers** — never let pricing references float without the designator.
+
+### When Rene asks Viktor
+
+| Rene asks | Viktor responds |
+|---|---|
+| "What's the price for a master carton landed?" | "$3.49/bag — designator B2. [source: `/contracts/wholesale-pricing.md` v1.0 §2]" |
+| "Can we offer $X to a new account?" | "Custom acquisition pricing is supported (manual). Default standard tier is B2 at $3.49 landed. Want me to log the request for Ben to approve?" |
+| "What does B3 mean?" | "Master carton, $3.25/bag, buyer pays freight. Online." |
+| "Onboard Bucky's at custom pricing" | "Custom-deal capture is in scope for the wholesale-onboarding-flow rebuild but DRAFT today (interviewer pass pending). I'll log to Open Brain `rene-request:bucks-custom-pricing` for Ben." |
+
+### Onboarding flow status (DRAFT)
+
+`/contracts/wholesale-onboarding-flow.md` v0.1 captures the desired flow but is BLOCKED on 5 disambiguation questions Ben needs to answer:
+1. New page path (`/wholesale` replace vs `/wholesale/order` separate)
+2. CC checkout via Shopify B2B vs Stripe
+3. AP packet template (existing vs new `wholesale-ap`)
+4. Order-captured-before-AP-fills semantics (HubSpot stage vs QBO draft vs new KV envelope)
+5. QBO customer create approval timing (auto-stage on submit vs after AP ack)
+
+If Rene asks "is the new wholesale onboarding live?" → "Spec is captured in `/contracts/wholesale-onboarding-flow.md` v0.1; blocked on 5 disambiguation questions for Ben. The current `/wholesale` form still routes leads via Phase 1.b direct HubSpot."
+
+---
+
+## 10.c Operating memory rule — Slack-first reporting
+
+Per `/contracts/operating-memory.md` v1.0 (LOCKED 2026-04-27):
+
+- Every system-generated report (sales summary, financial update, month-end recon) posts to Slack FIRST. Email is optional and secondary.
+- Reports for Rene's weekly cadence go to `#financials` thread.
+- Substantive calls/transcripts captured to Slack within 24h tagged `transcript:<short-id>`.
+- Drift correction pattern: Rene's correction in the thread becomes input to the next report cycle. Viktor reads recent Slack corrections on boot.
+
+When Rene asks "where's the Friday sales report?" → "Posted to `#financials` Friday 09:00 PT. If you don't see it, Stack-readiness may be flagging a service down — check `/ops/stack-readiness`."
+
+---
+
+## 10.d Open priorities from the call (Ben 2026-04-27)
+
+These are the near-term priorities Ben named in §12 of the recap. If Rene asks "what's coming this week?":
+
+1. Get organized + clean up notes from the last few days
+2. Simplify receipt scanning + auto-tagging
+3. Fix small background issues
+4. Online orders flowing
+5. **Amazon multipacks live** (high priority — Thursday target)
+6. Move away from unprofitable single-bag Amazon orders
+7. Daily cash flow
+8. Wholesale + AP follow-ups
+9. Repeatable email flow refinement
+10. Session history/context into repeatable systems
+11. Slack updates on deal status
+
+Specific follow-ups:
+- BoA business credit card (Rene asked Ben to check; want a dedicated card for recurring vendor charges to avoid personal-Platinum-card-compromise risk)
+- 3D printer guy + Keystone Insurance finalization
+- Bookie AI integration (waiting on Rene's bookkeeping patterns; should be simpler now that shipping is cleaner)
+
+---
+
 ## 11. Where to find things — canonical pointers
 
 When Rene asks "where's X?" Viktor cites the file path:
@@ -288,7 +369,10 @@ When Rene asks "where's X?" Viktor cites the file path:
 | W-7 Rene capture (decision queue) | [`/contracts/agents/viktor-rene-capture.md`](./agents/viktor-rene-capture.md) |
 | W-8 Rene system Q&A (this doc) | [`/contracts/viktor-rene-briefing.md`](./viktor-rene-briefing.md) |
 | Approval taxonomy | [`/contracts/approval-taxonomy.md`](./approval-taxonomy.md) v1.4 |
-| Workflow blueprint | [`/contracts/workflow-blueprint.md`](./workflow-blueprint.md) v1.60 |
+| **Wholesale pricing** (LOCKED) | [`/contracts/wholesale-pricing.md`](./wholesale-pricing.md) v1.0 |
+| **Operating memory** (Slack-first) | [`/contracts/operating-memory.md`](./operating-memory.md) v1.0 |
+| Wholesale onboarding flow | [`/contracts/wholesale-onboarding-flow.md`](./wholesale-onboarding-flow.md) v0.1 DRAFT |
+| Workflow blueprint | [`/contracts/workflow-blueprint.md`](./workflow-blueprint.md) v1.61 |
 | Session handoff | [`/contracts/session-handoff.md`](./session-handoff.md) |
 | Drew doctrine lock | `src/lib/ops/__tests__/drew-doctrine.test.ts` |
 | Vendor portal HMAC | `src/lib/ops/vendor-portal-token.ts` |

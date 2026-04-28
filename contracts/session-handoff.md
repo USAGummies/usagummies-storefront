@@ -8,7 +8,7 @@
 
 ## Where the build is right now
 
-**Test suite:** 1,958 green (131 files). **Workflow blueprint:** v1.61. **Latest baseline:** `6c2fafd feat(brief): Phase 32.1.c daily-brief signals wireup`. **Viktor briefing:** `/contracts/viktor-rene-briefing.md` v1.0 (W-8 Rene system Q&A wired into Viktor boot ritual).
+**Test suite:** 1,958 green (131 files). **Workflow blueprint:** v1.62. **Latest baseline:** `4d3e2ed docs(outreach): warehouse-location is INTERNAL`. **Viktor briefing:** v1.1 (extended with §10.b-d for wholesale pricing + operating memory + open priorities). **New LOCKED doctrine 2026-04-27 PM (post-Ben+Rene call):** `/contracts/wholesale-pricing.md` v1.0 (B1-B5 + atomic-bag), `/contracts/operating-memory.md` v1.0 (Slack-first reporting), `/contracts/wholesale-onboarding-flow.md` v0.1 DRAFT (5 interviewer Qs pending Ben).
 
 **Active build directive (Ben 2026-04-27):** "build the entire system tested." Working through Phase 28L → 29 → 30 → 31 autonomously. See workflow-blueprint.md §"Top P0 build items" for the full queue.
 
