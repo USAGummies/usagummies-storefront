@@ -66,6 +66,11 @@ const BLOCKED = [
   { re: /freight\s+on\s+us[, ]/i, label: "Blocked 'freight on us' — trade-show-only language. Use canonical tiers." },
   { re: /show\s+pricing\s+(as\s+a\s+welcome|locked|extended|honor)/i, label: "Blocked 'show pricing as welcome offer' — The Reunion show pricing was show-only and has expired." },
   { re: /welcome\s+offer\s+on\s+your\s+first\s+master\s+carton/i, label: "Blocked 'welcome offer on first MC' — not a real tier per canonical spec." },
+  // Internal warehouse location — Ben's 4/27 PM ruling: do not reference externally
+  { re: /\bAshford\b/i, label: "Blocked 'Ashford' — internal warehouse location, never reference externally per Ben 2026-04-27 ruling. Use 'our warehouse', 'we ship from WA', or omit entirely." },
+  { re: /30025\s+SR\s*706/i, label: "Blocked '30025 SR 706 E' — internal warehouse street address, never include in outbound." },
+  { re: /\bWA\s+98304\b/i, label: "Blocked '98304' — internal warehouse zip, never include in outbound." },
+  { re: /FOB\s+Ashford/i, label: "Blocked 'FOB Ashford' — never reference Ashford. Use 'FOB origin' or 'FOB our WA warehouse' if origin must be named." },
 ];
 
 // ---------------------------------------------------------- Required tokens

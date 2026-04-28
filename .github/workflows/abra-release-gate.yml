@@ -31,31 +31,7 @@ jobs:
       - name: Static production smoke contract
         run: npm run verify:production-smoke
 
-  live-readiness-gate:
-    runs-on: ubuntu-latest
-    needs: compile-gate
-    if: github.ref == 'refs/heads/main'
-    env:
-      ABRA_BASE_URL: ${{ secrets.ABRA_BASE_URL }}
-      CRON_SECRET: ${{ secrets.CRON_SECRET }}
-      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-
-      - name: Install
-        run: npm ci
-
-      - name: Live production smoke
-        run: node scripts/production-smoke-test.mjs "${ABRA_BASE_URL:-https://www.usagummies.com}"
-
-      - name: Live readiness suite
-        run: node scripts/abra-production-readiness-suite.mjs "${ABRA_BASE_URL:-https://www.usagummies.com}"
+  # live-readiness-gate retired 2026-04-27 — pinged /api/ops/abra/* routes that
+  # were removed during the Abra retirement. Compile-gate (typecheck + build +
+  # static smoke contract) is the canonical post-push safety net.
+  # See production-smoke-test.mjs (kept for manual debugging via verify:production-smoke-live).
