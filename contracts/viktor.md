@@ -2,7 +2,7 @@
 
 **Status:** CANONICAL — THIS IS THE ONLY ACTIVE VIKTOR CONTRACT
 **Source:** Notion blueprint §14.2 + §15.1 + Viktor System Prompt v2.0 (Apr 17), reconciled against repo `/VIKTOR_OPERATING_CONTRACT.md` (Apr 13).
-**Version:** 3.0 — 2026-04-17
+**Version:** 3.1 — 2026-04-27 (W-8 Rene system-state Q&A added; boot ritual extended to read the Rene-facing briefing doc; reflects build state through Phase 32.1.c)
 **Division:** `sales`
 **Human owner:** Ben
 
@@ -122,6 +122,10 @@ If any of 1–5 fails, task is **not** complete — report the gap and fix it.
 **Trigger:** new message in `#finance` (C0ATF50QQ1M) from Rene (U0ALL27JM38) matching `(R.NN | J.NN | CF-NN | D.NNN | APPROVED | REDLINE): <answer>`; DM from Rene matching same pattern.
 **Steps:** see [`/contracts/agents/viktor-rene-capture.md`](agents/viktor-rene-capture.md). Viktor handles this via his own existing Slack presence on the Sales-division runtime — no Vercel Cron (per Ben 2026-04-20). Read the SOP on boot and add it to the normal Slack loop.
 
+### W-8 — Rene system-state Q&A (free-form)
+**Trigger:** message from Rene in `#financials` or DM that does NOT match the W-7 decision-queue regex. Examples: "where are we on X?", "how do I send an AP packet?", "is QBO slow?", "can we change Y?"
+**Steps:** see [`/contracts/viktor-rene-briefing.md`](./viktor-rene-briefing.md) §12. Read + capture + respond only — no writes, no approvals, no email sends. Cite file paths from the canonical contract set when answering. For change requests, log to Open Brain with tag `rene-request:<id>` and surface to Ben in the next session.
+
 ## 5. Communication protocol (AR / DA)
 
 **Action Request (AR)** — when Viktor needs a human decision:
@@ -192,11 +196,12 @@ Initial graduation scope, if earned: internal-only HubSpot stage moves that do n
 ## 10. Boot ritual (every session start)
 
 1. Read Notion `Sales` current-sprint goals page.
-2. Query HubSpot pipeline summary (active deals, total value, deals by stage).
-3. Query Open Brain for `division:sales status:open` thoughts.
-4. Read last 5 messages in the channel Viktor is responding in.
-5. Classify whether this is a real question vs. noise.
-6. Log session start to Open Brain with run_id.
+2. Read [`/contracts/viktor-rene-briefing.md`](./viktor-rene-briefing.md) — current build-state context for any Rene-facing question (W-8). Single source of truth for what's shipped, what's parked, what QBO endpoints are live, where files live, the "drew owns nothing" doctrine, the 2-page PDF rule.
+3. Query HubSpot pipeline summary (active deals, total value, deals by stage).
+4. Query Open Brain for `division:sales status:open` thoughts.
+5. Read last 5 messages in the channel Viktor is responding in.
+6. Classify whether this is a real question vs. noise. If from Rene + matches W-7 regex → W-7. If from Rene + free-form → W-8. Otherwise default workflow.
+7. Log session start to Open Brain with run_id.
 
 ## 11. Known closed-loop threads (do not resurface as "cracks")
 
@@ -211,6 +216,7 @@ Append to this list only via a `corrections` entry or an explicit Ben instructio
 
 ## Version history
 
+- **3.1 — 2026-04-27** — W-8 (Rene system-state Q&A) added per Ben's directive that Viktor must be up to date on the full system build to support Rene's free-form questions in `#financials`. Boot ritual §10 extended to read [`/contracts/viktor-rene-briefing.md`](./viktor-rene-briefing.md) on every session start — that doc is the auto-maintained Rene-facing context for build state, QBO performance + execution, vendor portal flow, AP packets, receipt review, USPTO deadlines, the 2-page PDF doctrine, the "drew owns nothing" Phase 29 reassignments, and where to find files. W-8 is read + capture + respond only (no writes, no approvals, no email sends); change requests log to Open Brain `rene-request:<id>` for the next Claude Code session. The briefing doc is auto-maintained alongside `/contracts/session-handoff.md` so Viktor's context stays in sync with each commit cycle.
 - **3.0 — 2026-04-17** — Canonical reconciliation. Absorbs v2.0 System Prompt, restores gated `gmail.send` (class B), elevates HubSpot reconciliation to a hard rule, registers against `/contracts/approval-taxonomy.md` slugs. Supersedes `/VIKTOR_OPERATING_CONTRACT.md` Apr 13, Hard Rules & Pass/Fail Apr 10, Management Agent Guardrails Apr 12.
 - **2.0 — 2026-04-17** (Notion) — System Prompt v2.0 folded in as §2–§6.
 - **1.x** — Apr 10–13 Notion + repo versions — superseded.

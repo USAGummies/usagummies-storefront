@@ -8,7 +8,7 @@
 
 ## Where the build is right now
 
-**Test suite:** 1,958 green (131 files). **Workflow blueprint:** v1.60. **Latest baseline:** `cb2cba4 feat(brief): Phase 32.1.b composer signals section`.
+**Test suite:** 1,958 green (131 files). **Workflow blueprint:** v1.61. **Latest baseline:** `6c2fafd feat(brief): Phase 32.1.c daily-brief signals wireup`. **Viktor briefing:** `/contracts/viktor-rene-briefing.md` v1.0 (W-8 Rene system Q&A wired into Viktor boot ritual).
 
 **Active build directive (Ben 2026-04-27):** "build the entire system tested." Working through Phase 28L → 29 → 30 → 31 autonomously. See workflow-blueprint.md §"Top P0 build items" for the full queue.
 
@@ -70,6 +70,9 @@
 
 **Print artifact rule (Ben 2026-04-27, "this needs to be fixed fucking now"):**
 Every shipping label print MUST be a 2-page PDF — page 1 the label, page 2 the packing slip with correct quantities + product name. **One click = both pages.** Implementation: `mergeLabelAndSlipPdf` in `src/lib/ops/packing-slip-pdf.ts`, called by the auto-ship route BEFORE the Slack upload. No thread reply on the happy path. No race condition possible. Falling back to label-only is permitted ONLY when merge fails (loud audit `artifact.label.merge-failed`); the slip then posts via the legacy thread-reply path with the Phase 28i+ retry chain.
+
+**Viktor briefing rule (Ben 2026-04-27, "viktor is up to date on the status of the build etc"):**
+Viktor reads [`/contracts/viktor-rene-briefing.md`](./viktor-rene-briefing.md) on every session boot (per `viktor.md` §10 step 2). That doc is auto-maintained by every commit cycle alongside this session-handoff. When Rene asks Viktor a free-form question (W-8), Viktor answers from the briefing + cites file paths. Never fabricates. Change requests log to Open Brain `rene-request:<id>` for Ben's next session.
 
 These are immutable. If the user asks to relax one, push back and reference this doc.
 
