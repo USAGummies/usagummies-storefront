@@ -49,6 +49,7 @@ const SELF_AUTHENTICATED_PREFIXES = [
   "/api/ops/stack-readiness", // STACK READINESS — external service health surface, Phase 28L.3 (isAuthorized session + CRON_SECRET)
   "/api/ops/uspto/", // USPTO — trademark tracking + deadline surface, Phase 31.1 (isAuthorized session + CRON_SECRET)
   "/api/ops/vendor/", // VENDOR PORTAL — operator-side token issuance + admin, Phase 31.2.a (isAuthorized session + CRON_SECRET). Note: the public /api/vendor/[token]/* routes are SEPARATE — they live under /api/vendor (no /ops/) and self-authenticate via HMAC.
+  "/api/ops/vendors/", // VENDOR ONBOARDING — /ops/vendors/new + onboard route (vendor.master.create Class B approvals to Rene). isAuthorized() (session OR CRON_SECRET) inside the route.
   "/api/ops/fulfillment", // FULFILLMENT — Unified ship-today queue (session or CRON_SECRET)
   "/api/ops/shipping/", // SHIPPING — Unified auto-ship pipeline (session or CRON_SECRET)
   "/api/ops/ap-packets", // AP PACKETS — vendor setup reply pipeline (Gmail send with dedup + approval gate). No trailing slash so both /ap-packets and /ap-packets/send match.
