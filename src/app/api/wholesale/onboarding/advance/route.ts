@@ -47,6 +47,7 @@ import {
   newOnboardingState,
   nextStep,
   sideEffectsForStep,
+  type OnboardingState,
   type OnboardingStep,
 } from "@/lib/wholesale/onboarding-flow";
 import {
@@ -54,6 +55,11 @@ import {
   mintFlowId,
   saveOnboardingState,
 } from "@/lib/wholesale/onboarding-store";
+import {
+  dispatchSideEffects,
+  type DispatchOutcome,
+} from "@/lib/wholesale/onboarding-dispatch";
+import { buildProdDispatchDeps } from "@/lib/wholesale/onboarding-dispatch-prod";
 
 interface AdvanceRequestBody {
   flowId?: string;
@@ -146,10 +152,42 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 
-  // Persist. If KV is hard-down, return 500 — but log the state
-  // transition the caller saw so it's debuggable.
+  // Compute side effects for this transition + dispatch them.
+  // Failures don't abort; outcomes are surfaced in the response.
+  const effects = sideEffectsForStep(step, nextState);
+  let dispatchResult;
   try {
-    await saveOnboardingState(nextState);
+    dispatchResult = await dispatchSideEffects(
+      nextState,
+      effects,
+      buildProdDispatchDeps(),
+    );
+  } catch (err) {
+    // Dispatcher itself is wrapped in try/catch per-effect, so this
+    // catches only the very-rare "buildProdDispatchDeps threw" case.
+    return json(
+      {
+        ok: false,
+        errors: [
+          `dispatcher failed: ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        ],
+        flowId,
+      },
+      500,
+    );
+  }
+
+  // Capture upstream output ids back into state (so subsequent steps
+  // can reference them — e.g. hubspot.advance-stage needs the dealId
+  // captured at create-deal). This is the "fold dispatch outputs into
+  // state" half of the two-phase pattern.
+  const finalState = applyDispatchOutputs(nextState, dispatchResult.outcomes);
+
+  // Persist. If KV is hard-down, return 500.
+  try {
+    await saveOnboardingState(finalState);
   } catch (err) {
     return json(
       {
@@ -168,9 +206,41 @@ export async function POST(request: Request): Promise<NextResponse> {
   return json({
     ok: true,
     flowId,
-    currentStep: nextState.currentStep,
-    nextStep: nextStep(nextState),
-    stepsCompleted: nextState.stepsCompleted,
-    sideEffectsPending: sideEffectsForStep(step, nextState),
+    currentStep: finalState.currentStep,
+    nextStep: nextStep(finalState),
+    stepsCompleted: finalState.stepsCompleted,
+    // Effects emitted from the state machine for this step (a function
+    // of state — useful for the client to know what was attempted).
+    sideEffectsPending: effects,
+    // What actually fired and what came back from each handler.
+    sideEffectsDispatched: dispatchResult.outcomes,
+    sideEffectsSummary: {
+      success: dispatchResult.successCount,
+      failed: dispatchResult.failureCount,
+    },
   });
+}
+
+/**
+ * Fold dispatcher outputs (contactId, dealId, approvalId) back into
+ * the OnboardingState so subsequent steps can reference them.
+ */
+function applyDispatchOutputs(
+  state: OnboardingState,
+  outcomes: readonly DispatchOutcome[],
+): OnboardingState {
+  let next = state;
+  for (const o of outcomes) {
+    if (!o.ok) continue;
+    if (o.kind === "hubspot.create-deal" && typeof o.output?.dealId === "string") {
+      next = { ...next, hubspotDealId: o.output.dealId };
+    }
+    if (
+      o.kind === "qbo.vendor-master-create.stage-approval" &&
+      typeof o.output?.approvalId === "string"
+    ) {
+      next = { ...next, qboCustomerApprovalId: o.output.approvalId };
+    }
+  }
+  return next;
 }

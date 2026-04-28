@@ -30,8 +30,48 @@ vi.mock("@vercel/kv", () => ({
   },
 }));
 
+// Mock the prod-deps factory so the route doesn't call real HubSpot /
+// Slack / Gmail in tests. We hand back a no-op DispatchDeps where
+// every handler returns ok:true. Specific tests that need to assert
+// dispatch behavior swap individual handlers via the `__setDispatchDeps`
+// hook below.
+const dispatchDepsCurrent: { value: unknown } = {
+  value: undefined,
+};
+function makeDefaultDeps() {
+  return {
+    hubspotUpsertContact: vi.fn(async () => ({
+      ok: true as const,
+      contactId: "C-test",
+    })),
+    hubspotCreateDeal: vi.fn(async () => ({
+      ok: true as const,
+      dealId: "D-test",
+    })),
+    hubspotAdvanceStage: vi.fn(async () => ({ ok: true as const })),
+    hubspotSetOnboardingComplete: vi.fn(async () => ({ ok: true as const })),
+    kvArchiveInquiry: vi.fn(async () => ({ ok: true as const })),
+    kvWriteOrderCaptured: vi.fn(async () => ({ ok: true as const })),
+    slackPostFinancialsNotif: vi.fn(async () => ({
+      ok: true as const,
+      ts: "1.2",
+    })),
+    apPacketSend: vi.fn(async () => ({ ok: true as const })),
+    qboStageVendorMasterApproval: vi.fn(async () => ({
+      ok: true as const,
+      approvalId: "A-test",
+    })),
+    auditFlowComplete: vi.fn(async () => ({ ok: true as const })),
+  };
+}
+
+vi.mock("@/lib/wholesale/onboarding-dispatch-prod", () => ({
+  buildProdDispatchDeps: () => dispatchDepsCurrent.value ?? makeDefaultDeps(),
+}));
+
 beforeEach(() => {
   store.clear();
+  dispatchDepsCurrent.value = undefined;
 });
 
 afterEach(() => {
@@ -53,6 +93,13 @@ interface AdvanceResponse {
   nextStep?: string | null;
   stepsCompleted?: string[];
   sideEffectsPending?: { kind: string }[];
+  sideEffectsDispatched?: {
+    kind: string;
+    ok: boolean;
+    error?: string;
+    output?: Record<string, unknown>;
+  }[];
+  sideEffectsSummary?: { success: number; failed: number };
   errors?: string[];
 }
 
@@ -353,6 +400,127 @@ describe("POST /api/wholesale/onboarding/advance — AP path end-to-end", () => 
     expect(
       last.sideEffectsPending?.map((e) => e.kind),
     ).toContain("audit.flow-complete");
+  });
+});
+
+describe("POST /api/wholesale/onboarding/advance — dispatcher integration", () => {
+  it("calls each handler for every effect of the step", async () => {
+    const deps = makeDefaultDeps();
+    dispatchDepsCurrent.value = deps;
+    const { POST } = await import("../route");
+    await POST(
+      buildReq({
+        step: "info",
+        payload: {
+          companyName: "Acme",
+          contactName: "Jane",
+          contactEmail: "jane@acme.test",
+        },
+      }),
+    );
+    expect(deps.hubspotUpsertContact).toHaveBeenCalledTimes(1);
+    expect(deps.hubspotCreateDeal).toHaveBeenCalledTimes(1);
+    expect(deps.kvArchiveInquiry).toHaveBeenCalledTimes(1);
+  });
+
+  it("response includes sideEffectsDispatched outcomes + summary", async () => {
+    const { POST } = await import("../route");
+    const res = await POST(
+      buildReq({
+        step: "info",
+        payload: {
+          companyName: "Acme",
+          contactName: "Jane",
+          contactEmail: "jane@acme.test",
+        },
+      }),
+    );
+    const body = (await res.json()) as AdvanceResponse;
+    expect(body.sideEffectsDispatched).toBeDefined();
+    expect(body.sideEffectsSummary?.success).toBeGreaterThan(0);
+    const kinds = body.sideEffectsDispatched?.map((o) => o.kind) ?? [];
+    expect(kinds).toContain("hubspot.upsert-contact");
+    expect(kinds).toContain("hubspot.create-deal");
+  });
+
+  it("captures hubspotDealId from create-deal output and persists it for the next step", async () => {
+    const deps = makeDefaultDeps();
+    dispatchDepsCurrent.value = deps;
+    const { POST } = await import("../route");
+    const r1 = await POST(
+      buildReq({
+        step: "info",
+        payload: {
+          companyName: "Acme",
+          contactName: "Jane",
+          contactEmail: "jane@acme.test",
+        },
+      }),
+    );
+    const b1 = (await r1.json()) as AdvanceResponse;
+
+    // Walk to order-captured to trigger hubspot.advance-stage which
+    // requires hubspotDealId on state.
+    await POST(
+      buildReq({
+        flowId: b1.flowId,
+        step: "store-type",
+        payload: { storeType: "specialty-retail" },
+      }),
+    );
+    await POST(
+      buildReq({ flowId: b1.flowId, step: "pricing-shown", payload: {} }),
+    );
+    await POST(
+      buildReq({
+        flowId: b1.flowId,
+        step: "order-type",
+        payload: { tier: "B2", unitCount: 3 },
+      }),
+    );
+    await POST(
+      buildReq({
+        flowId: b1.flowId,
+        step: "payment-path",
+        payload: { paymentPath: "credit-card" },
+      }),
+    );
+    await POST(
+      buildReq({ flowId: b1.flowId, step: "order-captured", payload: {} }),
+    );
+
+    // hubspotAdvanceStage should have been called with the dealId
+    // captured at create-deal (D-test).
+    const advanceCalls = (
+      deps.hubspotAdvanceStage as ReturnType<typeof vi.fn>
+    ).mock.calls;
+    expect(advanceCalls.length).toBeGreaterThan(0);
+    expect(advanceCalls[0][0].dealId).toBe("D-test");
+  });
+
+  it("a failed dispatch effect surfaces in sideEffectsDispatched but does not block the response", async () => {
+    const deps = makeDefaultDeps() as unknown as Record<string, unknown>;
+    deps.kvArchiveInquiry = vi.fn(async () => ({
+      ok: false as const,
+      error: "kv down",
+    }));
+    dispatchDepsCurrent.value = deps;
+    const { POST } = await import("../route");
+    const res = await POST(
+      buildReq({
+        step: "info",
+        payload: {
+          companyName: "Acme",
+          contactName: "Jane",
+          contactEmail: "jane@acme.test",
+        },
+      }),
+    );
+    expect(res.status).toBe(200); // route still 200s
+    const body = (await res.json()) as AdvanceResponse;
+    expect(body.sideEffectsSummary?.failed).toBeGreaterThan(0);
+    const failed = body.sideEffectsDispatched?.find((o) => !o.ok);
+    expect(failed?.error).toMatch(/kv down/);
   });
 });
 

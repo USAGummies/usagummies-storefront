@@ -21,6 +21,32 @@ vi.mock("@vercel/kv", () => ({
   },
 }));
 
+// Mock the prod-deps factory so the round-trip test (which uses the
+// advance route to seed state) doesn't hit real HubSpot/Slack.
+vi.mock("@/lib/wholesale/onboarding-dispatch-prod", () => ({
+  buildProdDispatchDeps: () => ({
+    hubspotUpsertContact: vi.fn(async () => ({
+      ok: true as const,
+      contactId: "C-x",
+    })),
+    hubspotCreateDeal: vi.fn(async () => ({
+      ok: true as const,
+      dealId: "D-x",
+    })),
+    hubspotAdvanceStage: vi.fn(async () => ({ ok: true as const })),
+    hubspotSetOnboardingComplete: vi.fn(async () => ({ ok: true as const })),
+    kvArchiveInquiry: vi.fn(async () => ({ ok: true as const })),
+    kvWriteOrderCaptured: vi.fn(async () => ({ ok: true as const })),
+    slackPostFinancialsNotif: vi.fn(async () => ({ ok: true as const })),
+    apPacketSend: vi.fn(async () => ({ ok: true as const })),
+    qboStageVendorMasterApproval: vi.fn(async () => ({
+      ok: true as const,
+      approvalId: "A-x",
+    })),
+    auditFlowComplete: vi.fn(async () => ({ ok: true as const })),
+  }),
+}));
+
 beforeEach(() => {
   store.clear();
 });
