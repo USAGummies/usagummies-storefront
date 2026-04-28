@@ -334,7 +334,11 @@ export async function POST(req: Request) {
   // confirmed member) with a loud diagnostic so the operator sees
   // the failure path and can invite the bot to #financials.
   const FINANCIALS_CHANNEL_ID = "C0AKG9FSC2J";
-  const FALLBACK_CHANNEL = "#abra-control"; // bot confirmed-member here
+  // Fallback: DM Ben directly. The bot can DM any workspace user
+  // without needing a channel-membership invite. `#abra-control`
+  // would have worked but was archived on 2026-04-19. DM is more
+  // reliable + louder (lands in Ben's "DMs from apps" badge).
+  const FALLBACK_DM_USER_ID = "U08JY86Q508"; // Ben
   if (intent === "wholesale" && (email || phone)) {
     const headline = `:wave: *New wholesale lead* — ${storeName || buyerName || email || "(no name)"}`;
     const interestLabel = INTEREST_LABELS[interest] || interest || "(none)";
@@ -359,23 +363,23 @@ export async function POST(req: Request) {
       });
       if (!res.ok) {
         // Loud diagnostic — most likely cause is `not_in_channel`
-        // (bot needs to be invited to #financials). Fallback-post
-        // to a channel the bot IS in so the operator sees the
-        // failure.
+        // (bot needs to be invited to #financials). Fallback to a
+        // direct DM to Ben so the operator gets the notification
+        // even when channel-posting is blocked.
         console.error(
-          `[leads] Slack post to #financials failed: ${res.error}. Bot likely needs invite to channel ${FINANCIALS_CHANNEL_ID}.`,
+          `[leads] Slack post to #financials failed: ${res.error}. Bot likely needs invite to channel ${FINANCIALS_CHANNEL_ID}. Falling back to DM Ben.`,
         );
         try {
           await postMessage({
-            channel: FALLBACK_CHANNEL,
+            channel: FALLBACK_DM_USER_ID,
             text:
-              `:rotating_light: *Wholesale lead notification fell back to #abra-control*\n` +
+              `:rotating_light: *Wholesale lead notification — DM fallback*\n` +
               `Tried to post to #financials (\`${FINANCIALS_CHANNEL_ID}\`) but got \`${res.error || "unknown error"}\`. ` +
-              `Most likely fix: invite the bot to #financials (Slack channel settings → Integrations → Add app → USA Gummies bot).\n\n` +
+              `Fix: invite the bot to #financials (in the channel: \`/invite @USA Gummies Ops\`, OR Settings → Integrations → Add an App → USA Gummies Ops).\n\n` +
               `*Original notification below:*\n${text}`,
           });
         } catch {
-          /* fallback also failed; lead is still captured server-side */
+          /* DM also failed; lead is still captured server-side via HubSpot + Notion + KV */
         }
       }
     } catch (err) {
