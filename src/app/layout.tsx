@@ -39,6 +39,13 @@ const GOOGLE_ADS_CONVERSION_SEND_TO =
   "AW-17658867475/DvHdCO3n7KIcEJPes-RB";
 const GOOGLE_SITE_VERIFICATION = process.env.NEXT_PUBLIC_GSC_VERIFICATION?.trim();
 const META_PIXEL_ID = "26033875762978520";
+// Shopify storefront also has its own pixel (664545086717590) which fires
+// AddToCart/InitiateCheckout/Purchase from the Shopify checkout flow. To
+// give Meta full upstream signal on that pixel (so Sales-objective ad sets
+// can optimize), we also init it on the website. Then site events
+// (PageView, ViewContent) fire to BOTH pixels. Confirmed 2026-04-28 by
+// checking ad-set promoted_object.pixel_id mapping.
+const META_PIXEL_ID_SHOPIFY = "664545086717590";
 // Microsoft Clarity project for usagummies.com. Safe default so session
 // replays, heatmaps, and rage-click detection fire even if Vercel env is
 // empty. Dashboard: https://clarity.microsoft.com/projects/view/w9qsgk41dp
@@ -120,6 +127,7 @@ function MetaPixel() {
             s.parentNode.insertBefore(t,s)}(window, document,'script',
             'https://connect.facebook.net/en_US/fbevents.js');
             fbq('init', '${META_PIXEL_ID}');
+            fbq('init', '${META_PIXEL_ID_SHOPIFY}');
             fbq('track', 'PageView');
           `,
         }}
