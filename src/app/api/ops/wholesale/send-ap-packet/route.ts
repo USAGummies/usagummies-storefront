@@ -64,6 +64,16 @@ interface RequestBody {
     totalUsdOverride?: number;
     personalNote?: string;
   };
+  /**
+   * Optional per-call override of bundle Drive IDs. Lets explicit-
+   * context callers (one-off sends like first-customer Mike) skip
+   * Vercel env config and pass the IDs inline.
+   */
+  attachmentBundleOverride?: {
+    ncs001Id?: string;
+    cif001Id?: string;
+    welcomeId?: string;
+  };
 }
 
 export async function POST(req: Request): Promise<Response> {
@@ -126,6 +136,7 @@ export async function POST(req: Request): Promise<Response> {
     state,
     template: "wholesale-ap",
     invoiceContext: body.invoiceContext,
+    attachmentBundleOverride: body.attachmentBundleOverride,
   });
 
   if (!result.ok) {

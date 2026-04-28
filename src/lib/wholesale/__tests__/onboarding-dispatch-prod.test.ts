@@ -81,6 +81,7 @@ vi.mock("@vercel/kv", () => ({
 import {
   __INTERNAL,
   buildProdDispatchDeps,
+  sendWholesaleApPacket,
 } from "../onboarding-dispatch-prod";
 
 beforeEach(() => {
@@ -534,6 +535,58 @@ describe("apPacketSend — wired (Phase 35.f.3.c)", () => {
     });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error).toMatch(/bundle not configured/);
+  });
+
+  // Note: attachmentBundleOverride is on the explicit-context
+  // `sendWholesaleApPacket` helper, NOT the dispatcher's
+  // `DispatchDeps.apPacketSend` contract (which is intentionally
+  // narrow for state-machine fired sends). Tests call the helper
+  // directly to exercise the override path.
+
+  it("attachmentBundleOverride takes priority over env vars", async () => {
+    // Env says fake-default-* but override should win.
+    process.env.WHOLESALE_AP_PACKET_NCS001_DRIVE_ID = "fake-default-ncs";
+    process.env.WHOLESALE_AP_PACKET_CIF001_DRIVE_ID = "fake-default-cif";
+    mockSuccessfulDriveFetches();
+    mockSuccessfulGmailSend();
+    writeAuditEnvelopeMock.mockResolvedValue(undefined);
+    await sendWholesaleApPacket({
+      state: buildStateWithOrder(),
+      template: "wholesale-ap",
+      attachmentBundleOverride: {
+        ncs001Id: "override-ncs-id",
+        cif001Id: "override-cif-id",
+      },
+    });
+    expect(fetchDriveFileMock).toHaveBeenCalledWith({
+      kind: "file",
+      fileId: "override-ncs-id",
+    });
+    expect(fetchDriveFileMock).toHaveBeenCalledWith({
+      kind: "file",
+      fileId: "override-cif-id",
+    });
+    expect(fetchDriveFileMock).not.toHaveBeenCalledWith({
+      kind: "file",
+      fileId: "fake-default-ncs",
+    });
+  });
+
+  it("attachmentBundleOverride works when env vars are unset (Mike's path)", async () => {
+    delete process.env.WHOLESALE_AP_PACKET_NCS001_DRIVE_ID;
+    delete process.env.WHOLESALE_AP_PACKET_CIF001_DRIVE_ID;
+    mockSuccessfulDriveFetches();
+    mockSuccessfulGmailSend();
+    writeAuditEnvelopeMock.mockResolvedValue(undefined);
+    const r = await sendWholesaleApPacket({
+      state: buildStateWithOrder(),
+      template: "wholesale-ap",
+      attachmentBundleOverride: {
+        ncs001Id: "1yDFMzCW1WpUbGsBZKq4g9NsIboc-syvJ",
+        cif001Id: "1mfLMyDsAN5MfFb5TKk_xvR0eP9i3B2bB",
+      },
+    });
+    expect(r.ok).toBe(true);
   });
 
   it("ok:false when prospect missing", async () => {

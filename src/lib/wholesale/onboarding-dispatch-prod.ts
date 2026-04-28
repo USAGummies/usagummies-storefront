@@ -369,6 +369,27 @@ interface SendWholesaleApPacketParams {
     totalUsdOverride?: number;
     personalNote?: string;
   };
+  /**
+   * Optional per-call override of the bundle Drive file IDs.
+   *
+   * Used by the explicit-context route (`POST /api/ops/wholesale/
+   * send-ap-packet`) for one-off sends where the operator wants to
+   * skip Vercel env config (e.g. first-customer Mike where the
+   * agents resolved the Drive IDs in real time).
+   *
+   * State-machine fired sends always use env defaults — the override
+   * is for explicit-context callers only.
+   *
+   * If both `ncs001Id` and `cif001Id` are provided, env vars are
+   * ignored entirely. If only some are provided, env still fills
+   * the gaps (defensive — partial-override is unlikely but cheap
+   * to support).
+   */
+  attachmentBundleOverride?: {
+    ncs001Id?: string;
+    cif001Id?: string;
+    welcomeId?: string;
+  };
 }
 
 /**
@@ -412,14 +433,21 @@ export async function sendWholesaleApPacket(
     };
   }
 
-  // 2. Resolve attachment Drive IDs. Env defaults; explicit override
-  //    via invoiceContext.invoiceDriveFileId for the invoice draft.
-  const bundle = readBundleIdsFromEnv();
+  // 2. Resolve attachment Drive IDs. Per-call override takes priority
+  //    (explicit-context route use case); env vars fill any gaps.
+  const envBundle = readBundleIdsFromEnv();
+  const override = params.attachmentBundleOverride ?? {};
+  const bundle = {
+    ncs001Id: (override.ncs001Id ?? envBundle.ncs001Id ?? "").trim() || null,
+    cif001Id: (override.cif001Id ?? envBundle.cif001Id ?? "").trim() || null,
+    welcomeId:
+      (override.welcomeId ?? envBundle.welcomeId ?? "").trim() || null,
+  };
   if (!bundle.ncs001Id || !bundle.cif001Id) {
     return {
       ok: false,
       error:
-        "wholesale-ap bundle not configured — set WHOLESALE_AP_PACKET_NCS001_DRIVE_ID and WHOLESALE_AP_PACKET_CIF001_DRIVE_ID on Vercel",
+        "wholesale-ap bundle not configured — set WHOLESALE_AP_PACKET_NCS001_DRIVE_ID and WHOLESALE_AP_PACKET_CIF001_DRIVE_ID on Vercel, or pass attachmentBundleOverride with both ncs001Id + cif001Id",
     };
   }
 
