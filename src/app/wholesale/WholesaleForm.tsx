@@ -54,9 +54,9 @@ export function WholesaleForm() {
     return (
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-5 text-center space-y-2">
         <div className="text-2xl">🎉</div>
-        <div className="text-sm font-black text-[var(--text)]">Request received!</div>
-        <p className="text-xs text-[var(--muted)]">
-          We&rsquo;ll send wholesale pricing to your inbox within 24 hours.
+        <div className="text-base font-black text-[var(--text)]">Request received!</div>
+        <p className="text-sm text-[var(--text)]/80 leading-relaxed">
+          A confirmation email is on the way. <strong>If you don&rsquo;t see it in a few minutes, please check your spam or promotions folder</strong> &mdash; first-time senders sometimes land there. We&rsquo;ll follow up with wholesale pricing within 24 hours.
         </p>
       </div>
     );

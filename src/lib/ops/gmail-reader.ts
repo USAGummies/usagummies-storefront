@@ -582,8 +582,36 @@ export type SendGmailOpts = {
  *   - Any attachments                → multipart/mixed with an
  *                                       alternative part inside
  */
+/**
+ * RFC 2047-encode a header value if it contains non-ASCII characters.
+ * Without this, characters like em-dash (U+2014), curly quotes, and
+ * accented letters render as garbled mojibake in many mail clients
+ * AND increase the spam-flag risk because raw 8-bit bytes in
+ * headers violate RFC 5322.
+ *
+ * Format: `=?UTF-8?B?<base64-of-utf8-bytes>?=` — the standard encoded-
+ * word form Gmail / Outlook / iOS Mail all decode correctly.
+ *
+ * Pure ASCII passes through unchanged.
+ *
+ * Locked by Rene's 2026-04-27 walkthrough: an em-dash in the
+ * `lead.auto-ack` subject was rendering as garbled bytes at the top
+ * of the email, contributing to both spam-flagging + a confusing
+ * "weird writing" UX.
+ */
+function encodeHeaderRfc2047(value: string): string {
+  // Fast path: pure ASCII (codepoints 32-126 + tab) needs no encoding.
+  // eslint-disable-next-line no-control-regex
+  if (/^[\x20-\x7E\t]*$/.test(value)) return value;
+  const b64 = Buffer.from(value, "utf8").toString("base64");
+  return `=?UTF-8?B?${b64}?=`;
+}
+
 function buildRawEmail(opts: SendGmailOpts): string {
-  const from = opts.from || "Ben Stutman <ben@usagummies.com>";
+  const from = encodeHeaderRfc2047(
+    opts.from || "Ben Stutman <ben@usagummies.com>",
+  );
+  const subject = encodeHeaderRfc2047(opts.subject ?? "");
   const hasAttachments = Array.isArray(opts.attachments) && opts.attachments.length > 0;
   const hasHtml = typeof opts.htmlBody === "string" && opts.htmlBody.length > 0;
 
@@ -596,7 +624,7 @@ function buildRawEmail(opts: SendGmailOpts): string {
       ...(opts.bcc ? [`Bcc: ${opts.bcc}`] : []),
       ...(opts.inReplyTo ? [`In-Reply-To: ${opts.inReplyTo}`] : []),
       ...(opts.references ? [`References: ${opts.references}`] : []),
-      `Subject: ${opts.subject}`,
+      `Subject: ${subject}`,
       "MIME-Version: 1.0",
       "Content-Type: text/plain; charset=UTF-8",
       "",
@@ -642,7 +670,7 @@ function buildRawEmail(opts: SendGmailOpts): string {
       ...(opts.bcc ? [`Bcc: ${opts.bcc}`] : []),
       ...(opts.inReplyTo ? [`In-Reply-To: ${opts.inReplyTo}`] : []),
       ...(opts.references ? [`References: ${opts.references}`] : []),
-      `Subject: ${opts.subject}`,
+      `Subject: ${subject}`,
       "MIME-Version: 1.0",
       ...bodyBlock,
     ];
@@ -678,7 +706,7 @@ function buildRawEmail(opts: SendGmailOpts): string {
     ...(opts.bcc ? [`Bcc: ${opts.bcc}`] : []),
     ...(opts.inReplyTo ? [`In-Reply-To: ${opts.inReplyTo}`] : []),
     ...(opts.references ? [`References: ${opts.references}`] : []),
-    `Subject: ${opts.subject}`,
+    `Subject: ${subject}`,
     "MIME-Version: 1.0",
     `Content-Type: multipart/mixed; boundary="${mixBoundary}"`,
     "",

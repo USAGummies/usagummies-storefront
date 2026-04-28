@@ -408,15 +408,21 @@ export async function POST(req: Request) {
   if (intent === "wholesale" && email) {
     const recipientName =
       buyerName.trim() || (storeName.trim() ? storeName.trim() : "there");
-    const subject = "We got your wholesale inquiry — USA Gummies";
+    // Subject + body use plain ASCII only. Earlier versions had a
+    // unicode em-dash (U+2014) in the subject which caused two
+    // problems Rene flagged 2026-04-27: (a) garbled "weird writing"
+    // at the top of the email when the recipient client didn't
+    // RFC-2047-decode the Subject; (b) elevated spam-flag risk.
+    // ASCII-only subjects sail through.
+    const subject = "We received your wholesale inquiry";
     const textBody = [
       `Hi ${recipientName},`,
       "",
-      "Thanks for your wholesale inquiry on USA Gummies. We received your request and our team will follow up within 24 hours with pricing, MOQs, and lead times tailored to your volume + freight preferences.",
+      "Thanks for your wholesale inquiry on USA Gummies. We received your request and our team will follow up within 24 hours with pricing, MOQs, and lead times tailored to your volume and freight preferences.",
       "",
       "If you have any questions in the meantime, just reply to this email.",
       "",
-      "— Ben Stutman",
+      "Ben Stutman",
       "USA Gummies",
       "ben@usagummies.com",
     ].join("\n");
