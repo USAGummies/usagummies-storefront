@@ -218,12 +218,19 @@ export default async function OpsWholesaleOnboardingPage({
                   </td>
                   <td className="p-2">
                     <Link
+                      href={`/ops/wholesale/flow/${encodeURIComponent(r.flowId)}`}
+                      className="text-xs text-blue-700 underline"
+                    >
+                      detail
+                    </Link>
+                    {" · "}
+                    <Link
                       href={`/wholesale/order?flowId=${encodeURIComponent(r.flowId)}`}
                       className="text-xs text-blue-700 underline"
                       target="_blank"
                       rel="noopener noreferrer"
                     >
-                      open ↗
+                      as customer ↗
                     </Link>
                   </td>
                 </tr>

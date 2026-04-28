@@ -39,7 +39,6 @@
 import {
   isPricingTier,
   onlineTiers,
-  shouldUseCustomFreightQuote,
   summarizeOrderLine,
   type OrderLineSummary,
   type PricingTier,

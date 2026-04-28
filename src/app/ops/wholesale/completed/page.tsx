@@ -213,7 +213,14 @@ export default async function OpsWholesaleCompletedPage({
                   <td className="p-2 font-mono text-xs">
                     {e.hubspotDealId ?? "—"}
                   </td>
-                  <td className="p-2 font-mono text-xs">{e.flowId}</td>
+                  <td className="p-2 font-mono text-xs">
+                    <Link
+                      href={`/ops/wholesale/flow/${encodeURIComponent(e.flowId)}`}
+                      className="text-blue-700 underline"
+                    >
+                      {e.flowId}
+                    </Link>
+                  </td>
                 </tr>
               ))}
             </tbody>
