@@ -16,6 +16,7 @@ import { GuaranteeBlock } from "@/components/lp/GuaranteeBlock";
 import { FaqAccordion } from "@/components/lp/FaqAccordion";
 import { StickyBuyBar } from "@/components/lp/StickyBuyBar";
 import { ReviewHighlights } from "@/components/reviews/ReviewHighlights";
+import ProductViewTracker from "@/components/tracking/ProductViewTracker.client";
 
 import { GuideCard } from "@/components/internal-links/GuideCard";
 import { LinkModule } from "@/components/internal-links/LinkModule";
@@ -216,6 +217,19 @@ export default async function ShopPage() {
           { name: "Home", href: "/" },
           { name: "Shop", href: "/shop" },
         ]}
+      />
+
+      {/* Fire Meta ViewContent on /shop page load (2026-04-28). Until
+       * this was added, the pixel only fired ViewContent on
+       * /products/[handle] which our cold-ad traffic never visits — they
+       * all land on /shop. Without ViewContent signal, Meta couldn't
+       * optimize Sales-objective ad sets and view_content stuck at 1
+       * despite 240+ landing_page_views from the ads. */}
+      <ProductViewTracker
+        productId={SINGLE_BAG_SKU}
+        productName="All American Gummy Bears - 7.5 oz Bag"
+        price={BASE_PRICE}
+        currency="USD"
       />
 
       <HeroSection />
