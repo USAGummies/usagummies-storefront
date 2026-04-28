@@ -462,3 +462,139 @@ export type SideEffect =
   | { kind: "ap-packet.send"; template: "wholesale-ap" }
   | { kind: "qbo.vendor-master-create.stage-approval" }
   | { kind: "audit.flow-complete" };
+
+// ---------------------------------------------------------------------------
+// Route-layer bridge — fold a request payload into the state.
+// ---------------------------------------------------------------------------
+
+/**
+ * Result of `applyStepPayload`. On success, `mutator` is a pure
+ * fn that the route layer hands to `advanceStep` to fold the
+ * step-specific data into the OnboardingState. On failure, the
+ * route returns 400 with `errors` + does not advance the cursor.
+ */
+export type ApplyStepResult =
+  | {
+      ok: true;
+      mutator?: (s: OnboardingState) => Partial<OnboardingState>;
+    }
+  | { ok: false; errors: readonly string[] };
+
+/**
+ * Translate an untrusted-from-the-wire `payload` into a
+ * step-specific state mutator. Pure — no I/O. Validates per-step
+ * shape via the existing `validate*` helpers.
+ *
+ * Steps that have no payload (`pricing-shown`, `order-captured`,
+ * `ap-email-sent`, `qbo-customer-staged`, `crm-updated`) accept
+ * `payload === undefined` and return a no-op mutator. The route
+ * layer never lets the client drive those steps directly — they
+ * fire as server-side transitions after the data-bearing step
+ * completes.
+ *
+ * **Defense:** order-type step rejects B1 via `validateOrderLine`,
+ * so an attacker can't sneak the internal-only tier through this
+ * surface even if they know the slug.
+ */
+export function applyStepPayload(
+  step: OnboardingStep,
+  payload: unknown,
+): ApplyStepResult {
+  const p = (payload ?? {}) as Record<string, unknown>;
+
+  switch (step) {
+    case "info": {
+      const v = validateProspectInfo(p.prospect ?? p);
+      if (!v.ok) return { ok: false, errors: v.errors };
+      const prospect = (p.prospect ?? p) as ProspectInfo;
+      return {
+        ok: true,
+        mutator: () => ({ prospect }),
+      };
+    }
+    case "store-type": {
+      const storeType = p.storeType;
+      if (
+        typeof storeType !== "string" ||
+        !(STORE_TYPES as readonly string[]).includes(storeType)
+      ) {
+        return {
+          ok: false,
+          errors: [
+            `storeType must be one of: ${STORE_TYPES.join(", ")}`,
+          ],
+        };
+      }
+      return {
+        ok: true,
+        mutator: () => ({ storeType: storeType as StoreType }),
+      };
+    }
+    case "pricing-shown": {
+      // No payload — just a "yes I saw it" advance.
+      return { ok: true };
+    }
+    case "order-type": {
+      const v = validateOrderLine(p.tier, p.unitCount);
+      if (!v.ok) return { ok: false, errors: v.errors };
+      const tier = p.tier as PricingTier;
+      const unitCount = p.unitCount as number;
+      return {
+        ok: true,
+        mutator: (s) => ({
+          orderLines: [...s.orderLines, summarizeOrderLine(tier, unitCount)],
+        }),
+      };
+    }
+    case "payment-path": {
+      const path = p.paymentPath;
+      if (path !== "credit-card" && path !== "accounts-payable") {
+        return {
+          ok: false,
+          errors: [
+            "paymentPath must be 'credit-card' or 'accounts-payable'",
+          ],
+        };
+      }
+      return {
+        ok: true,
+        mutator: () => ({ paymentPath: path }),
+      };
+    }
+    case "ap-info": {
+      const v = validateAPInfo(p.apInfo ?? p);
+      if (!v.ok) return { ok: false, errors: v.errors };
+      const apInfo = (p.apInfo ?? p) as APInfo;
+      return {
+        ok: true,
+        mutator: () => ({ apInfo }),
+      };
+    }
+    case "order-captured": {
+      // Server-internal transition — no client payload.
+      return { ok: true };
+    }
+    case "shipping-info": {
+      const v = validateShippingAddress(p.shippingAddress ?? p);
+      if (!v.ok) return { ok: false, errors: v.errors };
+      const shippingAddress = (p.shippingAddress ?? p) as ShippingAddress;
+      return {
+        ok: true,
+        mutator: () => ({ shippingAddress }),
+      };
+    }
+    case "ap-email-sent":
+    case "qbo-customer-staged":
+    case "crm-updated": {
+      // Server-internal transitions — no client payload, side
+      // effects fired by the dispatcher (Phase 35.f).
+      return { ok: true };
+    }
+    default: {
+      // Exhaustiveness guard — TS will flag a missing case if the
+      // OnboardingStep union grows without updating this switch.
+      const exhaustive: never = step;
+      return { ok: false, errors: [`unknown step: ${String(exhaustive)}`] };
+    }
+  }
+}

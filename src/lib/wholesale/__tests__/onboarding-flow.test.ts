@@ -23,6 +23,7 @@ import {
   STORE_TYPES,
   advanceStep,
   anyLineNeedsCustomFreight,
+  applyStepPayload,
   buildOrderLine,
   newOnboardingState,
   nextStep,
@@ -560,6 +561,176 @@ describe("sideEffectsForStep — non-effecting steps", () => {
     expect(sideEffectsForStep("payment-path", freshState())).toEqual([]);
     expect(sideEffectsForStep("ap-info", freshState())).toEqual([]);
     expect(sideEffectsForStep("shipping-info", freshState())).toEqual([]);
+  });
+});
+
+describe("applyStepPayload — info", () => {
+  it("accepts a prospect under either {prospect:{...}} OR flat shape", () => {
+    const nested = applyStepPayload("info", {
+      prospect: {
+        companyName: "Acme",
+        contactName: "Jane",
+        contactEmail: "jane@acme.test",
+      },
+    });
+    expect(nested.ok).toBe(true);
+
+    const flat = applyStepPayload("info", {
+      companyName: "Acme",
+      contactName: "Jane",
+      contactEmail: "jane@acme.test",
+    });
+    expect(flat.ok).toBe(true);
+  });
+
+  it("rejects missing required fields with structured errors", () => {
+    const r = applyStepPayload("info", { companyName: "Acme" });
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.errors.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("mutator folds prospect into state", () => {
+    const r = applyStepPayload("info", {
+      companyName: "Acme",
+      contactName: "Jane",
+      contactEmail: "jane@acme.test",
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok && r.mutator) {
+      const next = r.mutator(freshState());
+      expect(next.prospect?.companyName).toBe("Acme");
+    }
+  });
+});
+
+describe("applyStepPayload — store-type", () => {
+  it("accepts a valid storeType", () => {
+    const r = applyStepPayload("store-type", { storeType: "specialty-retail" });
+    expect(r.ok).toBe(true);
+  });
+
+  it("rejects unknown storeType", () => {
+    const r = applyStepPayload("store-type", { storeType: "supermarket-X" });
+    expect(r.ok).toBe(false);
+  });
+
+  it("rejects missing storeType", () => {
+    const r = applyStepPayload("store-type", {});
+    expect(r.ok).toBe(false);
+  });
+});
+
+describe("applyStepPayload — order-type", () => {
+  it("accepts B2 × 3 master cartons", () => {
+    const r = applyStepPayload("order-type", { tier: "B2", unitCount: 3 });
+    expect(r.ok).toBe(true);
+    if (r.ok && r.mutator) {
+      const next = r.mutator(freshState());
+      expect(next.orderLines?.length).toBe(1);
+      expect(next.orderLines?.[0].tier).toBe("B2");
+      expect(next.orderLines?.[0].bags).toBe(108);
+    }
+  });
+
+  it("rejects B1 (internal-only) at this surface", () => {
+    const r = applyStepPayload("order-type", { tier: "B1", unitCount: 1 });
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.errors[0]).toMatch(/INTERNAL only/);
+    }
+  });
+
+  it("rejects unitCount < 1", () => {
+    const r = applyStepPayload("order-type", { tier: "B2", unitCount: 0 });
+    expect(r.ok).toBe(false);
+  });
+
+  it("appends to existing order lines (multi-line support)", () => {
+    const r1 = applyStepPayload("order-type", { tier: "B2", unitCount: 1 });
+    expect(r1.ok).toBe(true);
+    let s = freshState();
+    if (r1.ok && r1.mutator) s = { ...s, ...r1.mutator(s) };
+    const r2 = applyStepPayload("order-type", { tier: "B4", unitCount: 1 });
+    expect(r2.ok).toBe(true);
+    if (r2.ok && r2.mutator) s = { ...s, ...r2.mutator(s) };
+    expect(s.orderLines.length).toBe(2);
+    expect(s.orderLines[0].tier).toBe("B2");
+    expect(s.orderLines[1].tier).toBe("B4");
+  });
+});
+
+describe("applyStepPayload — payment-path", () => {
+  it("accepts 'credit-card'", () => {
+    const r = applyStepPayload("payment-path", { paymentPath: "credit-card" });
+    expect(r.ok).toBe(true);
+  });
+
+  it("accepts 'accounts-payable'", () => {
+    const r = applyStepPayload("payment-path", {
+      paymentPath: "accounts-payable",
+    });
+    expect(r.ok).toBe(true);
+  });
+
+  it("rejects an unknown path", () => {
+    const r = applyStepPayload("payment-path", { paymentPath: "wire" });
+    expect(r.ok).toBe(false);
+  });
+});
+
+describe("applyStepPayload — ap-info", () => {
+  it("accepts apEmail-only (route packet to AP team)", () => {
+    const r = applyStepPayload("ap-info", {
+      apInfo: { apEmail: "ap@acme.test" },
+    });
+    expect(r.ok).toBe(true);
+  });
+
+  it("rejects missing both apEmail and self-fill", () => {
+    const r = applyStepPayload("ap-info", { apInfo: {} });
+    expect(r.ok).toBe(false);
+  });
+});
+
+describe("applyStepPayload — shipping-info", () => {
+  it("accepts a complete address", () => {
+    const r = applyStepPayload("shipping-info", {
+      shippingAddress: {
+        street1: "123 Main St",
+        city: "Austin",
+        state: "TX",
+        postalCode: "78701",
+        country: "US",
+      },
+    });
+    expect(r.ok).toBe(true);
+  });
+
+  it("rejects a partial address", () => {
+    const r = applyStepPayload("shipping-info", {
+      shippingAddress: { street1: "123 Main St", city: "Austin" },
+    });
+    expect(r.ok).toBe(false);
+  });
+});
+
+describe("applyStepPayload — server-internal steps accept empty payload", () => {
+  it("returns ok with no mutator for pricing-shown", () => {
+    const r = applyStepPayload("pricing-shown", {});
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.mutator).toBeUndefined();
+  });
+
+  it("returns ok for order-captured (no client data)", () => {
+    expect(applyStepPayload("order-captured", undefined).ok).toBe(true);
+  });
+
+  it("returns ok for ap-email-sent / qbo-customer-staged / crm-updated", () => {
+    expect(applyStepPayload("ap-email-sent", undefined).ok).toBe(true);
+    expect(applyStepPayload("qbo-customer-staged", undefined).ok).toBe(true);
+    expect(applyStepPayload("crm-updated", undefined).ok).toBe(true);
   });
 });
 
