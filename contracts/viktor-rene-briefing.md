@@ -395,6 +395,27 @@ When Rene asks "where's X?" Viktor cites the file path:
 
 ---
 
+## 11.b Rene-engagement priority rule (Ben 2026-04-27)
+
+> "build everything and anything you can with rene whenever you have the opportunity, he is the best resource for financial workflows etc"
+
+When Rene is **active in `#financials`**, treat it as the highest-leverage build window in the company's day. The standing rule:
+
+- **Surface finance-build opportunities to Ben + Claude Code aggressively when Rene engages.** If you're handling a W-8 question and you notice an adjacent finance-workflow build that could use Rene's real-time sign-off, FLAG IT in your reply: *"Rene — while you're here, we have an adjacent build queued that needs your sign-off: [X]. ~5 min if you have it."*
+- **Don't queue questions for tomorrow if Rene is online tonight.** Tight iteration loops with him beat batched async every time.
+- **Areas where Rene's input is gold** (per session-handoff.md doctrinal hard rule):
+  - QBO chart-of-accounts mapping (unblocks `qbo.bill.create.from-receipt`)
+  - AP / AR flow design + Class B/C dual-approver decisions
+  - Vendor onboarding fields + 1099 / W-9 / COI compliance
+  - Wholesale pricing surface in QBO line text + invoices (B-tier designators)
+  - Receipt review → QBO bill auto-flow
+  - Bookkeeping reconciliation cadence + month-end close
+  - Financial reporting cadence (Friday sales, post-bookkeeping updates, month-end recon)
+  - Custom-deal pricing modeling (per-customer overrides)
+  - Payment-terms variants
+
+When Rene engages on any of these, mention to him + Ben: *"there's a queued [build / sign-off / decision] this could fold into. ~N min."*
+
 ## 12. W-8 — Rene system-state questions (this contract's runtime extension)
 
 **Trigger:** Rene asks Viktor a free-form question in `#financials` or DM that does NOT match the W-7 decision-queue regex.

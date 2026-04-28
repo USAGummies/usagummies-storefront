@@ -74,6 +74,24 @@ Every shipping label print MUST be a 2-page PDF — page 1 the label, page 2 the
 **Viktor briefing rule (Ben 2026-04-27, "viktor is up to date on the status of the build etc"):**
 Viktor reads [`/contracts/viktor-rene-briefing.md`](./viktor-rene-briefing.md) on every session boot (per `viktor.md` §10 step 2). That doc is auto-maintained by every commit cycle alongside this session-handoff. When Rene asks Viktor a free-form question (W-8), Viktor answers from the briefing + cites file paths. Never fabricates. Change requests log to Open Brain `rene-request:<id>` for Ben's next session.
 
+**Rene-engagement priority rule (Ben 2026-04-27, "build everything and anything you can with rene whenever you have the opportunity, he is the best resource for financial workflows etc"):**
+
+When Rene (`U0ALL27JM38`) is **active in `#financials`**, that is the highest-leverage build window in the company's day. Treat it as a session-wide priority interrupt. Specifically:
+
+1. **Drop other queued work for finance-touching builds.** AP packets, receipt review, QBO writes, vendor onboarding, wholesale pricing surface, bookkeeping reconciliation, financial reporting cadence, chart-of-accounts mapping — anything Rene can ratify in real time. Resume parked work after he taps out.
+
+2. **Walk him through it live.** Don't queue questions for tomorrow if he's online. Use the Path B / Path A walkthrough pattern from 2026-04-27: fire the proposal, post a clear checklist in the thread, watch for his sign-off or punch list, ship the fix immediately, push to prod, ask him to re-test. Tight ~2-min iteration loops. The 7-commit Path B run on 2026-04-27 was the canonical example.
+
+3. **Capture every clarification to canonical contracts.** Rene's call-time / Slack-time guidance is the source of truth for finance doctrine. Land it in `/contracts/wholesale-pricing.md`, `/contracts/operating-memory.md`, `/contracts/approval-taxonomy.md`, etc. — same commit cycle. Don't lose his sign-off in chat history.
+
+4. **Apply the interviewer-pre-build pass when scope is fuzzy.** Per `/contracts/agents/interviewer.md`, ask 3-5 questions with named defaults. Skip-with-defaults is a first-class option (Rene used it on the auto-ack email Option A choice tonight).
+
+5. **Rene's expertise areas** (treat any of these as priority surfaces when he's online): QBO chart-of-accounts mapping, AP / AR flows, bookkeeping reconciliation cadence, vendor onboarding + W-9 / COI / 1099 compliance, receipt → bill auto-flow (the parked `qbo.bill.create.from-receipt` slug needs his CoA), wholesale pricing surface in QBO line text + invoices, monthly close + month-end summaries, B2-B5 designator presentation, customer master record fields needed for AP run, payment-terms variants, financial reporting cadence (Friday sales, post-bookkeeping update, month-end recon). When Rene engages on any of these, that's the build window.
+
+6. **Audit trail Rene-touching commits with `rene-touch` tag in the commit body.** Makes it easy to grep `rene-touch` for "what did we ship together with Rene's sign-off" come month-end review. Tonight's 7 wholesale-flow commits are the seed — going forward, mention `rene-touch` in the trailer.
+
+7. **When Rene goes offline, leave a tight handoff.** Closing message format: signed-off lanes, queued for next session (Path A approval, etc.), parked items (CoA mapping, etc.), commit list. The 2026-04-27 21:24 PT closing message in `#financials` thread is the canonical example.
+
 These are immutable. If the user asks to relax one, push back and reference this doc.
 
 1. **Every dollar figure needs a source citation.** Cite `[source: QBO]`, `[source: ShipStation live]`, etc. "Approximately" is not a license to fabricate.
