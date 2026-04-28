@@ -32,7 +32,9 @@ import {
   listRecentFlows,
   loadOnboardingState,
   mintFlowId,
+  readOrderCapturedSnapshot,
   saveOnboardingState,
+  writeOrderCapturedSnapshot,
 } from "../onboarding-store";
 
 beforeEach(() => {
@@ -202,6 +204,72 @@ describe("listRecentFlows", () => {
   });
 });
 
+describe("writeOrderCapturedSnapshot + readOrderCapturedSnapshot", () => {
+  it("persists a denormalized snapshot under its own key prefix", async () => {
+    const state = makeState("wf_oc_001", {
+      paymentPath: "accounts-payable",
+      prospect: {
+        companyName: "Acme",
+        contactName: "Jane",
+        contactEmail: "jane@acme.test",
+      },
+      orderLines: [
+        {
+          tier: "B2",
+          unitCount: 3,
+          unitLabel: "Master carton (landed)",
+          bags: 108,
+          bagPriceUsd: 3.49,
+          subtotalUsd: 376.92,
+          freightMode: "landed",
+          invoiceLabel: "B2 — Master carton (36 bags), landed",
+          customFreightRequired: false,
+        },
+      ],
+    });
+    const snap = await writeOrderCapturedSnapshot(
+      state,
+      new Date("2026-04-27T20:00:00.000Z"),
+    );
+    expect(snap.flowId).toBe("wf_oc_001");
+    expect(snap.capturedAt).toBe("2026-04-27T20:00:00.000Z");
+    expect(snap.paymentPath).toBe("accounts-payable");
+    expect(snap.orderLines.length).toBe(1);
+  });
+
+  it("uses a key prefix distinct from the OnboardingState envelope", async () => {
+    const state = makeState("wf_distinct");
+    await saveOnboardingState(state);
+    await writeOrderCapturedSnapshot(state);
+    // Both keys should exist independently.
+    expect(store.has(__INTERNAL.recordKey("wf_distinct"))).toBe(true);
+    expect(store.has(__INTERNAL.orderCapturedKey("wf_distinct"))).toBe(true);
+  });
+
+  it("readOrderCapturedSnapshot round-trips the snapshot", async () => {
+    const state = makeState("wf_rt");
+    await writeOrderCapturedSnapshot(state);
+    const got = await readOrderCapturedSnapshot("wf_rt");
+    expect(got?.flowId).toBe("wf_rt");
+  });
+
+  it("readOrderCapturedSnapshot returns null on missing flow", async () => {
+    expect(await readOrderCapturedSnapshot("wf_nope")).toBeNull();
+    expect(await readOrderCapturedSnapshot("")).toBeNull();
+  });
+
+  it("readOrderCapturedSnapshot returns null on JSON corruption", async () => {
+    store.set(__INTERNAL.orderCapturedKey("wf_corrupt"), "{not json");
+    expect(await readOrderCapturedSnapshot("wf_corrupt")).toBeNull();
+  });
+
+  it("rejects writeOrderCapturedSnapshot on empty flowId", async () => {
+    await expect(
+      writeOrderCapturedSnapshot(makeState("")),
+    ).rejects.toThrow(/flowId required/);
+  });
+});
+
 describe("constants", () => {
   it("uses the wholesale:flow: key prefix", () => {
     expect(__INTERNAL.KV_RECORD_PREFIX).toBe("wholesale:flow:");
@@ -217,5 +285,15 @@ describe("constants", () => {
 
   it("expires per-record after 30 days", () => {
     expect(__INTERNAL.RECORD_TTL_SECONDS).toBe(30 * 24 * 3600);
+  });
+
+  it("uses wholesale:order-captured: prefix for snapshots", () => {
+    expect(__INTERNAL.KV_ORDER_CAPTURED_PREFIX).toBe(
+      "wholesale:order-captured:",
+    );
+  });
+
+  it("expires order-captured snapshots after 90 days", () => {
+    expect(__INTERNAL.ORDER_CAPTURED_TTL_SECONDS).toBe(90 * 24 * 3600);
   });
 });

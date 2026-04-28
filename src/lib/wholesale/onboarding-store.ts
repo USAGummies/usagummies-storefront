@@ -148,6 +148,77 @@ async function readIndex(): Promise<string[]> {
 }
 
 // ---------------------------------------------------------------------------
+// Order-captured snapshots (Phase 35.f.3 — kv.write-order-captured side effect)
+// ---------------------------------------------------------------------------
+//
+// When the flow reaches `order-captured` we persist a denormalized
+// snapshot under its own key prefix. This serves two jobs:
+//   1. Audit trail — a tamper-resistant marker that the customer
+//      acknowledged intent. Independent of OnboardingState mutations.
+//   2. Rene's stalled-flow review surface — list captured orders that
+//      haven't yet completed (Phase 35.f.4+).
+
+const KV_ORDER_CAPTURED_PREFIX = "wholesale:order-captured:";
+const ORDER_CAPTURED_TTL_SECONDS = 90 * 24 * 3600;
+
+export interface OrderCapturedSnapshot {
+  flowId: string;
+  capturedAt: string;
+  paymentPath?: "credit-card" | "accounts-payable";
+  prospect?: OnboardingState["prospect"];
+  orderLines: OnboardingState["orderLines"];
+}
+
+function orderCapturedKey(flowId: string): string {
+  return `${KV_ORDER_CAPTURED_PREFIX}${flowId}`;
+}
+
+/**
+ * Persist a `wholesale-order-captured` snapshot. Pure-write — no
+ * index. The snapshot is a denormalized projection of the state
+ * at order-captured time so consumers can read it without paging
+ * through the full OnboardingState envelope.
+ */
+export async function writeOrderCapturedSnapshot(
+  state: OnboardingState,
+  capturedAt: Date = new Date(),
+): Promise<OrderCapturedSnapshot> {
+  if (!state.flowId.trim()) {
+    throw new Error("writeOrderCapturedSnapshot: flowId required");
+  }
+  const snapshot: OrderCapturedSnapshot = {
+    flowId: state.flowId,
+    capturedAt: capturedAt.toISOString(),
+    paymentPath: state.paymentPath,
+    prospect: state.prospect,
+    orderLines: state.orderLines,
+  };
+  await kv.set(orderCapturedKey(state.flowId), JSON.stringify(snapshot), {
+    ex: ORDER_CAPTURED_TTL_SECONDS,
+  });
+  return snapshot;
+}
+
+/** Read a previously-persisted snapshot. Returns null if missing. */
+export async function readOrderCapturedSnapshot(
+  flowId: string,
+): Promise<OrderCapturedSnapshot | null> {
+  if (!flowId.trim()) return null;
+  const raw = await kv.get<string | OrderCapturedSnapshot>(
+    orderCapturedKey(flowId),
+  );
+  if (raw === null || raw === undefined) return null;
+  if (typeof raw === "string") {
+    try {
+      return JSON.parse(raw) as OrderCapturedSnapshot;
+    } catch {
+      return null;
+    }
+  }
+  return raw;
+}
+
+// ---------------------------------------------------------------------------
 // Test helpers — NOT exported from a barrel
 // ---------------------------------------------------------------------------
 
@@ -156,6 +227,9 @@ export const __INTERNAL = {
   KV_INDEX_KEY,
   INDEX_CAP,
   RECORD_TTL_SECONDS,
+  KV_ORDER_CAPTURED_PREFIX,
+  ORDER_CAPTURED_TTL_SECONDS,
   recordKey,
   readIndex,
+  orderCapturedKey,
 };
