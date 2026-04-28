@@ -23,7 +23,6 @@ import {
   ONBOARDING_STEPS,
   nextStep as computeNextStep,
   type OnboardingState,
-  type OnboardingStep,
 } from "@/lib/wholesale/onboarding-flow";
 import {
   loadOnboardingState,
@@ -343,8 +342,8 @@ export default async function FlowDetailPage({ params }: PageProps) {
           <p className="mt-1 text-sm">
             {captured.orderLines.length} line item
             {captured.orderLines.length === 1 ? "" : "s"} captured at the
-            "intent acknowledged" boundary. The customer is on the hook for
-            this order.
+            &ldquo;intent acknowledged&rdquo; boundary. The customer is on
+            the hook for this order.
           </p>
         </Panel>
       ) : null}
@@ -453,8 +452,9 @@ function AuditPanel({ audit }: { audit: AuditEnvelope }) {
         />
       </dl>
       <p className="mt-3 text-xs text-gray-500">
-        Audit envelopes have a 365-day TTL. They're written when a flow
-        reaches `crm-updated` and used by the monthly-close window query.
+        Audit envelopes have a 365-day TTL. They&rsquo;re written when a
+        flow reaches `crm-updated` and used by the monthly-close window
+        query.
       </p>
     </Panel>
   );
