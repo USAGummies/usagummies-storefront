@@ -13,6 +13,7 @@ import {
   upsertContactByEmail,
   HUBSPOT,
 } from "@/lib/ops/hubspot-client";
+import { postMessage } from "@/lib/ops/control-plane/slack/client";
 
 type LeadPayload = {
   email?: string;
@@ -293,6 +294,41 @@ export async function POST(req: Request) {
     } catch (err) {
       console.warn(
         "[leads] HubSpot deal-create failed:",
+        err instanceof Error ? err.message : err,
+      );
+    }
+  }
+
+  // Direct Slack notification for wholesale leads. Posts to #financials
+  // (where Rene + Ben already work) so a new lead is visible in real
+  // time without depending on the legacy Make.com bridge (broken since
+  // ~Apr 13). Per /contracts/operating-memory.md v1.0: "every system-
+  // generated report posts to Slack first." Fail-soft: a Slack post
+  // failure never blocks the lead-capture response.
+  if (intent === "wholesale" && (email || phone)) {
+    try {
+      const headline = `:wave: *New wholesale lead* — ${storeName || buyerName || email || "(no name)"}`;
+      const interestLabel = INTEREST_LABELS[interest] || interest || "(none)";
+      const lines = [
+        headline,
+        buyerName ? `*Contact:* ${buyerName}` : "",
+        email ? `*Email:* ${email}` : "",
+        phone ? `*Phone:* ${phone}` : "",
+        location ? `*Location:* ${location}` : "",
+        `*Interest:* ${interestLabel}`,
+        hubspotDealId
+          ? `*HubSpot deal id:* \`${hubspotDealId}\` (open the deal in HubSpot to advance the stage)`
+          : "*HubSpot deal:* (not created — check HubSpot config)",
+        "",
+        "_Next step:_ Ben reviews → advances HubSpot stage to `PO Received` → sends prospect the `/onboarding/<dealId>` link → quotes pricing within 24h.",
+      ].filter(Boolean);
+      await postMessage({
+        channel: "#financials",
+        text: lines.join("\n"),
+      });
+    } catch (err) {
+      console.warn(
+        "[leads] Slack notify failed:",
         err instanceof Error ? err.message : err,
       );
     }
