@@ -89,6 +89,39 @@ This is what `/api/ops/slack/events` + the W-7 Rene-capture route already do for
 3. **Corrections are inputs.** Claude Code sessions read recent Slack corrections on boot to detect drift before producing new output.
 4. **Transcripts are saved within 24h of the call.** Per §17, capture before the conversation evaporates.
 5. **No silent action.** Every autonomous write produces an audit envelope AND a Slack notification (per `/contracts/slack-operating.md`).
+6. **BCC `rene@usagummies.com` on every new-wholesale-customer first email.** See §"BCC-Rene rule" below.
+
+---
+
+## BCC-Rene rule on new-customer first emails (LOCKED 2026-04-28)
+
+**Rule:** Every email sent to a new wholesale customer carries `BCC: rene@usagummies.com` until the customer is fully onboarded.
+
+**Scope — applies to:**
+- Wholesale-AP onboarding packet send (`apPacketSend` handler / `/api/ops/wholesale/send-ap-packet` route)
+- First invoice email
+- Any system-generated outreach to a customer who has NOT YET returned a completed NCS-001 form
+- Manual-but-system-traced sends (e.g. operator-driven Gmail drafts that get sent through the same audit pipeline)
+
+**Scope — does NOT apply to:**
+- Auto-ack lead receipt email (`lead.auto-ack` Class A) — that's pre-customer; no AP visibility needed
+- Internal team emails
+- Sends to customers AFTER NCS-001 is returned + QBO customer record finalized (Rene has the AP info on file at that point; further visibility goes through standard QBO + AR aging surfaces)
+
+**Why:**
+- Finance has full visibility on intent + thread state without putting Rene on the To/CC line (which would invite the customer to reply-all to Rene, polluting her inbox)
+- BCC keeps the customer-facing thread clean; CC `ben@` is the visible second recipient (matches Apr 13 CIF-001 v3 lock — Ben is the public face, Rene is the back-office)
+- Drift-detection-via-Slack: if Rene sees a BCC'd email and notices something off, her correction in `#financials` becomes the input to the next iteration cycle (per §"Drift detection via Slack corrections" above)
+
+**Where this rule is wired in code:**
+- `src/lib/wholesale/onboarding-dispatch-prod.ts` — `RENE_BCC_EMAIL` constant, applied in `sendWholesaleApPacket()`
+- Tests lock the rule: `src/lib/wholesale/__tests__/onboarding-dispatch-prod.test.ts` asserts `bcc: "rene@usagummies.com"` on every send
+- The one-off route `POST /api/ops/wholesale/send-ap-packet` reuses the same helper, so the BCC is enforced regardless of entry point
+
+**Drift detection:**
+- If a `wholesale-ap-packet` send goes out without `BCC: rene@usagummies.com`, that's a regression. Future Claude Code session reading recent Slack corrections + audit envelopes can spot it (audit envelope captures the recipient list).
+
+**Source:** Ben directive 2026-04-28, in the context of preparing the first wholesale customer (Mike Hippler / Thanksgiving Point) onboarding bundle. The rule generalizes from "BCC Rene on Mike's emails today" to "BCC Rene on every new-customer first-email until full onboard."
 
 ---
 
@@ -109,3 +142,4 @@ This is what `/api/ops/slack/events` + the W-7 Rene-capture route already do for
 ## Version history
 
 - **1.0 — 2026-04-27** — First canonical publication. Locks Slack-as-operating-memory per Ben + Rene call recap §8, §16, §17. Pins drift-detection-via-Slack-corrections doctrine.
+- **1.1 — 2026-04-28** — Adds BCC-Rene-on-new-customer rule (§"BCC-Rene rule on new-customer first emails"). Wired in `src/lib/wholesale/onboarding-dispatch-prod.ts` ahead of first-customer Mike Hippler / Thanksgiving Point send.

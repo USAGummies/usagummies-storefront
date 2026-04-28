@@ -57,6 +57,17 @@ vi.mock("../onboarding-store", () => ({
   writeAuditEnvelope: (...a: unknown[]) => writeAuditEnvelopeMock(...a),
 }));
 
+const fetchDriveFileMock = vi.fn();
+vi.mock("@/lib/ops/drive-reader", () => ({
+  fetchDriveFile: (...a: unknown[]) => fetchDriveFileMock(...a),
+}));
+
+const sendViaGmailApiDetailedMock = vi.fn();
+vi.mock("@/lib/ops/gmail-reader", () => ({
+  sendViaGmailApiDetailed: (...a: unknown[]) =>
+    sendViaGmailApiDetailedMock(...a),
+}));
+
 const kvStore = new Map<string, unknown>();
 vi.mock("@vercel/kv", () => ({
   kv: {
@@ -82,13 +93,22 @@ beforeEach(() => {
   appendWholesaleInquiryMock.mockReset();
   writeOrderCapturedSnapshotMock.mockReset();
   writeAuditEnvelopeMock.mockReset();
+  fetchDriveFileMock.mockReset();
+  sendViaGmailApiDetailedMock.mockReset();
   kvStore.clear();
   process.env.HUBSPOT_PRIVATE_APP_TOKEN = "fake-token";
+  // Default env: bundle Drive IDs configured.
+  process.env.WHOLESALE_AP_PACKET_NCS001_DRIVE_ID = "drive-id-ncs001";
+  process.env.WHOLESALE_AP_PACKET_CIF001_DRIVE_ID = "drive-id-cif001";
+  delete process.env.WHOLESALE_AP_PACKET_WELCOME_DRIVE_ID;
 });
 
 afterEach(() => {
   vi.clearAllMocks();
   delete process.env.HUBSPOT_PRIVATE_APP_TOKEN;
+  delete process.env.WHOLESALE_AP_PACKET_NCS001_DRIVE_ID;
+  delete process.env.WHOLESALE_AP_PACKET_CIF001_DRIVE_ID;
+  delete process.env.WHOLESALE_AP_PACKET_WELCOME_DRIVE_ID;
 });
 
 function buildState(overrides: Partial<OnboardingState> = {}): OnboardingState {
@@ -105,6 +125,54 @@ function buildState(overrides: Partial<OnboardingState> = {}): OnboardingState {
     },
     ...overrides,
   };
+}
+
+/**
+ * Order-bearing state — used by ap-packet tests since the email
+ * builder requires at least one orderLines entry.
+ */
+function buildStateWithOrder(
+  overrides: Partial<OnboardingState> = {},
+): OnboardingState {
+  return {
+    ...buildState(overrides),
+    orderLines: [
+      {
+        tier: "B3",
+        unitCount: 15,
+        unitLabel: "Master carton + buyer freight",
+        bags: 540,
+        bagPriceUsd: 3.25,
+        subtotalUsd: 1755.0,
+        freightMode: "buyer-paid",
+        invoiceLabel: "B3",
+        customFreightRequired: false,
+      },
+    ],
+    paymentPath: "accounts-payable",
+    ...overrides,
+  };
+}
+
+function mockSuccessfulDriveFetches() {
+  fetchDriveFileMock.mockImplementation(async (ref: { fileId: string }) => ({
+    ok: true as const,
+    file: {
+      fileId: ref.fileId,
+      name: `${ref.fileId}.pdf`,
+      mimeType: "application/pdf",
+      data: Buffer.from(`pdf-bytes-for-${ref.fileId}`),
+      size: 100,
+    },
+  }));
+}
+
+function mockSuccessfulGmailSend() {
+  sendViaGmailApiDetailedMock.mockResolvedValue({
+    ok: true,
+    messageId: "gmail-msg-abc123",
+    threadId: null,
+  });
 }
 
 describe("buildProdDispatchDeps — shape", () => {
@@ -346,15 +414,215 @@ describe("slackPostFinancialsNotif", () => {
   });
 });
 
-describe("apPacketSend — TODO stub", () => {
-  it("returns ok:false with phase 35.f.3.c TODO marker", async () => {
+describe("apPacketSend — wired (Phase 35.f.3.c)", () => {
+  it("sends to customer with CC ben@ + BCC rene@ on happy path", async () => {
+    mockSuccessfulDriveFetches();
+    mockSuccessfulGmailSend();
+    writeAuditEnvelopeMock.mockResolvedValue(undefined);
     const deps = buildProdDispatchDeps();
     const r = await deps.apPacketSend({
-      state: buildState(),
+      state: buildStateWithOrder({
+        prospect: {
+          companyName: "Thanksgiving Point",
+          contactName: "Mike",
+          contactEmail: "mhippler@thanksgivingpoint.org",
+        },
+      }),
+      template: "wholesale-ap",
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.gmailMessageId).toBe("gmail-msg-abc123");
+    const sendCall = sendViaGmailApiDetailedMock.mock.calls[0][0];
+    expect(sendCall.to).toBe("mhippler@thanksgivingpoint.org");
+    expect(sendCall.cc).toBe("ben@usagummies.com");
+    expect(sendCall.bcc).toBe("rene@usagummies.com");
+    expect(sendCall.from).toBe("Ben Stutman <ben@usagummies.com>");
+  });
+
+  it("attaches NCS-001 + CIF-001 from configured Drive IDs", async () => {
+    mockSuccessfulDriveFetches();
+    mockSuccessfulGmailSend();
+    writeAuditEnvelopeMock.mockResolvedValue(undefined);
+    const deps = buildProdDispatchDeps();
+    await deps.apPacketSend({
+      state: buildStateWithOrder(),
+      template: "wholesale-ap",
+    });
+    expect(fetchDriveFileMock).toHaveBeenCalledWith({
+      kind: "file",
+      fileId: "drive-id-ncs001",
+    });
+    expect(fetchDriveFileMock).toHaveBeenCalledWith({
+      kind: "file",
+      fileId: "drive-id-cif001",
+    });
+    const sendCall = sendViaGmailApiDetailedMock.mock.calls[0][0];
+    expect(sendCall.attachments?.length).toBe(2);
+  });
+
+  it("includes Welcome Packet attachment when env configured", async () => {
+    process.env.WHOLESALE_AP_PACKET_WELCOME_DRIVE_ID = "drive-id-welcome";
+    mockSuccessfulDriveFetches();
+    mockSuccessfulGmailSend();
+    writeAuditEnvelopeMock.mockResolvedValue(undefined);
+    const deps = buildProdDispatchDeps();
+    await deps.apPacketSend({
+      state: buildStateWithOrder(),
+      template: "wholesale-ap",
+    });
+    const sendCall = sendViaGmailApiDetailedMock.mock.calls[0][0];
+    expect(sendCall.attachments?.length).toBe(3);
+  });
+
+  it("appends invoice attachment when invoiceContext.invoiceDriveFileId provided", async () => {
+    mockSuccessfulDriveFetches();
+    mockSuccessfulGmailSend();
+    writeAuditEnvelopeMock.mockResolvedValue(undefined);
+    const deps = buildProdDispatchDeps();
+    await deps.apPacketSend({
+      state: buildStateWithOrder(),
+      template: "wholesale-ap",
+      invoiceContext: {
+        invoiceNumber: "1755",
+        invoiceDriveFileId: "drive-id-invoice-1755",
+      },
+    });
+    expect(fetchDriveFileMock).toHaveBeenCalledWith({
+      kind: "file",
+      fileId: "drive-id-invoice-1755",
+    });
+    const sendCall = sendViaGmailApiDetailedMock.mock.calls[0][0];
+    expect(sendCall.attachments?.length).toBe(3); // NCS + CIF + invoice
+    expect(sendCall.subject).toMatch(/1755/);
+  });
+
+  it("routes to apEmail when payment path is accounts-payable + apEmail captured", async () => {
+    mockSuccessfulDriveFetches();
+    mockSuccessfulGmailSend();
+    writeAuditEnvelopeMock.mockResolvedValue(undefined);
+    const deps = buildProdDispatchDeps();
+    await deps.apPacketSend({
+      state: buildStateWithOrder({
+        paymentPath: "accounts-payable",
+        apInfo: { apEmail: "ap@thanksgivingpoint.org" },
+      }),
+      template: "wholesale-ap",
+    });
+    const sendCall = sendViaGmailApiDetailedMock.mock.calls[0][0];
+    expect(sendCall.to).toBe("ap@thanksgivingpoint.org");
+  });
+
+  it("falls back to prospect.contactEmail when no apEmail captured", async () => {
+    mockSuccessfulDriveFetches();
+    mockSuccessfulGmailSend();
+    writeAuditEnvelopeMock.mockResolvedValue(undefined);
+    const deps = buildProdDispatchDeps();
+    await deps.apPacketSend({
+      state: buildStateWithOrder({ apInfo: undefined }),
+      template: "wholesale-ap",
+    });
+    const sendCall = sendViaGmailApiDetailedMock.mock.calls[0][0];
+    expect(sendCall.to).toBe("jane@acme.test");
+  });
+
+  it("ok:false when bundle Drive IDs missing in env", async () => {
+    delete process.env.WHOLESALE_AP_PACKET_NCS001_DRIVE_ID;
+    const deps = buildProdDispatchDeps();
+    const r = await deps.apPacketSend({
+      state: buildStateWithOrder(),
       template: "wholesale-ap",
     });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error).toMatch(/phase 35\.f\.3\.c TODO/);
+    if (!r.ok) expect(r.error).toMatch(/bundle not configured/);
+  });
+
+  it("ok:false when prospect missing", async () => {
+    const deps = buildProdDispatchDeps();
+    const r = await deps.apPacketSend({
+      state: buildStateWithOrder({ prospect: undefined }),
+      template: "wholesale-ap",
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/prospect missing/);
+  });
+
+  it("ok:false when orderLines empty", async () => {
+    const deps = buildProdDispatchDeps();
+    const r = await deps.apPacketSend({
+      state: buildStateWithOrder({ orderLines: [] }),
+      template: "wholesale-ap",
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/orderLines empty/);
+  });
+
+  it("ok:false when required Drive fetch fails (NCS-001 or CIF-001)", async () => {
+    fetchDriveFileMock.mockResolvedValue({
+      ok: false,
+      error: "Drive 404 not found",
+    });
+    const deps = buildProdDispatchDeps();
+    const r = await deps.apPacketSend({
+      state: buildStateWithOrder(),
+      template: "wholesale-ap",
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/Drive fetch failed/);
+  });
+
+  it("ok:false when Gmail send fails", async () => {
+    mockSuccessfulDriveFetches();
+    sendViaGmailApiDetailedMock.mockResolvedValue({
+      ok: false,
+      error: "Gmail rate limited",
+    });
+    const deps = buildProdDispatchDeps();
+    const r = await deps.apPacketSend({
+      state: buildStateWithOrder(),
+      template: "wholesale-ap",
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/Gmail send failed/);
+  });
+
+  it("audit envelope failure is non-fatal (email already sent)", async () => {
+    mockSuccessfulDriveFetches();
+    mockSuccessfulGmailSend();
+    writeAuditEnvelopeMock.mockRejectedValue(new Error("kv down"));
+    const deps = buildProdDispatchDeps();
+    const r = await deps.apPacketSend({
+      state: buildStateWithOrder(),
+      template: "wholesale-ap",
+    });
+    // Send succeeded; audit miss is logged but doesn't fail the result.
+    expect(r.ok).toBe(true);
+  });
+
+  it("body contains Mike's Reunion-show order details (15 master cartons, $1755 total)", async () => {
+    mockSuccessfulDriveFetches();
+    mockSuccessfulGmailSend();
+    writeAuditEnvelopeMock.mockResolvedValue(undefined);
+    const deps = buildProdDispatchDeps();
+    await deps.apPacketSend({
+      state: buildStateWithOrder({
+        prospect: {
+          companyName: "Thanksgiving Point",
+          contactName: "Mike",
+          contactEmail: "mhippler@thanksgivingpoint.org",
+        },
+      }),
+      template: "wholesale-ap",
+      invoiceContext: {
+        invoiceNumber: "1755",
+        personalNote: "Per our call today.",
+      },
+    });
+    const sendCall = sendViaGmailApiDetailedMock.mock.calls[0][0];
+    expect(sendCall.body).toContain("Per our call today.");
+    expect(sendCall.body).toMatch(/^Hi Mike,/m);
+    expect(sendCall.body).toMatch(/15 master cartons/);
+    expect(sendCall.body).toMatch(/Total: \$1755\.00/);
+    expect(sendCall.body).toContain("Net 10");
   });
 });
 

@@ -91,11 +91,31 @@ export interface DispatchDeps {
     state: OnboardingState,
   ) => Promise<{ ok: true; ts?: string } | { ok: false; error: string }>;
 
-  /** Send the wholesale-AP onboarding packet. */
+  /**
+   * Send the wholesale-AP onboarding packet.
+   *
+   * The dispatcher's state machine fires this with `template:
+   * "wholesale-ap"` only. Explicit per-call routes (e.g. one-off
+   * sends like the first-customer Mike at Thanksgiving Point) can
+   * pass an `invoiceContext` override to embed an invoice number +
+   * total in the email body.
+   *
+   * Returns the Gmail message id on success so the caller can
+   * audit-log the linkage.
+   */
   apPacketSend: (params: {
     state: OnboardingState;
     template: "wholesale-ap";
-  }) => Promise<{ ok: true } | { ok: false; error: string }>;
+    invoiceContext?: {
+      invoiceNumber?: string;
+      invoiceDriveFileId?: string;
+      totalUsdOverride?: number;
+      personalNote?: string;
+    };
+  }) => Promise<
+    | { ok: true; gmailMessageId?: string }
+    | { ok: false; error: string }
+  >;
 
   /** Stage a QBO `vendor.master.create` Class B approval card. */
   qboStageVendorMasterApproval: (
@@ -273,7 +293,13 @@ async function runOne(
       case "ap-packet.send": {
         const r = await deps.apPacketSend({ state, template: effect.template });
         return r.ok
-          ? { kind: effect.kind, ok: true }
+          ? {
+              kind: effect.kind,
+              ok: true,
+              output: r.gmailMessageId
+                ? { gmailMessageId: r.gmailMessageId }
+                : {},
+            }
           : { kind: effect.kind, ok: false, error: r.error };
       }
 

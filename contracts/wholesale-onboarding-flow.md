@@ -69,11 +69,37 @@ The 11 steps mirror `OnboardingStep` in `src/lib/wholesale/onboarding-flow.ts`:
 
 ### Q3 — AP packet trigger — what packet template?
 
-**Default-applied:** new `wholesale-ap` template that reuses the existing `/api/ops/ap-packets/drafts` send + audit pipeline.
+**Default-applied + WIRED 2026-04-28 (Phase 35.f.3.c DONE):** the canonical Apr 13 Rene-approved bundle.
 
-**Why this default:** the AP-packet send pipeline (Gmail-API send, Drive write, audit envelope) is already proven — it shipped tonight in Phase 31.2. A new template plugs in without re-engineering the pipeline. The wholesale-AP template body differs from the existing single-vendor packet (it's customer-facing, not vendor-facing), but the send path is identical.
+**What ships with the packet:**
+| Attachment | Role | Source |
+|---|---|---|
+| `New_Customer_Setup_Form_USA_Gummies.pdf` (NCS-001 v2) | Customer fills + returns; captures full AP info (banking, EIN, tax-exempt, Account Rep, payment prefs, signature) | Drive — `04 — Finance > Document Templates` |
+| `Customer_Information_Form_USA_Gummies.pdf` (CIF-001) | Customer keeps for their records — our W-9 + ACH info pre-filled | Drive — same folder |
+| Welcome Packet (optional) | Orientation | Drive — same folder, env-configurable |
+| Invoice draft (when provided) | So AP team can pay | Drive — invoice id passed via `invoiceContext.invoiceDriveFileId` |
 
-**Code:** `sideEffectsForStep("ap-email-sent", state)` returns `{ kind: "ap-packet.send", template: "wholesale-ap" }`. Route layer dispatches.
+**Why this default:** Rene + Viktor finalized this exact bundle through 4 rounds of redlines on 2026-04-12/13. Rebuilding a parallel "new fillable PDF" would re-litigate field decisions Rene already locked. The dispatcher attaches the canonical Drive files at send time.
+
+**Code:** `sideEffectsForStep("ap-email-sent", state)` returns `{ kind: "ap-packet.send", template: "wholesale-ap" }`. The handler `apPacketSend` in `src/lib/wholesale/onboarding-dispatch-prod.ts`:
+- Reads bundle Drive IDs from env (`WHOLESALE_AP_PACKET_NCS001_DRIVE_ID`, `WHOLESALE_AP_PACKET_CIF001_DRIVE_ID`, optional `WHOLESALE_AP_PACKET_WELCOME_DRIVE_ID`)
+- Fetches each PDF via `fetchDriveFile`
+- Composes the email body via `buildApPacketEmail` (pure module — `src/lib/wholesale/wholesale-ap-email.ts`)
+- Sends via `sendViaGmailApiDetailed` with `From: ben@`, `To: customer`, `CC: ben@`, **`BCC: rene@`** (per `/contracts/operating-memory.md` v1.1 §BCC-Rene rule)
+- Writes audit envelope on success
+
+**Two AP-info-capture paths** (Phase 35 architecture lock):
+
+| Surface | Capture mechanism | Field schema | When used |
+|---|---|---|---|
+| `/wholesale/order` ap-info step | Web form (thin) | `APInfo` interface — apEmail, apContactName, apContactPhone, taxId, legalEntityType, billingAddress | Self-serve flow; prospect drives; APInfo lands directly in OnboardingState KV envelope |
+| Wholesale-AP packet email | NCS-001 PDF (heavyweight) | 9 sections — Company, Billing/Remit-To, Shipping, Key Contacts (Account Rep first), Banking/ACH, Tax Info, Payment Prefs, How heard, Authorization | Email-driven onboarding (Mike's path, plus any future operator-driven flow) |
+
+Both feed the QBO customer master record. The thin-vs-heavyweight split is deliberate: self-serve customers don't want to fill 9 sections on a phone, but AP teams of bigger accounts (Thanksgiving Point, Buc-ee's, Walmart vendor portal) expect a PDF round-trip.
+
+**Explicit-context send route:** `POST /api/ops/wholesale/send-ap-packet` lets operators (Ben, the other agent) fire the same handler with explicit state + invoice context — used for first-customer Mike at Thanksgiving Point and any future one-offs where the dispatcher state machine wasn't the entry point.
+
+**Doctrinal anchor:** Apr 13 working session record (Slack `#financials` thread, message ts `1776060235.611729`) — the canonical workflow Rene approved. The Phase 35.f.3.c handler implements that workflow verbatim.
 
 ### Q4 — Order-captured-before-AP-fills semantics
 
@@ -138,5 +164,6 @@ These come from §3 + §4 + §5 + §13 of the call recap and remain locked:
 
 ## Version history
 
+- **1.1 — 2026-04-28** — Phase 35.f.3.c DONE. `apPacketSend` handler wired in `src/lib/wholesale/onboarding-dispatch-prod.ts` against the canonical Apr 13 Rene-approved bundle (NCS-001 v2 + CIF-001). Two-AP-info-capture-paths formalized (web-form thin / NCS-001 heavyweight). Explicit-context route `POST /api/ops/wholesale/send-ap-packet` shipped for first-customer Mike at Thanksgiving Point + future one-offs. BCC-Rene rule from `/contracts/operating-memory.md` v1.1 enforced in send pipeline. 13 new prod-deps tests + 14 route tests + 31 email-body tests.
 - **1.0 — 2026-04-27 PM** — CANONICAL. Defaults applied for all 5 disambiguation questions. Code-side mirror shipped in commit `f941783` (pricing-tiers + onboarding-flow modules + 109 tests). Rene punch-lists tomorrow if defaults need adjustment; UI / route work proceeds.
 - **0.1 — 2026-04-27 AM** — DRAFT. Captured desired flow + 5 disambiguation questions awaiting Ben's interviewer-pass answers per Ben + Rene call recap §3 + §4 + §13.

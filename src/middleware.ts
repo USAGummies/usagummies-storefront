@@ -71,6 +71,7 @@ const SELF_AUTHENTICATED_PREFIXES = [
   "/api/ops/wholesale/onboarding", // WHOLESALE ONBOARDING — Rene's stalled-flow review surface + daily digest (Phase 35.f.5 + 35.f.5.b). isAuthorized() session + CRON_SECRET. NOTE: the trailing-slash-less prefix matches both /onboarding (read) and /onboarding-digest (cron-fired Slack post).
   "/api/ops/wholesale/completed", // WHOLESALE COMPLETED — monthly-close audit envelope query surface, Phase 35.f.6.b (isAuthorized session + CRON_SECRET).
   "/api/ops/wholesale/chase-email", // WHOLESALE CHASE EMAIL — draft chase email for a stalled flow, Phase 35.f.7 (isAuthorized session + CRON_SECRET, read-only never sends).
+  "/api/ops/wholesale/send-ap-packet", // WHOLESALE AP PACKET SEND — explicit-context send route, Phase 35.f.3.c (isAuthorized session + CRON_SECRET). Sends NCS-001 + CIF-001 + invoice draft via Gmail with BCC rene@. Used for first-customer Mike + future one-offs.
 ];
 
 function isSelfAuthenticated(pathname: string): boolean {
