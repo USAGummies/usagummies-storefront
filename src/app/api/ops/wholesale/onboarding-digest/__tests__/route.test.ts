@@ -160,6 +160,38 @@ describe("onboarding-digest — happy path with stalled flows", () => {
     const call = postMessageMock.mock.calls[0][0];
     expect(call.text).toMatch(/72h/);
   });
+
+  it("includes chase-email subject preview + fetch path per flow", async () => {
+    await saveOnboardingState(
+      makeStaleState("wf_chase", 48, {
+        prospect: {
+          companyName: "Chase Co",
+          contactName: "Pat",
+          contactEmail: "pat@chase.test",
+        },
+      }),
+    );
+    const { GET } = await import("../route");
+    await GET(buildReq());
+    const call = postMessageMock.mock.calls[0][0];
+    // Subject preview is indented under the flow row
+    expect(call.text).toContain("chase email subject");
+    expect(call.text).toContain("Chase Co");
+    // Fetch path is included so Rene can pull the full draft
+    expect(call.text).toContain(
+      "/api/ops/wholesale/chase-email?flowId=wf_chase",
+    );
+  });
+
+  it("omits chase-email line when prospect is missing", async () => {
+    await saveOnboardingState(
+      makeStaleState("wf_no_prospect", 48, { prospect: undefined }),
+    );
+    const { GET } = await import("../route");
+    await GET(buildReq());
+    const call = postMessageMock.mock.calls[0][0];
+    expect(call.text).not.toContain("chase email subject");
+  });
 });
 
 describe("onboarding-digest — dedup gate", () => {

@@ -29,6 +29,7 @@ import { kv } from "@vercel/kv";
 
 import { isAuthorized } from "@/lib/ops/abra-auth";
 import { postMessage } from "@/lib/ops/control-plane/slack/client";
+import { buildChaseEmail } from "@/lib/wholesale/chase-email";
 import {
   nextStep,
   type OnboardingState,
@@ -58,6 +59,9 @@ interface StalledRow {
   prospect?: OnboardingState["prospect"];
   totalSubtotalUsd: number;
   hoursSinceLastTouch: number;
+  /** Suggested chase-email subject (per Phase 35.f.7 chase-email
+   *  projection) — Rene can copy-paste from Slack into Gmail. */
+  chaseEmailSubject?: string;
 }
 
 function mostRecentTimestamp(state: OnboardingState): string | undefined {
@@ -96,6 +100,14 @@ function buildSlackText(rows: readonly StalledRow[], stallHours: number): string
     lines.push(
       `• *${company}* (${email}) — stalled at \`${r.currentStep}\`, next: \`${r.nextStep ?? "—"}\` — ${subtotal} — ${r.hoursSinceLastTouch.toFixed(0)}h since last touch — flow \`${r.flowId}\``,
     );
+    // Indented chase-email preview if we have a subject (i.e. the
+    // flow has a prospect on file). Rene can copy the subject and
+    // fetch the full draft via /api/ops/wholesale/chase-email.
+    if (r.chaseEmailSubject) {
+      lines.push(
+        `    ↳ chase email subject: _"${r.chaseEmailSubject}"_ — fetch draft: \`/api/ops/wholesale/chase-email?flowId=${r.flowId}\``,
+      );
+    }
   }
   lines.push("");
   lines.push(
@@ -113,6 +125,17 @@ async function buildDigest(stallHours: number, now: Date): Promise<{
   for (const f of flows) {
     const { stalled, lastTimestamp } = isStalled(f, stallMs, now);
     if (!stalled || !lastTimestamp) continue;
+    const hoursSinceLastTouch =
+      (now.getTime() - new Date(lastTimestamp).getTime()) / 3_600_000;
+    // Build a chase-email projection if we have enough data.
+    // Returns null when prospect is missing — we don't fabricate
+    // a subject for a no-recipient flow.
+    const chase = buildChaseEmail(f, {
+      hoursSinceLastTouch,
+      // Resume URL is just for the body; subject doesn't use it
+      // but we pass a sentinel so the projection runs.
+      resumeUrl: `https://www.usagummies.com/wholesale/order?flowId=${f.flowId}`,
+    });
     rows.push({
       flowId: f.flowId,
       currentStep: f.currentStep,
@@ -122,8 +145,8 @@ async function buildDigest(stallHours: number, now: Date): Promise<{
         Math.round(
           f.orderLines.reduce((acc, l) => acc + l.subtotalUsd, 0) * 100,
         ) / 100,
-      hoursSinceLastTouch:
-        (now.getTime() - new Date(lastTimestamp).getTime()) / 3_600_000,
+      hoursSinceLastTouch,
+      chaseEmailSubject: chase?.subject,
     });
   }
   return { rows };
