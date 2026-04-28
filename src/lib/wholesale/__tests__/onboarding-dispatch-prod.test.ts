@@ -50,9 +50,11 @@ vi.mock("../inquiries", () => ({
 }));
 
 const writeOrderCapturedSnapshotMock = vi.fn();
+const writeAuditEnvelopeMock = vi.fn();
 vi.mock("../onboarding-store", () => ({
   writeOrderCapturedSnapshot: (...a: unknown[]) =>
     writeOrderCapturedSnapshotMock(...a),
+  writeAuditEnvelope: (...a: unknown[]) => writeAuditEnvelopeMock(...a),
 }));
 
 const kvStore = new Map<string, unknown>();
@@ -79,6 +81,7 @@ beforeEach(() => {
   postMessageMock.mockReset();
   appendWholesaleInquiryMock.mockReset();
   writeOrderCapturedSnapshotMock.mockReset();
+  writeAuditEnvelopeMock.mockReset();
   kvStore.clear();
   process.env.HUBSPOT_PRIVATE_APP_TOKEN = "fake-token";
 });
@@ -365,21 +368,44 @@ describe("qboStageVendorMasterApproval — TODO stub", () => {
 });
 
 describe("auditFlowComplete", () => {
-  it("writes to wholesale:audit:flow-complete:<flowId>", async () => {
+  it("calls writeAuditEnvelope with the full envelope shape", async () => {
+    writeAuditEnvelopeMock.mockResolvedValue(undefined);
     const deps = buildProdDispatchDeps();
     const state = buildState({
       hubspotDealId: "D-99",
       qboCustomerApprovalId: "A-77",
       stepsCompleted: ["info", "store-type"],
+      orderLines: [
+        {
+          tier: "B2",
+          unitCount: 1,
+          unitLabel: "Master carton (landed)",
+          bags: 36,
+          bagPriceUsd: 3.49,
+          subtotalUsd: 125.64,
+          freightMode: "landed",
+          invoiceLabel: "B2",
+          customFreightRequired: false,
+        },
+      ],
     });
     const r = await deps.auditFlowComplete(state);
     expect(r.ok).toBe(true);
-    const key = `${__INTERNAL.KV_AUDIT_PREFIX}wf_prod_001`;
-    expect(kvStore.has(key)).toBe(true);
-    const stored = JSON.parse(kvStore.get(key) as string);
-    expect(stored.hubspotDealId).toBe("D-99");
-    expect(stored.qboCustomerApprovalId).toBe("A-77");
-    expect(stored.stepsCompleted).toEqual(["info", "store-type"]);
+    expect(writeAuditEnvelopeMock).toHaveBeenCalledTimes(1);
+    const env = writeAuditEnvelopeMock.mock.calls[0][0];
+    expect(env.flowId).toBe("wf_prod_001");
+    expect(env.hubspotDealId).toBe("D-99");
+    expect(env.qboCustomerApprovalId).toBe("A-77");
+    expect(env.stepsCompleted).toEqual(["info", "store-type"]);
+    expect(env.orderLineCount).toBe(1);
+    expect(env.totalSubtotalUsd).toBe(125.64);
+  });
+
+  it("ok:false when writeAuditEnvelope throws", async () => {
+    writeAuditEnvelopeMock.mockRejectedValue(new Error("kv down"));
+    const deps = buildProdDispatchDeps();
+    const r = await deps.auditFlowComplete(buildState());
+    expect(r.ok).toBe(false);
   });
 });
 

@@ -219,6 +219,156 @@ export async function readOrderCapturedSnapshot(
 }
 
 // ---------------------------------------------------------------------------
+// Audit envelopes — completed-flow snapshots for monthly close + month-end
+// summaries (Phase 35.f.6.b — supports Rene's monthly review cadence)
+// ---------------------------------------------------------------------------
+//
+// The dispatcher writes a `wholesale:audit:flow-complete:<flowId>` envelope
+// when a flow reaches `crm-updated`. To support "list completed flows in the
+// last N days" we maintain a separate index keyed by completion timestamp.
+//
+// Layout:
+//   `wholesale:audit:flow-complete:<flowId>`        — JSON envelope (1y TTL).
+//   `wholesale:audit:flow-complete:index`           — JSON array of
+//                                                     `{ flowId, completedAt }`,
+//                                                     most-recent first,
+//                                                     capped at AUDIT_INDEX_CAP.
+
+const KV_AUDIT_PREFIX = "wholesale:audit:flow-complete:";
+const KV_AUDIT_INDEX_KEY = "wholesale:audit:flow-complete:index";
+const AUDIT_INDEX_CAP = 5000;
+const AUDIT_TTL_SECONDS = 365 * 24 * 3600;
+
+function auditKey(flowId: string): string {
+  return `${KV_AUDIT_PREFIX}${flowId}`;
+}
+
+export interface AuditEnvelope {
+  flowId: string;
+  completedAt: string;
+  stepsCompleted: readonly string[];
+  paymentPath?: "credit-card" | "accounts-payable";
+  prospect?: OnboardingState["prospect"];
+  orderLineCount: number;
+  hubspotDealId?: string;
+  qboCustomerApprovalId?: string;
+  /** Optional — sum of order-line subtotals at completion. */
+  totalSubtotalUsd?: number;
+}
+
+interface AuditIndexEntry {
+  flowId: string;
+  completedAt: string;
+}
+
+async function readAuditIndex(): Promise<AuditIndexEntry[]> {
+  const raw = await kv.get<AuditIndexEntry[] | string>(KV_AUDIT_INDEX_KEY);
+  if (Array.isArray(raw)) {
+    return raw.filter(
+      (e): e is AuditIndexEntry =>
+        typeof e === "object" &&
+        e !== null &&
+        typeof (e as AuditIndexEntry).flowId === "string" &&
+        typeof (e as AuditIndexEntry).completedAt === "string",
+    );
+  }
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed.filter(
+          (e): e is AuditIndexEntry =>
+            typeof e === "object" &&
+            e !== null &&
+            typeof (e as AuditIndexEntry).flowId === "string" &&
+            typeof (e as AuditIndexEntry).completedAt === "string",
+        );
+      }
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+/**
+ * Persist an audit envelope + update the index. Used by the
+ * dispatcher's `auditFlowComplete` handler. Pure logic + KV writes;
+ * no other side effects. Idempotent — re-saving the same flowId
+ * overwrites the envelope and dedupes the index.
+ */
+export async function writeAuditEnvelope(
+  envelope: AuditEnvelope,
+): Promise<void> {
+  if (!envelope.flowId.trim()) {
+    throw new Error("writeAuditEnvelope: flowId required");
+  }
+  if (!envelope.completedAt) {
+    throw new Error("writeAuditEnvelope: completedAt required");
+  }
+  await kv.set(auditKey(envelope.flowId), JSON.stringify(envelope), {
+    ex: AUDIT_TTL_SECONDS,
+  });
+  const existing = await readAuditIndex();
+  const next: AuditIndexEntry[] = [
+    { flowId: envelope.flowId, completedAt: envelope.completedAt },
+    ...existing.filter((e) => e.flowId !== envelope.flowId),
+  ].slice(0, AUDIT_INDEX_CAP);
+  await kv.set(KV_AUDIT_INDEX_KEY, next);
+}
+
+/**
+ * Read a single audit envelope by flowId. Returns null on missing
+ * or corrupt records — same honest-read posture as
+ * `loadOnboardingState`.
+ */
+export async function readAuditEnvelope(
+  flowId: string,
+): Promise<AuditEnvelope | null> {
+  if (!flowId.trim()) return null;
+  const raw = await kv.get<string | AuditEnvelope>(auditKey(flowId));
+  if (raw === null || raw === undefined) return null;
+  if (typeof raw === "string") {
+    try {
+      return JSON.parse(raw) as AuditEnvelope;
+    } catch {
+      return null;
+    }
+  }
+  return raw;
+}
+
+/**
+ * List the N most-recent completed-flow audit envelopes. Optionally
+ * filter to those completed within the last `withinDays` days
+ * (used for monthly close + month-end summaries).
+ */
+export async function listRecentAuditEnvelopes(opts: {
+  limit?: number;
+  withinDays?: number;
+} = {}): Promise<AuditEnvelope[]> {
+  const limit = Math.max(1, Math.min(500, opts.limit ?? 100));
+  const cutoffMs =
+    opts.withinDays !== undefined
+      ? Date.now() - opts.withinDays * 24 * 3600 * 1000
+      : null;
+  const index = await readAuditIndex();
+  const out: AuditEnvelope[] = [];
+  for (const entry of index) {
+    if (out.length >= limit) break;
+    if (
+      cutoffMs !== null &&
+      new Date(entry.completedAt).getTime() < cutoffMs
+    ) {
+      continue;
+    }
+    const env = await readAuditEnvelope(entry.flowId);
+    if (env) out.push(env);
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
 // Test helpers — NOT exported from a barrel
 // ---------------------------------------------------------------------------
 
@@ -229,7 +379,13 @@ export const __INTERNAL = {
   RECORD_TTL_SECONDS,
   KV_ORDER_CAPTURED_PREFIX,
   ORDER_CAPTURED_TTL_SECONDS,
+  KV_AUDIT_PREFIX,
+  KV_AUDIT_INDEX_KEY,
+  AUDIT_INDEX_CAP,
+  AUDIT_TTL_SECONDS,
   recordKey,
   readIndex,
   orderCapturedKey,
+  auditKey,
+  readAuditIndex,
 };

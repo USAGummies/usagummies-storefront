@@ -35,11 +35,12 @@
  * so DispatchResult.failures[] surfaces them clearly. The route
  * layer logs failures; nothing crashes.
  */
-import { kv } from "@vercel/kv";
-
 import { appendWholesaleInquiry } from "./inquiries";
 import type { DispatchDeps } from "./onboarding-dispatch";
-import { writeOrderCapturedSnapshot } from "./onboarding-store";
+import {
+  writeAuditEnvelope,
+  writeOrderCapturedSnapshot,
+} from "./onboarding-store";
 import {
   HUBSPOT,
   createDeal,
@@ -55,10 +56,6 @@ import { postMessage } from "@/lib/ops/control-plane/slack/client";
 
 /** Slack channel id for #financials (canonical per channels.json). */
 const SLACK_FINANCIALS_CHANNEL_ID = "C0AKG9FSC2J";
-
-/** KV key prefix for the audit.flow-complete envelopes. */
-const KV_AUDIT_PREFIX = "wholesale:audit:flow-complete:";
-const AUDIT_TTL_SECONDS = 365 * 24 * 3600;
 
 // ---------------------------------------------------------------------------
 // Factory
@@ -269,20 +266,21 @@ export function buildProdDispatchDeps(): DispatchDeps {
     // ----- Audit envelope -----
     auditFlowComplete: async (state) => {
       try {
-        await kv.set(
-          `${KV_AUDIT_PREFIX}${state.flowId}`,
-          JSON.stringify({
-            flowId: state.flowId,
-            completedAt: new Date().toISOString(),
-            stepsCompleted: state.stepsCompleted,
-            paymentPath: state.paymentPath,
-            prospect: state.prospect,
-            orderLineCount: state.orderLines.length,
-            hubspotDealId: state.hubspotDealId,
-            qboCustomerApprovalId: state.qboCustomerApprovalId,
-          }),
-          { ex: AUDIT_TTL_SECONDS },
+        const totalSubtotalUsd = state.orderLines.reduce(
+          (acc, l) => acc + l.subtotalUsd,
+          0,
         );
+        await writeAuditEnvelope({
+          flowId: state.flowId,
+          completedAt: new Date().toISOString(),
+          stepsCompleted: state.stepsCompleted,
+          paymentPath: state.paymentPath,
+          prospect: state.prospect,
+          orderLineCount: state.orderLines.length,
+          hubspotDealId: state.hubspotDealId,
+          qboCustomerApprovalId: state.qboCustomerApprovalId,
+          totalSubtotalUsd: Math.round(totalSubtotalUsd * 100) / 100,
+        });
         return { ok: true };
       } catch (err) {
         return {
@@ -300,7 +298,5 @@ export function buildProdDispatchDeps(): DispatchDeps {
 
 export const __INTERNAL = {
   SLACK_FINANCIALS_CHANNEL_ID,
-  KV_AUDIT_PREFIX,
-  AUDIT_TTL_SECONDS,
   HUBSPOT_REF: HUBSPOT,
 };

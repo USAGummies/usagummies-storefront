@@ -29,12 +29,16 @@ vi.mock("@vercel/kv", () => ({
 
 import {
   __INTERNAL,
+  listRecentAuditEnvelopes,
   listRecentFlows,
   loadOnboardingState,
   mintFlowId,
+  readAuditEnvelope,
   readOrderCapturedSnapshot,
   saveOnboardingState,
+  writeAuditEnvelope,
   writeOrderCapturedSnapshot,
+  type AuditEnvelope,
 } from "../onboarding-store";
 
 beforeEach(() => {
@@ -270,6 +274,137 @@ describe("writeOrderCapturedSnapshot + readOrderCapturedSnapshot", () => {
   });
 });
 
+describe("audit envelopes — write + read round-trip", () => {
+  function makeEnv(
+    flowId: string,
+    overrides: Partial<AuditEnvelope> = {},
+  ): AuditEnvelope {
+    return {
+      flowId,
+      completedAt: new Date().toISOString(),
+      stepsCompleted: ["info", "store-type", "crm-updated"],
+      orderLineCount: 1,
+      totalSubtotalUsd: 125.64,
+      ...overrides,
+    };
+  }
+
+  it("writes an envelope and reads it back", async () => {
+    await writeAuditEnvelope(makeEnv("wf_audit_1"));
+    const got = await readAuditEnvelope("wf_audit_1");
+    expect(got?.flowId).toBe("wf_audit_1");
+    expect(got?.totalSubtotalUsd).toBe(125.64);
+  });
+
+  it("readAuditEnvelope returns null for missing flow", async () => {
+    expect(await readAuditEnvelope("wf_nope")).toBeNull();
+    expect(await readAuditEnvelope("")).toBeNull();
+  });
+
+  it("readAuditEnvelope returns null on JSON corruption", async () => {
+    store.set(__INTERNAL.auditKey("wf_corrupt"), "{not json");
+    expect(await readAuditEnvelope("wf_corrupt")).toBeNull();
+  });
+
+  it("writeAuditEnvelope rejects empty flowId", async () => {
+    await expect(
+      writeAuditEnvelope(makeEnv("")),
+    ).rejects.toThrow(/flowId required/);
+  });
+
+  it("writeAuditEnvelope rejects empty completedAt", async () => {
+    await expect(
+      writeAuditEnvelope({
+        flowId: "wf_x",
+        completedAt: "",
+        stepsCompleted: [],
+        orderLineCount: 0,
+      }),
+    ).rejects.toThrow(/completedAt required/);
+  });
+
+  it("re-writing same flowId dedupes the index", async () => {
+    await writeAuditEnvelope(makeEnv("wf_a"));
+    await writeAuditEnvelope(makeEnv("wf_b"));
+    await writeAuditEnvelope(makeEnv("wf_a")); // re-save
+    const idx = await __INTERNAL.readAuditIndex();
+    expect(idx.filter((e) => e.flowId === "wf_a").length).toBe(1);
+  });
+
+  it("re-writing same flowId moves it to the head of the index", async () => {
+    await writeAuditEnvelope(makeEnv("wf_old"));
+    await writeAuditEnvelope(makeEnv("wf_new"));
+    await writeAuditEnvelope(makeEnv("wf_old")); // refresh
+    const idx = await __INTERNAL.readAuditIndex();
+    expect(idx[0].flowId).toBe("wf_old");
+  });
+});
+
+describe("listRecentAuditEnvelopes", () => {
+  function makeEnv(
+    flowId: string,
+    completedAt: string,
+    overrides: Partial<AuditEnvelope> = {},
+  ): AuditEnvelope {
+    return {
+      flowId,
+      completedAt,
+      stepsCompleted: ["crm-updated"],
+      orderLineCount: 1,
+      ...overrides,
+    };
+  }
+
+  it("returns empty list when no envelopes persisted", async () => {
+    expect(await listRecentAuditEnvelopes()).toEqual([]);
+  });
+
+  it("returns envelopes in most-recent-first order", async () => {
+    const t1 = new Date("2026-01-01").toISOString();
+    const t2 = new Date("2026-02-01").toISOString();
+    const t3 = new Date("2026-03-01").toISOString();
+    await writeAuditEnvelope(makeEnv("wf_jan", t1));
+    await writeAuditEnvelope(makeEnv("wf_feb", t2));
+    await writeAuditEnvelope(makeEnv("wf_mar", t3));
+    const got = await listRecentAuditEnvelopes();
+    expect(got.map((e) => e.flowId)).toEqual(["wf_mar", "wf_feb", "wf_jan"]);
+  });
+
+  it("respects the limit parameter", async () => {
+    for (let i = 0; i < 5; i++) {
+      await writeAuditEnvelope(
+        makeEnv(`wf_${i}`, new Date(Date.now() - i * 1000).toISOString()),
+      );
+    }
+    const got = await listRecentAuditEnvelopes({ limit: 2 });
+    expect(got.length).toBe(2);
+  });
+
+  it("withinDays filter excludes envelopes outside the window", async () => {
+    const ancient = new Date(
+      Date.now() - 90 * 24 * 3600 * 1000,
+    ).toISOString();
+    const recent = new Date(
+      Date.now() - 5 * 24 * 3600 * 1000,
+    ).toISOString();
+    await writeAuditEnvelope(makeEnv("wf_ancient", ancient));
+    await writeAuditEnvelope(makeEnv("wf_recent", recent));
+
+    const got = await listRecentAuditEnvelopes({ withinDays: 30 });
+    expect(got.map((e) => e.flowId)).toEqual(["wf_recent"]);
+  });
+
+  it("skips index entries whose envelope is missing (best-effort lag)", async () => {
+    await writeAuditEnvelope(makeEnv("wf_a", new Date().toISOString()));
+    await writeAuditEnvelope(makeEnv("wf_b", new Date().toISOString()));
+    // Simulate TTL eviction of wf_a's envelope while leaving the
+    // index intact.
+    store.delete(__INTERNAL.auditKey("wf_a"));
+    const got = await listRecentAuditEnvelopes();
+    expect(got.map((e) => e.flowId)).toEqual(["wf_b"]);
+  });
+});
+
 describe("constants", () => {
   it("uses the wholesale:flow: key prefix", () => {
     expect(__INTERNAL.KV_RECORD_PREFIX).toBe("wholesale:flow:");
@@ -295,5 +430,19 @@ describe("constants", () => {
 
   it("expires order-captured snapshots after 90 days", () => {
     expect(__INTERNAL.ORDER_CAPTURED_TTL_SECONDS).toBe(90 * 24 * 3600);
+  });
+
+  it("uses wholesale:audit:flow-complete: prefix for audit envelopes", () => {
+    expect(__INTERNAL.KV_AUDIT_PREFIX).toBe("wholesale:audit:flow-complete:");
+  });
+
+  it("indexes audit envelopes under wholesale:audit:flow-complete:index", () => {
+    expect(__INTERNAL.KV_AUDIT_INDEX_KEY).toBe(
+      "wholesale:audit:flow-complete:index",
+    );
+  });
+
+  it("expires audit envelopes after 365 days (1 year)", () => {
+    expect(__INTERNAL.AUDIT_TTL_SECONDS).toBe(365 * 24 * 3600);
   });
 });

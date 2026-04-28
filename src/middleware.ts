@@ -69,6 +69,7 @@ const SELF_AUTHENTICATED_PREFIXES = [
   "/api/ops/shopify/", // SHOPIFY DTC — unfulfilled queue + dispatch bridge (isAuthorized)
   "/api/ops/upload", // UPLOAD — public-facing NCS-001 / vendor-doc capture (used by /upload/ncs and the wholesale inquiry receipt page). Route enforces its own perimeter: rate limit (5/min/IP), MIME allowlist, 10 MB cap, Drive-only writes (fail-closed if env missing).
   "/api/ops/wholesale/onboarding", // WHOLESALE ONBOARDING — Rene's stalled-flow review surface + daily digest (Phase 35.f.5 + 35.f.5.b). isAuthorized() session + CRON_SECRET. NOTE: the trailing-slash-less prefix matches both /onboarding (read) and /onboarding-digest (cron-fired Slack post).
+  "/api/ops/wholesale/completed", // WHOLESALE COMPLETED — monthly-close audit envelope query surface, Phase 35.f.6.b (isAuthorized session + CRON_SECRET).
 ];
 
 function isSelfAuthenticated(pathname: string): boolean {
