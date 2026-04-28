@@ -1,9 +1,19 @@
-// Hero v2 (2026-04-26) — adds eyebrow, star-rating row, flavor strip, and a
-// bigger product image to fill the cream void Ben flagged on desktop. Copy is
-// still verified-only: wordmark, "Made in the U.S.A." (on the bag itself),
-// "Five natural flavors" (panel claim), "No artificial dyes" (ingredient
-// panel). Star ratings come from getReviewAggregate() (legacy + Shopify
-// verified reviews) and the row only renders when real numbers exist.
+// Hero v3 (2026-04-28) — MOBILE-FIRST RESTRUCTURE. Clarity data 4/28
+// showed 99.5% bounce on mobile because:
+//   - 540px of empty space + 96px H1 ate the entire viewport
+//   - Product image was 360x360 square (off-fold)
+//   - ATC button at y=1140 (~700px BELOW the iPhone fold)
+//   - 281 link clicks → 202 LPVs → 1 view_content → 0 ATC
+// Fix: compressed mobile image (200-260px tall, not square), smaller H1
+// font, and the BagSlider buy widget MOVED right after the H1 so the
+// price + ATC are visible in the first viewport on mobile. Description,
+// flavor strip, and trust row pushed below the fold on mobile (still
+// above the fold on desktop). Desktop layout unchanged.
+//
+// Hero v2 (2026-04-26) — earlier rev. Eyebrow, star-rating, flavor
+// strip, and bigger product image to fill the cream void Ben flagged on
+// desktop. Copy verified-only: wordmark, "Made in the U.S.A." (on bag),
+// "Five natural flavors" (panel), "No artificial dyes" (panel).
 
 import Image from "next/image";
 // BagSlider is already a client component; App Router can render it directly
@@ -60,14 +70,36 @@ export function HeroSection({ review }: { review?: ReviewAggregate } = {}) {
           card, not a wash, so visitors immediately see what they're
           buying. */}
       <div className="relative bg-[var(--lp-cream)]">
-        <div className="relative mx-auto grid max-w-[1200px] grid-cols-1 items-center gap-8 px-5 pb-10 pt-10 sm:px-8 sm:pb-16 sm:pt-14 md:grid-cols-[1.05fr_1fr] md:gap-12 md:pb-20 md:pt-18">
+        {/* Top padding compressed on mobile (pt-4) to remove the 540px
+            empty space that was eating the entire mobile viewport.
+            Desktop padding unchanged (md:pt-18). */}
+        <div className="relative mx-auto grid max-w-[1200px] grid-cols-1 items-center gap-5 px-5 pb-10 pt-4 sm:gap-7 sm:px-8 sm:pb-16 sm:pt-10 md:grid-cols-[1.05fr_1fr] md:gap-12 md:pb-20 md:pt-18">
+          {/* MOBILE-ONLY product photo — must be FIRST in DOM order on
+              mobile (-order-1 in single-column grid). Height-capped
+              200/260px (was 360x360 square) so it doesn't eat the
+              fold. Sits BEFORE the copy column. */}
+          <figure
+            className="relative -order-1 mx-auto w-full max-w-[260px] overflow-hidden border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] sm:max-w-[320px] md:hidden"
+            style={{ boxShadow: "6px 6px 0 var(--lp-red)" }}
+          >
+            <div className="relative h-[200px] w-full sm:h-[240px]">
+              <Image
+                src="/brand/hero-pack-icon.png"
+                alt="USA Gummies — All American Gummy Bears 7.5 oz bag"
+                fill
+                priority
+                sizes="(max-width: 640px) 260px, 320px"
+                className="object-contain p-2"
+              />
+            </div>
+          </figure>
+
           {/* Copy column */}
           <div className="relative">
-            {/* Eyebrow — small caps tag that frames the H1 instead of
-                starting cold. All claims here are panel-verified. */}
+            {/* Eyebrow — small caps tag */}
             <p
               data-reveal="1"
-              className="lp-label flex items-center gap-2 text-[0.78rem] uppercase tracking-[0.18em] text-[var(--lp-ink)]/80"
+              className="lp-label flex items-center gap-2 text-[0.72rem] uppercase tracking-[0.16em] text-[var(--lp-ink)]/80 sm:text-[0.78rem] sm:tracking-[0.18em]"
             >
               <span aria-hidden className="lp-star-ornament h-[10px] w-[10px] text-[var(--lp-red)]" />
               <span>Dye-Free</span>
@@ -75,24 +107,24 @@ export function HeroSection({ review }: { review?: ReviewAggregate } = {}) {
               <span>Made in the U.S.A.</span>
             </p>
 
+            {/* H1 — smaller mobile font (clamp 1.85rem) so it fits 1
+                line height + still reads large. Desktop unchanged. */}
             <h1
               data-reveal="2"
-              className="lp-display mt-3 text-[clamp(2.8rem,9.5vw,6rem)] text-[var(--lp-ink)]"
+              className="lp-display mt-2 text-[clamp(1.85rem,7vw,6rem)] leading-[1.05] text-[var(--lp-ink)] md:mt-3"
             >
               <span className="block">All American</span>
               <span className="block text-[var(--lp-red)]">Gummy Bears.</span>
             </h1>
 
-            {/* Star-rating row — only renders when real review data is
-                present. ratingValue + reviewCount come from
-                getReviewAggregate(); no fabricated numbers. */}
+            {/* Star-rating row — renders only when real review data is present */}
             {showRating && (
               <div
                 data-reveal="3"
-                className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1"
+                className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 md:mt-4"
               >
                 <StarRow value={review!.ratingValue} />
-                <span className="lp-sans text-[0.95rem] text-[var(--lp-ink)]/85">
+                <span className="lp-sans text-[0.9rem] text-[var(--lp-ink)]/85 sm:text-[0.95rem]">
                   <span className="font-semibold text-[var(--lp-ink)]">
                     {review!.ratingValue.toFixed(1)}
                   </span>{" "}
@@ -102,9 +134,22 @@ export function HeroSection({ review }: { review?: ReviewAggregate } = {}) {
               </div>
             )}
 
+            {/* MOBILE BAG SLIDER — moved here (right after H1) so the
+                price + qty + ATC button are in the first viewport on
+                mobile. Was previously ~700px below this position. */}
+            <div
+              data-reveal="3"
+              className="relative mt-4 rounded-sm border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-3 shadow-[6px_6px_0_var(--lp-red)] sm:p-5 md:hidden"
+            >
+              <BagSlider variant="full" defaultQty={5} />
+            </div>
+
+            {/* DESCRIPTION — pushed below the buy widget on mobile.
+                On desktop, sits in normal flow (Bag slider on desktop
+                lives in the right column, so this stays under H1). */}
             <p
               data-reveal="3"
-              className="lp-sans mt-5 max-w-[32ch] text-[1.1rem] leading-[1.5] text-[var(--lp-ink)]/85 sm:text-[1.2rem]"
+              className="lp-sans mt-6 max-w-[32ch] text-[1.05rem] leading-[1.5] text-[var(--lp-ink)]/85 sm:text-[1.2rem]"
             >
               Real gummy bears. Five natural flavors.{" "}
               <span className="font-bold text-[var(--lp-red)]">
@@ -112,21 +157,18 @@ export function HeroSection({ review }: { review?: ReviewAggregate } = {}) {
               </span>
             </p>
 
-            {/* Flavor strip — five real bears for visual proof of the
-                "Five natural flavors" claim. Same canonical mapping as
-                ThreePromises (pink → Cherry, red → Watermelon — the
-                file names were mislabeled before the rebuild). */}
+            {/* Flavor strip — five real bears (below fold on mobile) */}
             <ul
               data-reveal="4"
               aria-label="Five natural flavors"
-              className="mt-6 flex flex-wrap items-end gap-x-4 gap-y-3 sm:gap-x-5"
+              className="mt-5 flex flex-wrap items-end gap-x-4 gap-y-3 sm:mt-6 sm:gap-x-5"
             >
               {FLAVORS.map((f) => (
                 <li
                   key={f.label}
                   className="group flex flex-col items-center gap-1.5"
                 >
-                  <span className="relative block h-[44px] w-[44px] sm:h-[52px] sm:w-[52px]">
+                  <span className="relative block h-[40px] w-[40px] sm:h-[52px] sm:w-[52px]">
                     <Image
                       src={f.src}
                       alt={`${f.label} gummy bear`}
@@ -135,17 +177,17 @@ export function HeroSection({ review }: { review?: ReviewAggregate } = {}) {
                       className="object-contain drop-shadow-[2px_2px_0_var(--lp-red)] transition-transform duration-200 group-hover:-translate-y-0.5"
                     />
                   </span>
-                  <span className="lp-label text-[0.7rem] uppercase tracking-[0.14em] text-[var(--lp-ink)]/80">
+                  <span className="lp-label text-[0.65rem] uppercase tracking-[0.12em] text-[var(--lp-ink)]/80 sm:text-[0.7rem] sm:tracking-[0.14em]">
                     {f.label}
                   </span>
                 </li>
               ))}
             </ul>
 
-            {/* Trust row — three claims that are all on the bag itself */}
+            {/* Trust row — bag claims (below fold on mobile) */}
             <ul
               data-reveal="4"
-              className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-3"
+              className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-3 sm:mt-6"
             >
               {["Made in the U.S.A.", "No Artificial Dyes", "All Natural Flavors"].map(
                 (t) => (
@@ -162,34 +204,15 @@ export function HeroSection({ review }: { review?: ReviewAggregate } = {}) {
                 ),
               )}
             </ul>
-
-            {/* Bag slider tucked under the copy on mobile-first stacks;
-                on desktop it shares the right column with the product
-                photo (see grid below). */}
-            <div
-              data-reveal="3"
-              className="relative mt-8 rounded-sm border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-4 shadow-[6px_6px_0_var(--lp-red)] sm:p-6 md:hidden"
-            >
-              <BagSlider variant="full" defaultQty={5} />
-            </div>
           </div>
 
-          {/* Product hero column — actual product photo first
-              (so visitors immediately see what they're buying), bag
-              slider directly under it for the purchase action. Hidden
-              on small screens where the slider lives in the copy
-              column above. Bumped max-width 360 → 480 on 2026-04-26
-              per Ben's audit ("really lacking some design") to fill
-              the cream void on the desktop fold. */}
+          {/* Desktop product hero column — unchanged, only renders ≥md */}
           <div className="relative hidden flex-col items-end gap-5 md:flex">
             <figure
               data-reveal="3"
               className="relative w-full max-w-[480px] overflow-hidden border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)]"
               style={{ boxShadow: "8px 8px 0 var(--lp-red)" }}
             >
-              {/* Square aspect matches the hero-pack-icon asset
-                  natively (512×512) so the bag + 5-bear lineup shows
-                  in full without cropping. */}
               <div className="relative aspect-square w-full">
                 <Image
                   src="/brand/hero-pack-icon.png"
@@ -209,27 +232,6 @@ export function HeroSection({ review }: { review?: ReviewAggregate } = {}) {
               <BagSlider variant="full" defaultQty={5} />
             </div>
           </div>
-
-          {/* Mobile-only product photo — sits between the trust row
-              and the buy widget (in the copy column above) so the
-              product is still the first thing visitors see when the
-              page stacks. Compact 4:3 keeps the headline above the
-              fold even on narrow screens. */}
-          <figure
-            className="relative -order-1 mx-auto w-full max-w-[360px] overflow-hidden border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] md:hidden"
-            style={{ boxShadow: "6px 6px 0 var(--lp-red)" }}
-          >
-            <div className="relative aspect-square w-full">
-              <Image
-                src="/brand/hero-pack-icon.png"
-                alt="USA Gummies — All American Gummy Bears 7.5 oz bag"
-                fill
-                priority
-                sizes="100vw"
-                className="object-contain p-3"
-              />
-            </div>
-          </figure>
         </div>
 
         <div className="lp-bunting-thin" aria-hidden />
