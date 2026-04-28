@@ -44,6 +44,7 @@ describe("POST /api/leads inquiryUrl behavior", () => {
         source: "wholesale-page",
         buyerName: "Test Buyer",
         storeName: "Test Store",
+        location: "Austin, TX",
       }),
     );
     expect(res.status).toBe(200);
@@ -73,6 +74,7 @@ describe("POST /api/leads inquiryUrl behavior", () => {
         email: "ap@retailer.com",
         intent: "wholesale",
         source: "wholesale-page",
+        location: "Austin, TX",
       }),
     );
     expect(res.status).toBe(200);
@@ -98,10 +100,27 @@ describe("POST /api/leads inquiryUrl behavior", () => {
 
   it("wholesale submission without email is rejected before token mint", async () => {
     const { POST } = await import("../route");
+    // No email AND no phone → 400 missing-contact
     const res = await POST(
       postJson({ intent: "wholesale", source: "wholesale-page" }),
     );
     expect(res.status).toBe(400);
+  });
+
+  it("wholesale submission without location → 400 (location required for freight pricing)", async () => {
+    const { POST } = await import("../route");
+    const res = await POST(
+      postJson({
+        email: "ap@retailer.com",
+        intent: "wholesale",
+        source: "wholesale-page",
+        // no location
+      }),
+    );
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { ok: boolean; error?: string };
+    expect(body.ok).toBe(false);
+    expect(body.error).toMatch(/location|city|state/i);
   });
 
   it("response uses path-only URL when NEXT_PUBLIC_SITE_URL is unset", async () => {
@@ -112,6 +131,7 @@ describe("POST /api/leads inquiryUrl behavior", () => {
         email: "ap@retailer.com",
         intent: "wholesale",
         source: "wholesale-page",
+        location: "Austin, TX",
       }),
     );
     const body = (await res.json()) as { inquiryUrl?: string };
@@ -152,6 +172,7 @@ describe("POST /api/leads — HubSpot deal-create", () => {
         source: "wholesale-page",
         storeName: "Snow Leopard Ventures LLC (TEST)",
         buyerName: "Test Operator",
+        location: "Austin, TX",
       }),
     );
     expect(res.status).toBe(200);
@@ -207,6 +228,7 @@ describe("POST /api/leads — HubSpot deal-create", () => {
           phone: "555-0100", // phone-only inquiry
           intent: "wholesale",
           source: "wholesale-page",
+          location: "Austin, TX", // location now required for wholesale (Rene 2026-04-27)
         }),
       );
       expect(res.status).toBe(200);

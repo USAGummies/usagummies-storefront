@@ -14,6 +14,10 @@ import {
   HUBSPOT,
 } from "@/lib/ops/hubspot-client";
 import { postMessage } from "@/lib/ops/control-plane/slack/client";
+import { sendViaGmailApiDetailed } from "@/lib/ops/gmail-reader";
+import { buildAuditEntry } from "@/lib/ops/control-plane/audit";
+import { newRunContext } from "@/lib/ops/control-plane/run-id";
+import { auditStore } from "@/lib/ops/control-plane/stores";
 
 type LeadPayload = {
   email?: string;
@@ -145,6 +149,22 @@ export async function POST(req: Request) {
 
   if (!email && !phone) {
     return json({ ok: false, error: "Missing email or phone." }, 400);
+  }
+
+  // Wholesale leads must include city/state — it's required for the
+  // freight quote that Ben builds when he replies. Per Rene's
+  // 2026-04-27 walkthrough feedback: "city/state says optional on
+  // intake form - i would want both city and state for freight
+  // pricing not sure why optional."
+  if (intent === "wholesale" && !location) {
+    return json(
+      {
+        ok: false,
+        error:
+          "Location (city, state) is required for wholesale freight pricing.",
+      },
+      400,
+    );
   }
 
   console.info("Lead capture", {
@@ -329,6 +349,83 @@ export async function POST(req: Request) {
     } catch (err) {
       console.warn(
         "[leads] Slack notify failed:",
+        err instanceof Error ? err.message : err,
+      );
+    }
+  }
+
+  // Auto-ack email — Class A `lead.auto-ack` slug (Rene approved
+  // 2026-04-27: "option A - clean simple non pricing email - a good
+  // touch point and confirmation that we did receive request").
+  //
+  // Doctrine: this is autonomous (no per-send approval gate) because
+  // it's a non-commercial confirmation, not outreach. Body is fixed
+  // template — never quotes prices, never makes commitments beyond
+  // restating the 24h response promise. The Apr 13 Viktor incident
+  // locked outbound `gmail.send` behind Class B; this slug is a
+  // narrow exception for receipt confirmations only.
+  //
+  // Audit envelope fires per send. Fail-soft: if Gmail send fails,
+  // the lead-capture response still returns 200 and the on-screen
+  // confirmation still displays. Slack notif (above) is the
+  // operator-side backstop.
+  if (intent === "wholesale" && email) {
+    const recipientName =
+      buyerName.trim() || (storeName.trim() ? storeName.trim() : "there");
+    const subject = "We got your wholesale inquiry — USA Gummies";
+    const textBody = [
+      `Hi ${recipientName},`,
+      "",
+      "Thanks for your wholesale inquiry on USA Gummies. We received your request and our team will follow up within 24 hours with pricing, MOQs, and lead times tailored to your volume + freight preferences.",
+      "",
+      "If you have any questions in the meantime, just reply to this email.",
+      "",
+      "— Ben Stutman",
+      "USA Gummies",
+      "ben@usagummies.com",
+    ].join("\n");
+    try {
+      const sendRes = await sendViaGmailApiDetailed({
+        to: email,
+        subject,
+        body: textBody,
+        from: "Ben Stutman <ben@usagummies.com>",
+      });
+      // Audit envelope per send — Class A `lead.auto-ack` slug.
+      try {
+        const run = newRunContext({
+          agentId: "leads-auto-ack",
+          division: "sales",
+          source: "event",
+          trigger: "lead.auto-ack",
+        });
+        const entry = buildAuditEntry(run, {
+          action: "lead.auto-ack",
+          entityType: "lead",
+          entityId: email,
+          after: {
+            recipient: email,
+            sent: sendRes.ok,
+            messageId: sendRes.ok ? sendRes.messageId : null,
+            threadId: sendRes.ok ? sendRes.threadId : null,
+            sendError: sendRes.ok ? null : sendRes.error,
+            hubspotDealId,
+            interest,
+          },
+          result: sendRes.ok ? "ok" : "error",
+          sourceCitations: [{ system: "wholesale-form" }],
+          confidence: 1,
+        });
+        await auditStore().append(entry);
+      } catch {
+        /* audit failure is non-fatal observability gap */
+      }
+      if (!sendRes.ok) {
+        console.warn("[leads] Auto-ack send failed:", sendRes.error);
+      }
+    } catch (err) {
+      console.warn(
+        "[leads] Auto-ack email error:",
         err instanceof Error ? err.message : err,
       );
     }

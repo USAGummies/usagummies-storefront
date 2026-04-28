@@ -92,7 +92,8 @@ export function WholesaleForm() {
       <input
         name="location"
         type="text"
-        placeholder="City, State (optional)"
+        required
+        placeholder="City, State (required for freight quote)"
         className="w-full rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm text-[var(--text)] placeholder:text-[var(--muted)] outline-none focus:ring-2 focus:ring-[var(--navy)]/20"
       />
       <select
