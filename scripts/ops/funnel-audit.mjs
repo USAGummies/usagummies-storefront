@@ -236,6 +236,81 @@ async function pullDevAppStatus() {
 }
 
 // ---------------------------------------------------------------------------
+// Auto-Sales-reactivation trigger
+//
+// The Sales campaign + ATC/Purchase ad sets are paused while the pixel
+// has too few signal events for Meta to optimize against. As the funnel
+// fills (PageView → ATC → Purchase from the upper-funnel ad sets), this
+// trigger watches the rolling 7-day pixel event totals and unpauses the
+// downstream ad sets automatically once thresholds are crossed.
+//
+// Thresholds (from Meta's documented optimization minimums):
+//   ≥ 25 ATC events in last 7 days → unpause ATC ad set + parent campaign
+//   ≥ 50 Purchase events in last 7d → unpause PURCHASE ad set
+//
+// Posts an event to KV and Slack on any state change so the operator
+// knows when downstream layers came online.
+// ---------------------------------------------------------------------------
+
+const SALES_CAMPAIGN_ID = "120245331362440294";
+const ATC_ADSET_ID = "120245458396790294";
+const PURCHASE_ADSET_ID = "120245452776480294";
+const ATC_THRESHOLD = 25;
+const PURCHASE_THRESHOLD = 50;
+
+async function maybeAutoReactivateSales(pixelEvents) {
+  // Pull last-7d totals for ATC + Purchase
+  const sevenD = Math.floor(Date.now() / 1000) - 7 * 86400;
+  let atc = 0, purchase = 0;
+  try {
+    const stats = await gget(`/${META_PIXEL}/stats?aggregation=event&start_time=${sevenD}`);
+    for (const window of stats.data || []) {
+      for (const ev of window.data || []) {
+        if (ev.value === "AddToCart") atc += ev.count;
+        if (ev.value === "Purchase") purchase += ev.count;
+      }
+    }
+  } catch (e) {
+    return { error: e.message };
+  }
+
+  const actions = [];
+
+  // Check ATC threshold
+  if (atc >= ATC_THRESHOLD) {
+    try {
+      const adset = await gget(`/${ATC_ADSET_ID}?fields=effective_status,configured_status`);
+      const camp = await gget(`/${SALES_CAMPAIGN_ID}?fields=effective_status,configured_status`);
+      if (camp.configured_status === "PAUSED") {
+        await fetch(`https://graph.facebook.com/v21.0/${SALES_CAMPAIGN_ID}`, { method: "POST", body: new URLSearchParams({ status: "ACTIVE", access_token: META_TOKEN }) });
+        actions.push(`✅ Unpaused Sales campaign (had ${atc} ATC events in 7d)`);
+      }
+      if (adset.configured_status === "PAUSED") {
+        await fetch(`https://graph.facebook.com/v21.0/${ATC_ADSET_ID}`, { method: "POST", body: new URLSearchParams({ status: "ACTIVE", access_token: META_TOKEN }) });
+        actions.push(`✅ Unpaused ATC ad set`);
+      }
+    } catch (e) {
+      actions.push(`⚠ ATC reactivation error: ${e.message}`);
+    }
+  }
+
+  // Check Purchase threshold
+  if (purchase >= PURCHASE_THRESHOLD) {
+    try {
+      const adset = await gget(`/${PURCHASE_ADSET_ID}?fields=effective_status,configured_status`);
+      if (adset.configured_status === "PAUSED") {
+        await fetch(`https://graph.facebook.com/v21.0/${PURCHASE_ADSET_ID}`, { method: "POST", body: new URLSearchParams({ status: "ACTIVE", access_token: META_TOKEN }) });
+        actions.push(`✅ Unpaused PURCHASE ad set (had ${purchase} purchases in 7d)`);
+      }
+    } catch (e) {
+      actions.push(`⚠ Purchase reactivation error: ${e.message}`);
+    }
+  }
+
+  return { atc_7d: atc, purchase_7d: purchase, actions };
+}
+
+// ---------------------------------------------------------------------------
 // Anomaly detection
 // ---------------------------------------------------------------------------
 
@@ -290,8 +365,11 @@ async function main() {
     pullDevAppStatus(),
   ]);
 
+  // Auto-reactivate Sales ad sets if pixel signal has crossed thresholds
+  const reactivation = await maybeAutoReactivateSales(pixel);
+
   const previous = loadState();
-  const current = { delivery, pixel, account, shopify, devApp, ts: new Date().toISOString() };
+  const current = { delivery, pixel, account, shopify, devApp, reactivation, ts: new Date().toISOString() };
   const anomalies = detectAnomalies(current, previous);
 
   saveState(current);
@@ -334,6 +412,13 @@ async function main() {
     const dImp = delivery.impressions - (previous.delivery.impressions || 0);
     const dOrders = (shopify.orders_today || 0) - (previous.shopify?.orders_today || 0);
     lines.push(`*vs last audit:* +$${dSpend} spend | +${dImp} imp | +${dOrders} orders`);
+  }
+  lines.push("");
+  lines.push(`*Sales ad set thresholds (7d):*`);
+  lines.push(`  ATC: ${reactivation.atc_7d ?? "?"} / ${ATC_THRESHOLD}  |  Purchase: ${reactivation.purchase_7d ?? "?"} / ${PURCHASE_THRESHOLD}`);
+  if (reactivation.actions && reactivation.actions.length > 0) {
+    lines.push(`*Auto-reactivation:*`);
+    for (const a of reactivation.actions) lines.push(`  ${a}`);
   }
   lines.push("");
   if (anomalies.length > 0) {
