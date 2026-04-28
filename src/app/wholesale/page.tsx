@@ -49,21 +49,6 @@ const VALUE_BULLETS = [
   "Patriotic packaging built for shelf and gift sets.",
 ];
 
-const PROOF_ITEMS = [
-  {
-    title: "Shelf-ready format",
-    detail: "Clean branding, bold USA cues, easy price-pointing.",
-  },
-  {
-    title: "Repeat-friendly",
-    detail: "Classic gummy profile built for reorders and seasonal gifting.",
-  },
-  {
-    title: "Reliable supply",
-    detail: "USA-made production with fast fulfillment windows.",
-  },
-];
-
 const pageJsonLd = {
   "@context": "https://schema.org",
   "@type": "WebPage",
@@ -88,93 +73,67 @@ export default function WholesalePage() {
       />
       <JsonLd data={pageJsonLd} />
 
+      {/* Utility nav — already a buyer link, top-right, doesn't compete with the form */}
+      <div className="bg-[var(--lp-cream)] border-b border-[var(--lp-ink)]/10">
+        <div className="mx-auto flex max-w-[1100px] items-center justify-end gap-4 px-5 py-2 text-[0.78rem] sm:px-8">
+          <span className="lp-sans text-[var(--lp-ink)]/60">Already a buyer?</span>
+          <Link
+            href="/wholesale/status"
+            className="lp-sans font-bold text-[var(--lp-ink)] hover:text-[var(--lp-red)]"
+          >
+            Check order status →
+          </Link>
+        </div>
+      </div>
+
       <PageHero
-        eyebrow="For Buyers"
+        eyebrow="For Distributors, Retailers, and Bulk Buyers"
         headline="Wholesale"
         scriptAccent="USA Gummies."
-        sub="Bring America's favorite dye-free gummy bears to your shelves. Pricing, MOQs, and lead times sent within one business day."
-        ctas={[
-          { href: "#wholesale-form", label: "Request pricing" },
-          { href: "/where-to-buy", label: "Find us in stores", variant: "light" },
-        ]}
+        sub="Pricing, MOQs, and lead times sent within one business day. Master cartons (36 bags) and pallet quantities — landed or buyer-paid freight."
       />
 
-      <section className="bg-[var(--lp-cream)]">
-        <div className="mx-auto max-w-[1100px] px-5 py-14 sm:px-8 sm:py-20">
-          <div className="grid gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
-            <div className="space-y-6">
-              <p className="lp-label text-[var(--lp-red)]">★ Wholesale Snapshot ★</p>
-              <h2 className="lp-display text-[clamp(2rem,5vw,3.2rem)] leading-tight text-[var(--lp-ink)]">
-                Request wholesale
-                <br />
-                <span className="lp-script text-[var(--lp-red)]">pricing.</span>
-              </h2>
-              <p className="lp-sans text-[1.05rem] leading-[1.7] text-[var(--lp-ink)]/85">
-                Built for retail partners who want clean ingredients, made-in-USA credibility, and a
-                bold patriotic brand story. Tell us about your business and we&rsquo;ll send wholesale
-                pricing, MOQs, and lead times within one business day.
-              </p>
-
-              <ul className="lp-sans space-y-3 text-[1rem] text-[var(--lp-ink)]/88">
-                {VALUE_BULLETS.map((bullet) => (
-                  <li key={bullet} className="flex gap-3">
-                    <span className="text-[var(--lp-red)]">★</span>
-                    <span>{bullet}</span>
-                  </li>
-                ))}
-              </ul>
-
-              <div
-                className="border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-6"
-                style={{ boxShadow: "5px 5px 0 var(--lp-ink)" }}
-              >
-                <p className="lp-label mb-3 text-[var(--lp-red)]">★ Retailer Snapshot ★</p>
-                <h3 className="lp-display text-[1.4rem] leading-tight text-[var(--lp-ink)]">
-                  Wholesale-ready at a glance
-                </h3>
-                <div className="mt-4 grid gap-3">
-                  {PROOF_ITEMS.map((item) => (
-                    <div
-                      key={item.title}
-                      className="border-2 border-[var(--lp-ink)] bg-[var(--lp-cream-soft)] p-4"
-                    >
-                      <div className="lp-display text-[1.05rem] text-[var(--lp-ink)]">{item.title}</div>
-                      <div className="lp-sans mt-1 text-[0.92rem] leading-[1.5] text-[var(--lp-ink)]/75">
-                        {item.detail}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div id="wholesale-form" className="lg:sticky lg:top-6">
-              <div
-                className="border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-6 sm:p-7"
-                style={{ boxShadow: "5px 5px 0 var(--lp-red)" }}
-              >
-                <WholesaleForm />
-              </div>
-              <p className="lp-sans mt-4 text-center text-[0.85rem] text-[var(--lp-ink)]/70">
-                Pricing, MOQs, and lead times sent to your inbox within one business day.
-              </p>
-            </div>
+      {/* Form is the primary CTA — no anchor-scroll, no buried-below-marketing-copy. */}
+      <section className="bg-[var(--lp-cream)] border-t-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[680px] px-5 py-12 sm:px-8 sm:py-16">
+          <div
+            className="border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-6 sm:p-8"
+            style={{ boxShadow: "6px 6px 0 var(--lp-red)" }}
+          >
+            <WholesaleForm />
           </div>
+          <p className="lp-sans mt-4 text-center text-[0.85rem] text-[var(--lp-ink)]/65">
+            Pricing, MOQs, and lead times sent to your inbox within one business day.
+          </p>
         </div>
       </section>
 
+      {/* Value pitch lives BELOW the form, not above. Anyone scrolling past
+          the form is reading for context — they're past the conversion point. */}
       <section className="bg-[var(--lp-cream-soft)] border-t-2 border-[var(--lp-ink)]">
-        <div className="mx-auto max-w-[900px] px-5 py-14 text-center sm:px-8 sm:py-16">
-          <p className="lp-label mb-3 text-[var(--lp-red)]">★ Already a Buyer? ★</p>
-          <h2 className="lp-display text-[clamp(2rem,5vw,3rem)] text-[var(--lp-ink)]">
-            Check your
-            <br />
-            <span className="lp-script text-[var(--lp-red)]">order status.</span>
-          </h2>
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
-            <Link href="/wholesale/status" className="lp-cta">
-              Order status
-            </Link>
+        <div className="mx-auto max-w-[1100px] px-5 py-14 sm:px-8 sm:py-16">
+          <div className="text-center">
+            <p className="lp-label text-[var(--lp-red)]">★ Why USA Gummies ★</p>
+            <h2 className="lp-display mt-3 text-[clamp(1.8rem,4.5vw,2.6rem)] leading-tight text-[var(--lp-ink)]">
+              Built for retail partners who want
+              <br />
+              <span className="lp-script text-[var(--lp-red)]">clean credibility.</span>
+            </h2>
+          </div>
+
+          <ul className="lp-sans mx-auto mt-8 grid max-w-[820px] gap-3 text-[1rem] text-[var(--lp-ink)]/88 sm:grid-cols-2">
+            {VALUE_BULLETS.map((bullet) => (
+              <li
+                key={bullet}
+                className="flex gap-3 border-2 border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-4"
+              >
+                <span className="text-[var(--lp-red)]">★</span>
+                <span>{bullet}</span>
+              </li>
+            ))}
+          </ul>
+
+          <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
             <a
               href="https://www.faire.com/brand/bw_cqd5dvfzqu"
               target="_blank"

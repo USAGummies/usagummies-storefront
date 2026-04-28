@@ -64,9 +64,9 @@ export function WholesaleForm() {
 
   return (
     <form onSubmit={handleSubmit} className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] p-4 space-y-3">
-      <div className="text-sm font-black text-[var(--text)]">Get wholesale pricing</div>
-      <p className="text-xs text-[var(--muted)]">
-        For distributors, retailers, and businesses ordering in bulk.
+      <div className="text-xl font-black text-[var(--text)] sm:text-2xl">Get wholesale pricing</div>
+      <p className="text-sm text-[var(--text)]/80 leading-relaxed">
+        For <span className="font-bold">distributors, retailers, and businesses</span> ordering in bulk. Master cartons (36 bags) or pallet quantities.
       </p>
 
       <input
