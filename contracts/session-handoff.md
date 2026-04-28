@@ -8,7 +8,7 @@
 
 ## Where the build is right now
 
-**Test suite:** 2,206 green (140 files). **Workflow blueprint:** v1.62. **Latest baseline:** `4aa3213 feat(wholesale): Phase 35.f.5.c — ops UI page /ops/wholesale/onboarding`. **Viktor briefing:** v1.1 (extended with §10.b-d for wholesale pricing + operating memory + open priorities). **LOCKED doctrine 2026-04-27 PM (post-Ben+Rene call):** `/contracts/wholesale-pricing.md` v1.0 (B1-B5 + atomic-bag), `/contracts/operating-memory.md` v1.0 (Slack-first reporting), `/contracts/wholesale-onboarding-flow.md` **v1.0 CANONICAL** (5 interviewer Qs answered with named defaults — Rene punch-lists tomorrow if anything wrong). **Phase 35 wholesale onboarding shipped end-to-end + ops surface** (13 commits, +248 tests, `npm run build` green): customer-facing flow at `/wholesale/order` (live with HubSpot + Slack + KV + audit) AND Rene's ops surface (`/ops/wholesale/onboarding` browser table, `GET /api/ops/wholesale/onboarding` JSON API, `GET/POST /api/ops/wholesale/onboarding-digest` daily Slack digest cron with idempotent dedup gate).
+**Test suite:** 2,261 green (142 files). **Workflow blueprint:** v1.62. **Latest baseline:** `7b0b052 feat(wholesale): Phase 35.f.6.b — audit envelope index + monthly-close API`. **Viktor briefing:** v1.1 (extended with §10.b-d for wholesale pricing + operating memory + open priorities). **LOCKED doctrine 2026-04-27 PM (post-Ben+Rene call):** `/contracts/wholesale-pricing.md` v1.0 (B1-B5 + atomic-bag), `/contracts/operating-memory.md` v1.0 (Slack-first reporting), `/contracts/wholesale-onboarding-flow.md` **v1.0 CANONICAL** (5 interviewer Qs answered with named defaults — Rene punch-lists tomorrow if anything wrong). **Phase 35 wholesale onboarding shipped end-to-end + ops surface + monthly-close API** (16 commits, +303 tests, `npm run build` green): customer flow at `/wholesale/order` (live with HubSpot + Slack + KV + audit) → ops surface (`/ops/wholesale/onboarding` browser table, `GET /api/ops/wholesale/onboarding`, daily digest cron) → QBO customer/invoice projection module → audit envelope index → `GET /api/ops/wholesale/completed` for monthly close.
 
 **Active build directive (Ben 2026-04-27):** "build the entire system tested." Working through Phase 28L → 29 → 30 → 31 autonomously. See workflow-blueprint.md §"Top P0 build items" for the full queue.
 
@@ -56,8 +56,11 @@
 | Phase 35.f.5 — Rene's stalled-flow review API + middleware allowlist (+15 tests) | DONE | `c8c4dca` |
 | Phase 35.f.5.b — Daily stalled-flow digest cron with idempotent dedup gate (+10 tests) | DONE | `dda60e0` |
 | Phase 35.f.5.c — Ops UI page `/ops/wholesale/onboarding` (browser table view, build green) | DONE | `4aa3213` |
+| Phase 35.f.6 — `qbo-projection.ts` (customer master + invoice + line text) (+28 tests) | DONE | `389c9e8` |
+| Phase 35.f.6.b — Audit envelope index + `/api/ops/wholesale/completed` monthly-close API (+27 tests) | DONE | `7b0b052` |
 | Phase 35.f.3.c — wholesale-AP packet template + QBO approval card payload | NEXT (w/ Rene) | — |
 | Phase 35.f.5.b.cron — Wire digest into Make.com / QStash / Vercel Cron (cadence per Rene preference) | NEXT (w/ Rene) | — |
+| Phase 35.f.6.c — Wire `qbo-projection.ts` into the dispatcher's QBO stub (drops the TODO; needs Rene CoA + customer master schema sign-off) | NEXT (w/ Rene) | — |
 
 ---
 
