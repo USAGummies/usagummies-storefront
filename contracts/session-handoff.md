@@ -8,7 +8,7 @@
 
 ## Where the build is right now
 
-**Test suite:** 2,109 green (134 files). **Workflow blueprint:** v1.62. **Latest baseline:** `1819059 feat(wholesale): Phase 35.e.2 — applyStepPayload route-layer bridge`. **Viktor briefing:** v1.1 (extended with §10.b-d for wholesale pricing + operating memory + open priorities). **LOCKED doctrine 2026-04-27 PM (post-Ben+Rene call):** `/contracts/wholesale-pricing.md` v1.0 (B1-B5 + atomic-bag), `/contracts/operating-memory.md` v1.0 (Slack-first reporting), `/contracts/wholesale-onboarding-flow.md` **v1.0 CANONICAL** (5 interviewer Qs answered with named defaults — Rene punch-lists tomorrow if anything wrong). **Phase 35.a→e.2 shipped autonomously**: pricing-tiers + onboarding state machine + KV persistence + applyStepPayload route-layer bridge (4 commits, +151 tests).
+**Test suite:** 2,181 green (138 files). **Workflow blueprint:** v1.62. **Latest baseline:** `fece472 feat(wholesale): Phase 35.f.4 — multi-step UI at /wholesale/order`. **Viktor briefing:** v1.1 (extended with §10.b-d for wholesale pricing + operating memory + open priorities). **LOCKED doctrine 2026-04-27 PM (post-Ben+Rene call):** `/contracts/wholesale-pricing.md` v1.0 (B1-B5 + atomic-bag), `/contracts/operating-memory.md` v1.0 (Slack-first reporting), `/contracts/wholesale-onboarding-flow.md` **v1.0 CANONICAL** (5 interviewer Qs answered with named defaults — Rene punch-lists tomorrow if anything wrong). **Phase 35 shipped end-to-end autonomously** (10 commits, +223 tests, `npm run build` green): locked-business-logic core (pricing-tiers, state machine, KV persistence, applyStepPayload bridge) → routes (advance + state) → dispatcher (DI) → prod deps wiring (8 of 10 handlers wired; 2 stubs awaiting Rene) → route dispatcher integration → multi-step UI at `/wholesale/order`. Customer can now place a wholesale order live; HubSpot + Slack + KV + audit envelope all fire.
 
 **Active build directive (Ben 2026-04-27):** "build the entire system tested." Working through Phase 28L → 29 → 30 → 31 autonomously. See workflow-blueprint.md §"Top P0 build items" for the full queue.
 
@@ -47,7 +47,13 @@
 | Phase 35.d — Graduate `/contracts/wholesale-onboarding-flow.md` v0.1 → v1.0 with 5 defaults | DONE | `23915e5` |
 | Phase 35.e — KV persistence layer (`onboarding-store.ts` + 21 tests) | DONE | `754c721` |
 | Phase 35.e.2 — `applyStepPayload` route-layer bridge (+20 tests) | DONE | `1819059` |
-| Phase 35.f — Routes (`POST /api/wholesale/onboarding/advance`) + side-effect dispatcher + UI | NEXT | — |
+| Phase 35.f.1 — `POST /api/wholesale/onboarding/advance` route (+13 tests) | DONE | `72e2f67` |
+| Phase 35.f.2 — `GET /api/wholesale/onboarding/state` route (+5 tests) | DONE | `72e2f67` |
+| Phase 35.f.3 — Side-effect dispatcher with DI (+21 tests) | DONE | `d85ca70` |
+| Phase 35.f.3.b — Production deps wiring (+29 tests, 8 of 10 handlers wired) | DONE | `0199181` |
+| Phase 35.f.3.d — Wire dispatcher into advance route (+4 tests) | DONE | `295a009` |
+| Phase 35.f.4 — Multi-step UI at `/wholesale/order` (page + client component, build green) | DONE | `fece472` |
+| Phase 35.f.3.c — wholesale-AP packet template + QBO approval card payload | NEXT (w/ Rene) | — |
 
 ---
 
