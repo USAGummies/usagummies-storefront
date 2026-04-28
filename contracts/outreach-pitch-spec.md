@@ -52,6 +52,8 @@
 | Free freight / free shipping on a master carton (1 MC) | **Trade-show-only offer. Expired after Reunion 2026 closed.** Never re-extend in cold outreach. Free freight only at 3+ pallet MOQ per §6 (Ben ruling 2026-04-27). |
 | "Show pricing as a welcome offer" / "honor the show pricing" | Same — show pricing was show-only. Don't re-extend. |
 | "Freight on us" on any sub-pallet quantity | Same — only at 3+ pallets. |
+| "Ashford" / "Ashford WA" / specific warehouse city or street address | **Internal location. NEVER reference in any outbound email.** Use "our warehouse" / "we ship from WA" / "FOB origin" — but never name the city or street (Ben ruling 2026-04-27). |
+| "30025 SR 706 E" / "98304" | Same — internal warehouse street + zip, never appear in outbound copy. |
 
 ## 5. Case pack (LOCKED)
 
