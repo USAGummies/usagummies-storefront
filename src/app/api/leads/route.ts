@@ -325,30 +325,62 @@ export async function POST(req: Request) {
   // ~Apr 13). Per /contracts/operating-memory.md v1.0: "every system-
   // generated report posts to Slack first." Fail-soft: a Slack post
   // failure never blocks the lead-capture response.
+  //
+  // **Hardened (Rene 2026-04-27 walkthrough):** uses channel ID
+  // (`C0AKG9FSC2J`) not name to remove name-resolution ambiguity.
+  // CHECKS the postMessage return value — silent failures were
+  // hiding a `not_in_channel` error from Rene's first test. On
+  // failure, falls back to `#abra-control` (where the bot is a
+  // confirmed member) with a loud diagnostic so the operator sees
+  // the failure path and can invite the bot to #financials.
+  const FINANCIALS_CHANNEL_ID = "C0AKG9FSC2J";
+  const FALLBACK_CHANNEL = "#abra-control"; // bot confirmed-member here
   if (intent === "wholesale" && (email || phone)) {
+    const headline = `:wave: *New wholesale lead* — ${storeName || buyerName || email || "(no name)"}`;
+    const interestLabel = INTEREST_LABELS[interest] || interest || "(none)";
+    const lines = [
+      headline,
+      buyerName ? `*Contact:* ${buyerName}` : "",
+      email ? `*Email:* ${email}` : "",
+      phone ? `*Phone:* ${phone}` : "",
+      location ? `*Location:* ${location}` : "",
+      `*Interest:* ${interestLabel}`,
+      hubspotDealId
+        ? `*HubSpot deal id:* \`${hubspotDealId}\` (open the deal in HubSpot to advance the stage)`
+        : "*HubSpot deal:* (not created — check HubSpot config)",
+      "",
+      "_Next step:_ Ben reviews → advances HubSpot stage to `PO Received` → sends prospect the `/onboarding/<dealId>` link → quotes pricing within 24h.",
+    ].filter(Boolean);
+    const text = lines.join("\n");
     try {
-      const headline = `:wave: *New wholesale lead* — ${storeName || buyerName || email || "(no name)"}`;
-      const interestLabel = INTEREST_LABELS[interest] || interest || "(none)";
-      const lines = [
-        headline,
-        buyerName ? `*Contact:* ${buyerName}` : "",
-        email ? `*Email:* ${email}` : "",
-        phone ? `*Phone:* ${phone}` : "",
-        location ? `*Location:* ${location}` : "",
-        `*Interest:* ${interestLabel}`,
-        hubspotDealId
-          ? `*HubSpot deal id:* \`${hubspotDealId}\` (open the deal in HubSpot to advance the stage)`
-          : "*HubSpot deal:* (not created — check HubSpot config)",
-        "",
-        "_Next step:_ Ben reviews → advances HubSpot stage to `PO Received` → sends prospect the `/onboarding/<dealId>` link → quotes pricing within 24h.",
-      ].filter(Boolean);
-      await postMessage({
-        channel: "#financials",
-        text: lines.join("\n"),
+      const res = await postMessage({
+        channel: FINANCIALS_CHANNEL_ID,
+        text,
       });
+      if (!res.ok) {
+        // Loud diagnostic — most likely cause is `not_in_channel`
+        // (bot needs to be invited to #financials). Fallback-post
+        // to a channel the bot IS in so the operator sees the
+        // failure.
+        console.error(
+          `[leads] Slack post to #financials failed: ${res.error}. Bot likely needs invite to channel ${FINANCIALS_CHANNEL_ID}.`,
+        );
+        try {
+          await postMessage({
+            channel: FALLBACK_CHANNEL,
+            text:
+              `:rotating_light: *Wholesale lead notification fell back to #abra-control*\n` +
+              `Tried to post to #financials (\`${FINANCIALS_CHANNEL_ID}\`) but got \`${res.error || "unknown error"}\`. ` +
+              `Most likely fix: invite the bot to #financials (Slack channel settings → Integrations → Add app → USA Gummies bot).\n\n` +
+              `*Original notification below:*\n${text}`,
+          });
+        } catch {
+          /* fallback also failed; lead is still captured server-side */
+        }
+      }
     } catch (err) {
-      console.warn(
-        "[leads] Slack notify failed:",
+      console.error(
+        "[leads] Slack notify exception:",
         err instanceof Error ? err.message : err,
       );
     }
