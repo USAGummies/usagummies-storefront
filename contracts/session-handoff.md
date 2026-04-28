@@ -8,7 +8,7 @@
 
 ## Where the build is right now
 
-**Test suite:** 2,181 green (138 files). **Workflow blueprint:** v1.62. **Latest baseline:** `fece472 feat(wholesale): Phase 35.f.4 — multi-step UI at /wholesale/order`. **Viktor briefing:** v1.1 (extended with §10.b-d for wholesale pricing + operating memory + open priorities). **LOCKED doctrine 2026-04-27 PM (post-Ben+Rene call):** `/contracts/wholesale-pricing.md` v1.0 (B1-B5 + atomic-bag), `/contracts/operating-memory.md` v1.0 (Slack-first reporting), `/contracts/wholesale-onboarding-flow.md` **v1.0 CANONICAL** (5 interviewer Qs answered with named defaults — Rene punch-lists tomorrow if anything wrong). **Phase 35 shipped end-to-end autonomously** (10 commits, +223 tests, `npm run build` green): locked-business-logic core (pricing-tiers, state machine, KV persistence, applyStepPayload bridge) → routes (advance + state) → dispatcher (DI) → prod deps wiring (8 of 10 handlers wired; 2 stubs awaiting Rene) → route dispatcher integration → multi-step UI at `/wholesale/order`. Customer can now place a wholesale order live; HubSpot + Slack + KV + audit envelope all fire.
+**Test suite:** 2,206 green (140 files). **Workflow blueprint:** v1.62. **Latest baseline:** `4aa3213 feat(wholesale): Phase 35.f.5.c — ops UI page /ops/wholesale/onboarding`. **Viktor briefing:** v1.1 (extended with §10.b-d for wholesale pricing + operating memory + open priorities). **LOCKED doctrine 2026-04-27 PM (post-Ben+Rene call):** `/contracts/wholesale-pricing.md` v1.0 (B1-B5 + atomic-bag), `/contracts/operating-memory.md` v1.0 (Slack-first reporting), `/contracts/wholesale-onboarding-flow.md` **v1.0 CANONICAL** (5 interviewer Qs answered with named defaults — Rene punch-lists tomorrow if anything wrong). **Phase 35 wholesale onboarding shipped end-to-end + ops surface** (13 commits, +248 tests, `npm run build` green): customer-facing flow at `/wholesale/order` (live with HubSpot + Slack + KV + audit) AND Rene's ops surface (`/ops/wholesale/onboarding` browser table, `GET /api/ops/wholesale/onboarding` JSON API, `GET/POST /api/ops/wholesale/onboarding-digest` daily Slack digest cron with idempotent dedup gate).
 
 **Active build directive (Ben 2026-04-27):** "build the entire system tested." Working through Phase 28L → 29 → 30 → 31 autonomously. See workflow-blueprint.md §"Top P0 build items" for the full queue.
 
@@ -53,7 +53,11 @@
 | Phase 35.f.3.b — Production deps wiring (+29 tests, 8 of 10 handlers wired) | DONE | `0199181` |
 | Phase 35.f.3.d — Wire dispatcher into advance route (+4 tests) | DONE | `295a009` |
 | Phase 35.f.4 — Multi-step UI at `/wholesale/order` (page + client component, build green) | DONE | `fece472` |
+| Phase 35.f.5 — Rene's stalled-flow review API + middleware allowlist (+15 tests) | DONE | `c8c4dca` |
+| Phase 35.f.5.b — Daily stalled-flow digest cron with idempotent dedup gate (+10 tests) | DONE | `dda60e0` |
+| Phase 35.f.5.c — Ops UI page `/ops/wholesale/onboarding` (browser table view, build green) | DONE | `4aa3213` |
 | Phase 35.f.3.c — wholesale-AP packet template + QBO approval card payload | NEXT (w/ Rene) | — |
+| Phase 35.f.5.b.cron — Wire digest into Make.com / QStash / Vercel Cron (cadence per Rene preference) | NEXT (w/ Rene) | — |
 
 ---
 
