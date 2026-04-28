@@ -1,7 +1,12 @@
 "use client";
 
-// Sticky mobile buy bar — appears after the user scrolls past the hero.
-// Thumb-zone anchored. Keeps the CTA a tap away no matter how deep they scroll.
+// Sticky mobile buy bar — keeps the CTA a tap away from the moment users
+// arrive. Critical for ad traffic: Instagram WebView users bounce in 1-2
+// seconds; they need a visible buy CTA in the first viewport, before they
+// scroll. Logic (revised 2026-04-27 from data showing 1-2s bounce on
+// Instagram traffic):
+//   - On mobile (<768px viewport): show after 1.2s delay regardless of scroll
+//   - On desktop / above any-device 50px scroll: show immediately
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -11,14 +16,25 @@ export function StickyBuyBar() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    const isMobile = window.matchMedia("(max-width: 767px)").matches;
+
+    // On mobile, force-show after 1.2 seconds — ad-click visitors need an
+    // immediate visible CTA, they bounce too fast to scroll for it.
+    let mobileTimer: ReturnType<typeof setTimeout> | null = null;
+    if (isMobile) {
+      mobileTimer = setTimeout(() => setShow(true), 1200);
+    }
+
     const onScroll = () => {
-      // Show once the user is past the first viewport-ish of scroll
-      const threshold = Math.min(window.innerHeight * 0.8, 620);
-      setShow(window.scrollY > threshold);
+      // Aggressive low threshold (~50px) — show as soon as any scroll happens.
+      setShow(window.scrollY > 50);
     };
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    return () => {
+      if (mobileTimer) clearTimeout(mobileTimer);
+      window.removeEventListener("scroll", onScroll);
+    };
   }, []);
 
   return (
