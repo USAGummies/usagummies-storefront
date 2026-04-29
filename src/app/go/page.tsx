@@ -1,9 +1,19 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { AMAZON_LISTING_URL } from "@/lib/amazon";
 import { AMAZON_REVIEWS } from "@/data/amazonReviews";
 import GoTracker from "./GoTracker.client";
+
+// Inline US map SVG for the supply-chain section. Read at build time.
+// We strip the SVG's internal <defs><style>...</style></defs> because Next's
+// SSR + client hydration encode <style> inside dangerouslySetInnerHTML
+// inconsistently, throwing a hydration error. We move the equivalent rules
+// to the page CSS instead.
+const US_MAP_SVG = readFileSync(resolve(process.cwd(), "public/us-map-states.svg"), "utf8")
+  .replace(/<defs>[\s\S]*?<\/defs>/, "");
 
 // API route that creates a Storefront API cart and redirects to checkout
 // (bypasses the Shop Pay / shop.app redirect that the raw cart permalink triggers)
@@ -108,6 +118,19 @@ export default function GoLandingPage() {
         @media (min-width: 768px) {
           .lp-sticky-bar { display: none; }
         }
+        /* Supply-chain US map — base styles + highlight the 5 active states.
+           The SVG's internal <defs><style> block was stripped (hydration
+           mismatch); we recreate the base styles here. */
+        .supply-chain-map { max-width: 760px; margin: 28px auto 0; padding: 0 4px; }
+        .supply-chain-map svg { width: 100%; height: auto; display: block; }
+        .supply-chain-map svg .state path { fill: #e6e1d6; }
+        .supply-chain-map svg .borders { stroke: #d6d0c3; stroke-width: 0.75; }
+        .supply-chain-map svg .dccircle { display: none; }
+        .supply-chain-map svg .in,
+        .supply-chain-map svg .wi,
+        .supply-chain-map svg .wa,
+        .supply-chain-map svg .wy,
+        .supply-chain-map svg .pa { fill: #c7362c; }
       `}</style>
 
       {/* Header */}
@@ -420,12 +443,15 @@ export default function GoLandingPage() {
           <div className="lp-display" style={{ fontSize: 26, letterSpacing: "1px", color: "#1B2A4A" }}>
             ACROSS AMERICA. ONE BAG.
           </div>
-          <div style={{ fontSize: 14, color: "#5f5b56", marginTop: 8, marginBottom: 32 }}>
+          <div style={{ fontSize: 14, color: "#5f5b56", marginTop: 8, marginBottom: 8 }}>
             Six locations. Five states. From sea to shining sea.
           </div>
 
+          {/* US map — highlights IN, WI, WA, WY, PA in red. Inlined SVG so we can override .state fill via CSS. */}
+          <div className="supply-chain-map" dangerouslySetInnerHTML={{ __html: US_MAP_SVG }} aria-hidden="true" />
+
           {/* Row 1 — Production */}
-          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "2px", color: "#c7362c", marginBottom: 12 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "2px", color: "#c7362c", marginTop: 36, marginBottom: 12 }}>
             PRODUCTION
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12, maxWidth: 820, margin: "0 auto 28px" }} className="sm:!grid-cols-3">
