@@ -19,12 +19,35 @@ describe("OpenAI workspace tool registry", () => {
     const summary = summarizeOpenAIWorkspaceTools();
     expect(summary.total).toBe(OPENAI_WORKSPACE_TOOLS.length);
     expect(summary.ready).toBeGreaterThan(0);
-    expect(summary.planned).toBeGreaterThan(0);
+    // `planned` is allowed to be 0 — we ship planned tools to ready as
+    // their blockers clear (e.g. ops.agent.packs + ops.operating-memory.search
+    // moved planned→ready when P0-2 + P0-3 shipped 2026-04-29).
+    expect(summary.planned).toBeGreaterThanOrEqual(0);
     expect(summary.blocked).toBeGreaterThan(0);
     expect(summary.total).toBe(summary.ready + summary.planned + summary.blocked);
     expect(summary.total).toBe(
       summary.readOnly + summary.approvalRequest + summary.prohibited,
     );
+  });
+
+  it("ops.agent.packs is wired to the P0-2 dashboard backing route", () => {
+    const t = getOpenAIWorkspaceTool("ops.agent.packs");
+    expect(t).toBeDefined();
+    expect(t?.status).toBe("ready");
+    expect(t?.mode).toBe("read");
+    expect(t?.readOnly).toBe(true);
+    expect(t?.backingRoute).toBe("/api/ops/agents/packs/snapshot");
+    expect(t?.blocker).toBeUndefined();
+  });
+
+  it("ops.operating-memory.search is wired to the P0-3 transcript-saver backing route", () => {
+    const t = getOpenAIWorkspaceTool("ops.operating-memory.search");
+    expect(t).toBeDefined();
+    expect(t?.status).toBe("ready");
+    expect(t?.mode).toBe("read");
+    expect(t?.readOnly).toBe(true);
+    expect(t?.backingRoute).toBe("/api/ops/operating-memory/recent");
+    expect(t?.blocker).toBeUndefined();
   });
 
   it("all read tools are actually read-only and never require approval", () => {
