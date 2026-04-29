@@ -23,7 +23,6 @@
  */
 
 export type RedactionKind =
-  | "api_key"
   | "aws_key"
   | "private_key"
   | "jwt"
@@ -98,8 +97,22 @@ const PATTERNS: readonly RedactionPattern[] = Object.freeze([
     kind: "ach_routing",
     re: /\b(?:routing|aba|account|acct)\s*(?:#|number|no\.?)?\s*[:=]?\s*\d{8,17}\b/gi,
   },
-  // Generic high-entropy api-key-shaped strings (last resort, conservative)
-  { kind: "api_key", re: /\b[A-Za-z0-9_-]{40,}\b/g },
+  // NOTE — 2026-04-29 post-P0 architecture review:
+  // Removed the generic catch-all `\b[A-Za-z0-9_-]{40,}\b` pattern.
+  // It was over-aggressive: it would silently scrub Shopify GraphQL
+  // cursors, Notion page IDs (concatenated form), long URL fragments,
+  // and other benign business content that happens to be ≥40 chars
+  // alphanumeric — corrupting the operator transcript without warning.
+  // The 13 shape-specific patterns above (AWS, Stripe, OpenAI, GitHub,
+  // Slack, Supabase, JWT, PEM, Bearer-prefixed, labeled password=,
+  // SSN, CC, ACH) catch every known-shape real secret. The labeled
+  // `password_assignment` pattern catches unknown-shape secrets that
+  // appear with a context word (`api_key=`, `secret:`, etc.). A bare
+  // 40+-char alphanumeric run with NO labeled context is more likely
+  // a benign cursor/id than a leaked secret. Defense-in-depth is
+  // preserved by the specific patterns; the false-positive risk on
+  // operator content is removed. If a new shape-specific secret
+  // emerges, ADD a pattern for it — don't reintroduce the catch-all.
 ]);
 
 const REDACTED_TOKEN = "[REDACTED]";

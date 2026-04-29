@@ -117,11 +117,16 @@ export function classifyEntry(body: string, kindHint?: EntryKind): Classificatio
     }
   }
 
-  // Long-body fallback to "transcript" if nothing else matched and the
-  // body looks like a recap (long + multi-paragraph).
+  // Catch-all fallback: when no pattern matched, file as "transcript".
+  // (Earlier versions of this branch had a `looksLikeRecap` test
+  // intended to distinguish recap-shaped bodies from short stubs, but
+  // both branches resolved to "transcript" — the distinction was never
+  // implemented. Removed 2026-04-29 to drop dead code; the §17
+  // capture-or-evaporate doctrine still defaults to "transcript" for
+  // unclassifiable content, which is the safer bucket for drift
+  // detection than silently dropping it.)
   if (chosen === null) {
-    const looksLikeRecap = body.length >= 1200 && /\n\s*\n/.test(body);
-    chosen = looksLikeRecap ? "transcript" : "transcript";
+    chosen = "transcript";
   }
 
   // Honor an explicit kindHint when it's compatible — but a "correction"

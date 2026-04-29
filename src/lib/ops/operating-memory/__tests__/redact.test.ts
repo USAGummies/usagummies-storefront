@@ -115,6 +115,35 @@ describe("redactSecrets — clean input", () => {
   it("returns text unchanged when input is empty", () => {
     expect(redactSecrets("")).toEqual({ text: "", kinds: [] });
   });
+
+  // Locks the 2026-04-29 fix: generic 40+-char alphanumeric catch-all
+  // was removed because it scrubbed Shopify GraphQL cursors, Notion
+  // page IDs, and other benign business content that happens to be
+  // long. The 13 shape-specific patterns still catch real secrets.
+  it("does NOT scrub a Shopify GraphQL cursor or similar long benign string", () => {
+    const cursor =
+      "eyJsYXN0X2lkIjoiZ2lkOi8vc2hvcGlmeS9PcmRlci8xMjM0NTY3ODkwIiwibGFzdF92YWx1ZSI6IjIwMjYtMDQtMjkifQ";
+    // The cursor STARTS with `eyJ` so the JWT pattern WILL still match
+    // (intentional — JWT shape is high-confidence). For this specific
+    // test, use a non-JWT-shaped long benign string:
+    const benign =
+      "shopify_admin_query_cursor_R0lEcG93ZXJzbW9uZGF5b3JkZXJ0aGFua3lvdXBhZ2UyMDI2";
+    const r = redactSecrets(`Order pull cursor: ${benign} returned 47 orders.`);
+    expect(r.text).toContain(benign);
+    expect(r.kinds).toEqual([]);
+    // Sanity: the cursor that starts with eyJ IS still caught by the
+    // JWT pattern (defense-in-depth on a real shape).
+    const jwtShaped = redactSecrets(`Cursor: ${cursor}.foo.bar`);
+    expect(jwtShaped.kinds).toContain("jwt");
+  });
+
+  it("does NOT scrub 40+ char alphanumeric runs without secret-shape context", () => {
+    const r = redactSecrets(
+      "Mike confirmed Powers production batch B0001 ID is reallylongbutbenignidentifierxxxxxxxxxxxxxxxxxxx noted.",
+    );
+    expect(r.kinds).toEqual([]);
+    expect(r.text).toContain("reallylongbutbenignidentifier");
+  });
 });
 
 describe("redactSecrets — multiple distinct kinds", () => {
