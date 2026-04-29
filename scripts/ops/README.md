@@ -18,8 +18,21 @@ Override `CONTROL_PLANE_BASE_URL` (default `https://www.usagummies.com`) for loc
 | `append-violation.mjs` | `CRON_SECRET` | `POST /api/ops/control-plane/violations` |
 | `append-correction.mjs` | `CRON_SECRET` | `POST /api/ops/control-plane/corrections` |
 | `list-paused.mjs` | `CRON_SECRET` | `GET /api/ops/control-plane/paused` |
+| `daily-brief.mjs` | `CRON_SECRET` | `POST /api/ops/daily-brief?kind=<morning\|eod>&post=<true\|false>` |
 | `unpause-agent.mjs` | **`CONTROL_PLANE_ADMIN_SECRET`** | `POST /api/ops/control-plane/unpause` |
 | `control-plane.mjs` | — | Shared helpers (not invoked directly). |
+
+## Daily brief
+
+Use the canonical route, not local scripts that talk to Gmail/HubSpot/Slack directly:
+
+```bash
+# Compose only; no Slack post
+CRON_SECRET=... node scripts/ops/daily-brief.mjs --kind morning --dry
+
+# Post to the configured daily-brief Slack channel
+CRON_SECRET=... node scripts/ops/daily-brief.mjs --kind morning --post
+```
 
 ## Inspection (no dedicated script; curl the endpoints directly)
 
