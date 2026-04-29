@@ -129,9 +129,6 @@ export default function GoLandingPage() {
               style={{ height: 36, width: "auto", objectFit: "contain" }}
               priority
             />
-            <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: "0.18em", textTransform: "uppercase", color: "#1B2A4A" }}>
-              Made in the USA
-            </span>
           </Link>
           <a
             href={CHECKOUT_URL}
@@ -173,16 +170,10 @@ export default function GoLandingPage() {
 
           {/* Mobile: Compact hero with image + CTA side by side */}
           <div className="lp-animate" style={{ textAlign: "center" }}>
-            {/* Headline pills */}
-            <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 6, marginBottom: 12 }}>
-              <span style={{ background: "#1B2A4A", color: "#fff", padding: "5px 12px", borderRadius: 8, fontSize: 12, fontWeight: 700, letterSpacing: "1px" }} className="lp-display">
-                🇺🇸 MADE IN AMERICA
-              </span>
-              <span style={{ background: "#2D7A3A", color: "#fff", padding: "5px 12px", borderRadius: 8, fontSize: 12, fontWeight: 700, letterSpacing: "1px" }} className="lp-display">
+            {/* Headline pill — single distinct claim, no Made-in-USA repetition (the bag + supply-chain section already say it) */}
+            <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 6, marginBottom: 14 }}>
+              <span style={{ background: "#2D7A3A", color: "#fff", padding: "5px 14px", borderRadius: 8, fontSize: 12, fontWeight: 700, letterSpacing: "1px" }} className="lp-display">
                 NO ARTIFICIAL DYES
-              </span>
-              <span style={{ background: "#c7a062", color: "#1B2A4A", padding: "5px 12px", borderRadius: 8, fontSize: 12, fontWeight: 700, letterSpacing: "1px" }} className="lp-display">
-                ALL NATURAL
               </span>
             </div>
 
@@ -195,12 +186,10 @@ export default function GoLandingPage() {
                 margin: 0,
               }}
             >
-              No Red 40. No Yellow 5. No Blue 1.
-              <br />
-              <span style={{ color: "#c7362c" }}>Just real American gummy bears.</span>
+              No Red 40. <span style={{ color: "#c7362c" }}>No Yellow 5. No Blue 1.</span>
             </h1>
-            <p style={{ fontSize: 14, lineHeight: 1.5, color: "#5f5b56", marginTop: 12, maxWidth: 440, marginLeft: "auto", marginRight: "auto" }}>
-              Made in three American states. Indiana, Wisconsin, and Spokane &mdash; at a veteran-owned facility.
+            <p style={{ fontSize: 14, lineHeight: 1.5, color: "#5f5b56", marginTop: 12, maxWidth: 460, marginLeft: "auto", marginRight: "auto" }}>
+              American gummy bears, made across the country.
             </p>
 
             {/* Social proof stat */}
@@ -228,24 +217,6 @@ export default function GoLandingPage() {
                   boxShadow: "0 24px 48px rgba(27,42,74,0.12)",
                 }}
               />
-              <span
-                className="lp-display lp-animate-d2"
-                style={{
-                  position: "absolute",
-                  top: -10,
-                  right: -4,
-                  background: "#1B2A4A",
-                  color: "#fff",
-                  fontSize: 12,
-                  letterSpacing: "1.5px",
-                  padding: "5px 12px",
-                  borderRadius: 6,
-                  transform: "rotate(3deg)",
-                  boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-                }}
-              >
-                🇺🇸 MADE IN USA
-              </span>
             </div>
           </div>
         </div>
@@ -443,39 +414,60 @@ export default function GoLandingPage() {
         </div>
       </section>
 
-      {/* 3-state supply chain story */}
-      <section style={{ background: "#f8f5ef", padding: "36px 20px", borderBottom: "1px solid #e0dcd6" }}>
-        <div style={{ maxWidth: 800, margin: "0 auto", textAlign: "center" }}>
-          <div className="lp-display" style={{ fontSize: 20, letterSpacing: "1px", color: "#1B2A4A" }}>
-            THREE STATES. ONE PRODUCT.
+      {/* Supply chain story — 6 locations, 2 rows (production + ops). Typography-only, no emojis. */}
+      <section style={{ background: "#f8f5ef", padding: "44px 20px", borderBottom: "1px solid #e0dcd6" }}>
+        <div style={{ maxWidth: 960, margin: "0 auto", textAlign: "center" }}>
+          <div className="lp-display" style={{ fontSize: 26, letterSpacing: "1px", color: "#1B2A4A" }}>
+            ACROSS AMERICA. ONE BAG.
           </div>
-          <div style={{ fontSize: 14, color: "#5f5b56", marginTop: 8, marginBottom: 24 }}>
-            From sea to shining sea &mdash; American jobs, American workers.
+          <div style={{ fontSize: 14, color: "#5f5b56", marginTop: 8, marginBottom: 32 }}>
+            Six locations. Five states. From sea to shining sea.
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 16, maxWidth: 720, margin: "0 auto" }} className="sm:!grid-cols-3">
+
+          {/* Row 1 — Production */}
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "2px", color: "#c7362c", marginBottom: 12 }}>
+            PRODUCTION
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12, maxWidth: 820, margin: "0 auto 28px" }} className="sm:!grid-cols-3">
             {[
-              { state: "INDIANA", role: "Gummies crafted", icon: "🌽" },
-              { state: "WISCONSIN", role: "Packaging printed at Belmark", icon: "🏭" },
-              { state: "SPOKANE, WA", role: "Repacked at a veteran-owned facility", icon: "🇺🇸" },
-            ].map((step, i) => (
-              <div key={step.state} style={{ background: "#ffffff", border: "1px solid #e0dcd6", borderRadius: 12, padding: "20px 16px", position: "relative" }}>
-                <div style={{ fontSize: 32 }}>{step.icon}</div>
-                <div className="lp-display" style={{ fontSize: 14, letterSpacing: "1.5px", color: "#1B2A4A", marginTop: 8 }}>
+              { state: "Indiana", role: "Gummies crafted" },
+              { state: "Wisconsin", role: "Packaging printed at Belmark" },
+              { state: "Spokane, WA", role: "Repacked at a veteran-owned facility" },
+            ].map((step) => (
+              <div key={step.state} style={{ background: "#ffffff", border: "1px solid #e0dcd6", borderRadius: 12, padding: "20px 16px" }}>
+                <div className="lp-display" style={{ fontSize: 18, letterSpacing: "0.5px", color: "#1B2A4A" }}>
                   {step.state}
                 </div>
-                <div style={{ fontSize: 12, color: "#5f5b56", marginTop: 4 }}>
+                <div style={{ fontSize: 12, color: "#5f5b56", marginTop: 6, lineHeight: 1.5 }}>
                   {step.role}
                 </div>
-                {i < 2 && (
-                  <div style={{ position: "absolute", right: -8, top: "50%", fontSize: 18, color: "#c7a062", fontWeight: 700 }} className="hidden sm:!block">
-                    →
-                  </div>
-                )}
               </div>
             ))}
           </div>
-          <div style={{ fontSize: 11, color: "#5f5b56", marginTop: 18, fontStyle: "italic" }}>
-            Most &ldquo;Made in USA&rdquo; brands won&rsquo;t tell you which states. We can.
+
+          {/* Row 2 — Headquarters & Shipping */}
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "2px", color: "#1B2A4A", marginBottom: 12 }}>
+            HEADQUARTERS & SHIPPING
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12, maxWidth: 820, margin: "0 auto" }} className="sm:!grid-cols-3">
+            {[
+              { state: "Wyoming", role: "Corporate offices" },
+              { state: "Ashford, WA", role: "Shipping warehouse" },
+              { state: "Pennsylvania", role: "East Coast warehouse" },
+            ].map((step) => (
+              <div key={step.state} style={{ background: "#ffffff", border: "1px solid #e0dcd6", borderRadius: 12, padding: "20px 16px" }}>
+                <div className="lp-display" style={{ fontSize: 18, letterSpacing: "0.5px", color: "#1B2A4A" }}>
+                  {step.state}
+                </div>
+                <div style={{ fontSize: 12, color: "#5f5b56", marginTop: 6, lineHeight: 1.5 }}>
+                  {step.role}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ fontSize: 12, color: "#5f5b56", marginTop: 24, fontStyle: "italic" }}>
+            Most &ldquo;Made in USA&rdquo; brands won&rsquo;t tell you which states. We will.
           </div>
         </div>
       </section>
@@ -522,28 +514,7 @@ export default function GoLandingPage() {
         </div>
       </section>
 
-      {/* Why USA Gummies */}
-      <section style={{ maxWidth: 800, margin: "0 auto", padding: "32px 20px" }}>
-        <div className="lp-display" style={{ fontSize: 20, letterSpacing: "1px", color: "#1B2A4A", textAlign: "center", marginBottom: 20 }}>
-          WHY CHOOSE USA GUMMIES?
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }} className="sm:!grid-cols-4">
-          {[
-            { icon: "🇺🇸", title: "Made in USA", desc: "FDA-registered facilities" },
-            { icon: "🌿", title: "No Artificial Dyes", desc: "All natural colors" },
-            { icon: "🍬", title: "5 Classic Flavors", desc: "Cherry, Lemon, Apple, Orange, Watermelon" },
-            { icon: "💯", title: "Money-Back Guarantee", desc: "Love them or full refund" },
-          ].map((item) => (
-            <div key={item.title} style={{ background: "#ffffff", border: "1px solid #e0dcd6", borderRadius: 12, padding: "16px 12px", textAlign: "center" }}>
-              <div style={{ fontSize: 28 }}>{item.icon}</div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#1B2A4A", marginTop: 6 }}>{item.title}</div>
-              <div style={{ fontSize: 11, color: "#5f5b56", marginTop: 2 }}>{item.desc}</div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Second CTA block — after social proof */}
+      {/* Second CTA block — after social proof. (Killed redundant "Why Choose USA Gummies?" 4-card section 2026-04-29 — same claims appeared 4x earlier on page.) */}
       <section style={{ maxWidth: 560, margin: "0 auto", padding: "32px 20px" }}>
         <div style={{ textAlign: "center", marginBottom: 16 }}>
           <span className="lp-display" style={{ fontSize: 22, letterSpacing: "1px", color: "#1B2A4A" }}>
