@@ -125,9 +125,12 @@ describe("buildApPacketEmail — greeting", () => {
 // ---------------------------------------------------------------------------
 
 describe("buildApPacketEmail — order block", () => {
-  it("enumerates each order line with B-tier designator", () => {
+  it("enumerates each order line with clean prose description (Rene 2026-04-28 lock)", () => {
     const r = buildApPacketEmail(buildState(), BASIC_CTX);
-    expect(r.body).toMatch(/B3/);
+    // Description must be customer-facing prose, NOT the legacy "B3 —" form.
+    expect(r.body).not.toMatch(/B3 —/);
+    expect(r.body).toContain("36-Bag Master Carton");
+    expect(r.body).toContain("Buyer Freight");
     expect(r.body).toMatch(/15 master cartons/);
     expect(r.body).toMatch(/540 bags/);
   });

@@ -100,14 +100,61 @@ export const TIER_DISPLAY: Readonly<Record<PricingTier, string>> = {
   B5: "Pallet + buyer freight",
 };
 
-/** Short label for QBO invoice line text + Slack notifications. */
+/**
+ * Customer-facing QBO invoice line description.
+ *
+ * Per Rene's 2026-04-28 lock (Slack `#financials` thread):
+ * descriptions are clean wholesale prose. NO tier-code prefix
+ * ("B3 —" was the legacy form; removed). The fulfillment-type code
+ * lives in the SKU column on the invoice via the batch-SKU format
+ * `UG-B[NNNN]-[YYMMDD]-[FT]` — see `src/lib/wholesale/batch-skus.ts`.
+ *
+ * Doctrinal rule: tier code in code (audit/internal) → SKU column;
+ * description text stays customer-facing.
+ */
 export const TIER_INVOICE_LABEL: Readonly<Record<PricingTier, string>> = {
-  B1: "B1 — Case (6 bags), local delivery",
-  B2: "B2 — Master carton (36 bags), landed",
-  B3: "B3 — Master carton (36 bags), buyer freight",
-  B4: "B4 — Pallet (~432 bags), landed",
-  B5: "B5 — Pallet (~432 bags), buyer freight",
+  B1: "All American Gummy Bears — 7.5 oz, 6-Bag Case, Local Delivery",
+  B2: "All American Gummy Bears — 7.5 oz, 36-Bag Master Carton, Freight Included",
+  B3: "All American Gummy Bears — 7.5 oz, 36-Bag Master Carton, Buyer Freight",
+  B4: "All American Gummy Bears — 7.5 oz, ~432-Bag Pallet, Freight Included",
+  B5: "All American Gummy Bears — 7.5 oz, ~432-Bag Pallet, Buyer Freight",
 };
+
+/**
+ * Fulfillment-type code per tier — the 2-4 char code that becomes
+ * the `[FT]` segment of the batch SKU `UG-B[NNNN]-[YYMMDD]-[FT]`.
+ *
+ * Locked 2026-04-28 (Rene + Viktor batch-SKU session, ratified by
+ * Ben). Naming convention: each code = `{Unit}{FreightMode}`:
+ *   LCD  = Local Case, Delivered (Ben delivers locally)
+ *   MCL  = Master Carton, Landed
+ *   MCBF = Master Carton, Buyer Freight
+ *   PL   = Pallet, Landed
+ *   PBF  = Pallet, Buyer Freight
+ *
+ * The B1-B5 internal identifiers stay stable in code (audit
+ * envelopes, tests, KV records) — fulfillment-type is the customer-
+ * + finance-facing view, derived from tier. Both coexist: B-tier =
+ * stable internal ID, FT = readable surface.
+ */
+export type FulfillmentType = "LCD" | "MCL" | "MCBF" | "PL" | "PBF";
+
+export const FULFILLMENT_TYPE: Readonly<Record<PricingTier, FulfillmentType>> = {
+  B1: "LCD",
+  B2: "MCL",
+  B3: "MCBF",
+  B4: "PL",
+  B5: "PBF",
+};
+
+/** All 5 fulfillment-type codes in canonical order (matches PRICING_TIERS). */
+export const FULFILLMENT_TYPES: readonly FulfillmentType[] = [
+  "LCD",
+  "MCL",
+  "MCBF",
+  "PL",
+  "PBF",
+] as const;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -272,4 +319,63 @@ export function summarizeOrderLine(
     invoiceLabel: TIER_INVOICE_LABEL[tier],
     customFreightRequired: shouldUseCustomFreightQuote(tier, unitCount),
   };
+}
+
+/**
+ * Map a B-tier internal id to its fulfillment-type code (the
+ * customer-facing 2-4 char code used in batch SKUs + invoice SKU
+ * column). Pure.
+ *
+ * Locked 2026-04-28 by Rene + Viktor batch-SKU session.
+ */
+export function tierToFulfillmentType(tier: PricingTier): FulfillmentType {
+  return FULFILLMENT_TYPE[tier];
+}
+
+/**
+ * Type guard: is `value` a registered fulfillment-type code? Pure.
+ *
+ * Use at boundaries where the SKU is parsed from external input
+ * (QBO invoice line, hand-typed batch SKU, etc.).
+ */
+export function isFulfillmentType(value: unknown): value is FulfillmentType {
+  return (
+    typeof value === "string" &&
+    (FULFILLMENT_TYPES as readonly string[]).includes(value)
+  );
+}
+
+/** Reverse lookup: fulfillment-type code → B-tier internal id. */
+export function fulfillmentTypeToTier(ft: FulfillmentType): PricingTier {
+  // Build the inverse map once. Cheap (5 entries) and pure.
+  const entries = Object.entries(FULFILLMENT_TYPE) as Array<
+    [PricingTier, FulfillmentType]
+  >;
+  for (const [tier, code] of entries) {
+    if (code === ft) return tier;
+  }
+  // Unreachable given the type guard at the boundary, but defensive.
+  throw new Error(`fulfillmentTypeToTier: unknown FulfillmentType ${ft}`);
+}
+
+/**
+ * Standard noun for the order unit at this tier. Used by email/
+ * invoice composers for pluralization-aware copy ("3 master cartons"
+ * vs "1 master carton"). Pure.
+ *
+ * Single source of truth — composers should import this rather
+ * than reinventing per-module switch tables.
+ */
+export function unitNoun(tier: PricingTier, count: number): string {
+  const plural = count !== 1;
+  switch (tier) {
+    case "B1":
+      return plural ? "cases" : "case";
+    case "B2":
+    case "B3":
+      return plural ? "master cartons" : "master carton";
+    case "B4":
+    case "B5":
+      return plural ? "pallets" : "pallet";
+  }
 }

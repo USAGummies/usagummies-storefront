@@ -222,11 +222,14 @@ describe("projectQboInvoice — happy path", () => {
     expect(r.lines[1].lineNumber).toBe(2);
   });
 
-  it("description embeds B-tier designator + unit count + bag total", () => {
+  it("description embeds clean prose (no B-tier prefix per Rene 2026-04-28) + unit count + bag total", () => {
     const r = projectQboInvoice(
       buildState({ orderLines: [summarizeOrderLine("B2", 3)] }),
     );
-    expect(r.lines[0].description).toMatch(/B2/);
+    // Description must NOT include the B-tier prefix (Rene's lock).
+    expect(r.lines[0].description).not.toMatch(/^B2/);
+    expect(r.lines[0].description).toContain("36-Bag Master Carton");
+    expect(r.lines[0].description).toContain("Freight Included");
     expect(r.lines[0].description).toContain("3 master cartons");
     expect(r.lines[0].description).toContain("108 bags total");
   });
@@ -314,9 +317,10 @@ describe("projectQboInvoice — defensive errors", () => {
 // ---------------------------------------------------------------------------
 
 describe("formatInvoiceLineText", () => {
-  it("formats B2 × 3 master cartons", () => {
+  it("formats B2 × 3 master cartons (clean prose, no tier prefix)", () => {
     const text = formatInvoiceLineText(summarizeOrderLine("B2", 3));
-    expect(text).toMatch(/^B2/);
+    expect(text).toMatch(/^All American Gummy Bears/);
+    expect(text).not.toMatch(/^B2/);
     expect(text).toContain("3 master cartons");
     expect(text).toContain("108 bags total");
   });

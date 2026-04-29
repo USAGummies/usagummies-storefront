@@ -1,9 +1,18 @@
 # Wholesale Pricing — LOCKED
 
 **Status:** CANONICAL
-**Source:** Ben + Rene call recap, 2026-04-27 §2 + §5 + §6
-**Version:** 1.0 — 2026-04-27
+**Source:** Ben + Rene call recap 2026-04-27 §2 + §5 + §6 (v1.0); Rene + Viktor `#financials` thread 2026-04-28 batch-SKU session ratified by Ben (v2.0).
+**Version:** 2.0 — 2026-04-28
 **Replaces:** any ad hoc pricing scattered across previous outreach scripts. This is the single source of truth.
+
+## What changed in v2.0 (2026-04-28)
+
+Rene + Viktor designed the operational naming + invoice-presentation layer in `#financials` on 2026-04-28; Ben ratified ("we want to build it completely, following rene's feedback"). The v1.0 `B1-B5` internal identifiers are preserved unchanged in code (audit envelopes + Mike's existing flow `wf_a54616e3-...` continue to resolve cleanly). The additions are:
+
+1. **Fulfillment-type code layer (`LCD/MCL/MCBF/PL/PBF`)** — parallel to the B-tier internal ids, used at the customer-+ finance-facing surface (SKUs + invoice line copy). Mapping is fixed and bijective. See §9.
+2. **Batch SKU pattern `UG-B[NNNN]-[YYMMDD]-[FT]`** — the shape of every QBO Products & Services entry going forward. Price is locked at SKU creation; price changes always = new batch SKU. See §10.
+3. **Customer-facing invoice description rule** — descriptions are clean wholesale prose. NO tier code prefix in the description. The fulfillment-type code lives in the SKU column on the invoice. See §11.
+4. **Show-deal freight handling + promo-bag treatment** — locked the canonical pattern for absorbed-freight ("show deal") sales + complimentary-bag sales. See §12.
 
 ---
 
@@ -104,6 +113,150 @@ Per [`/contracts/viktor.md`](./viktor.md) §6 hard rule "every dollar figure nee
 
 ---
 
+---
+
+## 9. Fulfillment-type code layer (added v2.0)
+
+Rene's 2026-04-28 design with Viktor introduced a parallel naming layer for customer-+ finance-facing use. The B-tier ids stay as the stable internal identifier; the fulfillment-type code is the readable derived label that goes on SKUs, invoice columns, and any operator surface where readability beats audit-stability.
+
+| B-tier (internal id) | Fulfillment-type code | Expanded |
+|---|---|---|
+| **B1** | **LCD** | Local Case, Delivered (Ben delivers locally) |
+| **B2** | **MCL** | Master Carton, Landed |
+| **B3** | **MCBF** | Master Carton, Buyer Freight |
+| **B4** | **PL** | Pallet, Landed |
+| **B5** | **PBF** | Pallet, Buyer Freight |
+
+**Where each surfaces:**
+
+| Layer | Use | Example |
+|---|---|---|
+| Code (`PricingTier` type, audit envelopes, KV records, tests) | B-tier | `tier: "B3"` |
+| QBO Products & Services SKU field | Fulfillment-type code (via batch SKU) | `UG-B0001-260415-MCBF` |
+| QBO invoice SKU column (printed customer copy) | Fulfillment-type code | `UG-B0001-260415-MCBF` |
+| QBO invoice description column (printed customer copy) | NEITHER — clean wholesale prose only | "All American Gummy Bears — 7.5 oz, 36-Bag Master Carton, Buyer Freight" |
+| Slack notifications, audit log lines, internal ops UI | B-tier (compact + stable) | `B3 — Master carton + buyer freight` |
+| Customer-facing email body (wholesale-AP packet, etc.) | Description prose; no code | "15 master cartons (540 bags)" |
+
+Helpers in `src/lib/wholesale/pricing-tiers.ts`:
+- `tierToFulfillmentType(tier: PricingTier): FulfillmentType`
+- `fulfillmentTypeToTier(ft: FulfillmentType): PricingTier`
+- `isFulfillmentType(value: unknown): value is FulfillmentType`
+
+---
+
+## 10. Batch SKU pattern `UG-B[NNNN]-[YYMMDD]-[FT]` (added v2.0)
+
+Every QBO Products & Services entry going forward uses the canonical batch-SKU naming scheme:
+
+```
+UG-B0001-260415-MCL
+└┬┘ └─┬─┘ └──┬──┘ └─┬─┘
+ │    │     │      └─ Fulfillment-type code (LCD / MCL / MCBF / PL / PBF)
+ │    │     └──────── Pickup date YYMMDD (sorts chronologically)
+ │    └────────────── Batch number, 4-digit zero-padded (B0001..B9999)
+ └─────────────────── USA Gummies brand prefix (future-proofs multi-line catalog)
+```
+
+**Doctrinal rules:**
+
+1. **Batch number scope:** B0001..B9999. If we ever cross 9999, the spec upgrades to 5-digit (`B[NNNNN]`); that's a doctrine bump, not a runtime patch.
+2. **Pickup date:** the date the supplier (Powers etc.) released the batch to us. UTC; the canonical helper accepts a `Date` and emits YYMMDD.
+3. **Price is locked to the SKU at QBO-item creation time.** Price changes always = new batch SKU. Existing SKU prices are never edited. This preserves the audit trail — every invoice forever resolves to the price that was in effect when its SKU was created.
+4. **Same physical batch can spawn multiple SKUs** — one per fulfillment-type code. They share batch number + pickup date but differ on the FT segment. Inventory deduction (a future module) walks the FT-keyed SKUs to find the next-available batch matching the customer's order.
+
+**Implementation:** `src/lib/wholesale/batch-skus.ts`
+
+Public API:
+- `formatBatchSku(parts): string` — pure; throws on invalid input
+- `parseBatchSku(sku): ParsedBatchSku | null` — pure; never throws (returns null on malformed)
+- `isBatchSku(sku): sku is string` — type guard
+- `canonicalizeBatchSku(sku): string | null` — round-trips through parse+format
+
+Locked by 39 unit tests. Format ↔ parse is identity for every fulfillment-type code.
+
+**Future scope (not in this commit):** the batch *registry* — KV-backed list of `{ batchNumber, pickupDate, supplier, totalBags, unitCostUsd }` for FIFO selection + cost-of-goods rollups.
+
+---
+
+## 11. Invoice description rule (added v2.0)
+
+Per Rene's 2026-04-28 lock in `#financials`: customer-facing invoice descriptions are **clean wholesale prose**. NO tier code or fulfillment-type code in the description. The code(s) live in the SKU column.
+
+**Before (v1.0, retired):**
+```
+Description: B3 — Master carton (36 bags), buyer freight
+```
+
+**After (v2.0, locked):**
+```
+SKU:         UG-B0001-260415-MCBF
+Description: All American Gummy Bears — 7.5 oz, 36-Bag Master Carton, Buyer Freight
+```
+
+The cleanup is enforced in `src/lib/wholesale/pricing-tiers.ts` `TIER_INVOICE_LABEL`:
+
+| B-tier | Description (locked) |
+|---|---|
+| B1 (LCD) | All American Gummy Bears — 7.5 oz, 6-Bag Case, Local Delivery |
+| B2 (MCL) | All American Gummy Bears — 7.5 oz, 36-Bag Master Carton, Freight Included |
+| B3 (MCBF) | All American Gummy Bears — 7.5 oz, 36-Bag Master Carton, Buyer Freight |
+| B4 (PL) | All American Gummy Bears — 7.5 oz, ~432-Bag Pallet, Freight Included |
+| B5 (PBF) | All American Gummy Bears — 7.5 oz, ~432-Bag Pallet, Buyer Freight |
+
+Locked by tests in `src/lib/wholesale/__tests__/pricing-tiers.test.ts` ("TIER_INVOICE_LABEL — Rene 2026-04-28 lock").
+
+**QBO operator action (one-time):** enable the SKU column on the invoice template (Gear → Custom Form Styles → Edit invoice template → Columns → turn on SKU). Already done by Rene 2026-04-28 ("looks like sku is open - i updated").
+
+**Existing QBO items needing description scrub:** Item 15 ("All American Gummy Bears - Trade Show") had `B3 — Master carton (36 bags), buyer freight` baked into the description. After v2.0 lands, the operator should edit Item 15 to use clean prose. (Mike's invoice 1539 was already created with the legacy description; new invoices going forward use v2.0 prose.)
+
+---
+
+## 12. Show-deal freight + promo-bag treatment (added v2.0)
+
+Two scenarios came up while invoicing Mike (Thanksgiving Point), and Rene + Viktor locked the canonical handling for both.
+
+### Scenario 1 — Show deal (we absorb freight)
+
+Customer paid the standard MCBF / PBF rate; we cover their freight as a deal sweetener. Mike's case: 15 master cartons × $3.25/bag at MCBF, freight covered per Reunion 2026 show terms.
+
+**Invoice presentation:**
+- Customer line at standard MCBF / PBF rate, full bag quantity
+- Optional courtesy memo line: *"Freight covered per Reunion 2026 show terms"* — visible on invoice but $0
+- NO freight charge on the customer's total
+
+**QBO posting:**
+- Revenue line: standard MCBF / PBF income account (Trade Show - Retail acct 325 today; future Wholesale - Retail acct per Rene's ongoing CoA work)
+- When we pay the carrier, the freight cost posts to a **`Freight Out / Shipping & Delivery Expense`** account (CoA addition in flight w/ Rene as of 2026-04-28). Operating expense, not COGS adjustment.
+
+### Scenario 2 — Promo bags (we give product as part of the deal)
+
+Customer paid for N bags at standard rate; we threw in M bonus bags at $0. Real product cost (COGS), customer pays $0 for the bonus units.
+
+**Invoice presentation (recommended Option A):**
+```
+QTY    DESCRIPTION                                      RATE     AMOUNT
+504    All American Gummy Bears — 36-Bag Master Carton  $3.25   $1,638.00
+ 36    Promotional Bags — per deal terms                 $0.00       $0.00
+                                                       TOTAL   $1,638.00
+```
+
+Why Option A (not the QBO native discount line): customer sees what they got, QBO records $0 revenue on the bonus bags, COGS still hits when the bags ship. Clean audit trail without enabling QBO's discount-line feature.
+
+**QBO posting:**
+- Standard product line: standard MCBF / PBF income account
+- $0 promotional line: same account (revenue $0)
+- Optional CoA addition: **`Sales Promotions Expense`** to track the product-cost-given-away. Sub-tracking; not strictly required.
+
+### Rene's Apr 28 framing
+
+> "got a show deal - so in this we would have to pay for the freight - so when we buy the freight it would charge as an expense to freight line in coa and we would eat the cost - the question is how do we best show the discounts on the invoice and capture appropriately in qbo? this will also occur in future when we have to give certain amount of bags as part of the sale"
+
+Both scenarios are fully addressed above. Locked.
+
+---
+
 ## Version history
 
+- **2.0 — 2026-04-28** — Adds fulfillment-type code layer (LCD/MCL/MCBF/PL/PBF), batch SKU pattern `UG-B[NNNN]-[YYMMDD]-[FT]`, customer-facing invoice description rule (no tier prefix in description, code lives in SKU column), and show-deal/promo-bag treatment. B-tier internal ids preserved unchanged for audit-trail continuity (Mike's flow `wf_a54616e3-...` resolves cleanly under both v1.0 and v2.0). Source: Rene + Viktor `#financials` thread 2026-04-28; ratified by Ben "we want to build it completely, following rene's feedback". Code-side mirror: `src/lib/wholesale/pricing-tiers.ts` (TIER_INVOICE_LABEL clean prose + FulfillmentType helpers + canonical unitNoun) + `src/lib/wholesale/batch-skus.ts` (new module).
 - **1.0 — 2026-04-27** — First canonical publication. Locks the 5-line-item pricing model + B1-B5 designators + 3 freight modes + atomic-bag inventory invariant per Ben + Rene call recap §1, §2, §3, §5, §6. Replaces ad-hoc pricing scattered across previous outreach scripts.

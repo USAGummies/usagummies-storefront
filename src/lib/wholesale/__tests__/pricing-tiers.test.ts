@@ -17,6 +17,8 @@ import {
   BAG_PRICE_USD,
   BAGS_PER_UNIT,
   FREIGHT_MODE,
+  FULFILLMENT_TYPE,
+  FULFILLMENT_TYPES,
   ONLINE_AVAILABLE,
   PRICING_TIERS,
   TIER_DISPLAY,
@@ -26,6 +28,8 @@ import {
   bagsForOrderLine,
   bagsPerUnit,
   freightMode,
+  fulfillmentTypeToTier,
+  isFulfillmentType,
   isPricingTier,
   lineSubtotalUsd,
   onlineTiers,
@@ -33,6 +37,8 @@ import {
   summarizeOrderLine,
   tierDisplay,
   tierInvoiceLabel,
+  tierToFulfillmentType,
+  unitNoun,
 } from "../pricing-tiers";
 
 describe("PRICING_TIERS canonical enum", () => {
@@ -247,14 +253,15 @@ describe("Lookup helpers (single-tier accessors)", () => {
     expect(tierDisplay("B2")).toContain("landed");
   });
 
-  it("tierInvoiceLabel embeds the designator + unit count + freight mode", () => {
-    // QBO line text must trace back to the designator unambiguously.
-    expect(tierInvoiceLabel("B2")).toContain("B2");
-    expect(tierInvoiceLabel("B2")).toContain("36 bags");
-    expect(tierInvoiceLabel("B2")).toContain("landed");
-    expect(tierInvoiceLabel("B5")).toContain("B5");
-    expect(tierInvoiceLabel("B5")).toContain("432");
-    expect(tierInvoiceLabel("B5")).toContain("buyer freight");
+  it("tierInvoiceLabel is clean wholesale prose (Rene 2026-04-28 lock; no tier prefix)", () => {
+    // Per Rene 2026-04-28: tier code lives in SKU column, NOT in description.
+    // Description must be customer-facing prose (catalog-style).
+    expect(tierInvoiceLabel("B2")).not.toContain("B2");
+    expect(tierInvoiceLabel("B2")).toContain("36-Bag Master Carton");
+    expect(tierInvoiceLabel("B2")).toContain("Freight Included");
+    expect(tierInvoiceLabel("B5")).not.toContain("B5");
+    expect(tierInvoiceLabel("B5")).toContain("Pallet");
+    expect(tierInvoiceLabel("B5")).toContain("Buyer Freight");
   });
 });
 
@@ -316,5 +323,134 @@ describe("Designator stability invariant", () => {
       expect(BAG_PRICE_USD[tier]).toBeGreaterThan(0);
       expect(BAGS_PER_UNIT[tier]).toBeGreaterThan(0);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 35.g — additive doctrine 2026-04-28 (Rene + Viktor batch SKU session)
+// ---------------------------------------------------------------------------
+
+describe("TIER_INVOICE_LABEL — Rene 2026-04-28 lock (no tier-code prefix)", () => {
+  it("B3 description has NO 'B3 —' prefix (was 'B3 — Master carton...' pre-2026-04-28)", () => {
+    expect(TIER_INVOICE_LABEL.B3).not.toMatch(/^B3/);
+    expect(TIER_INVOICE_LABEL.B3).not.toMatch(/B3 —/);
+  });
+
+  it("MCBF (B3) label is clean wholesale prose", () => {
+    expect(TIER_INVOICE_LABEL.B3).toBe(
+      "All American Gummy Bears — 7.5 oz, 36-Bag Master Carton, Buyer Freight",
+    );
+  });
+
+  it("MCL (B2) label is clean wholesale prose", () => {
+    expect(TIER_INVOICE_LABEL.B2).toBe(
+      "All American Gummy Bears — 7.5 oz, 36-Bag Master Carton, Freight Included",
+    );
+  });
+
+  it("PL (B4) label is clean wholesale prose", () => {
+    expect(TIER_INVOICE_LABEL.B4).toBe(
+      "All American Gummy Bears — 7.5 oz, ~432-Bag Pallet, Freight Included",
+    );
+  });
+
+  it("PBF (B5) label is clean wholesale prose", () => {
+    expect(TIER_INVOICE_LABEL.B5).toBe(
+      "All American Gummy Bears — 7.5 oz, ~432-Bag Pallet, Buyer Freight",
+    );
+  });
+
+  it("LCD (B1) label is clean wholesale prose", () => {
+    expect(TIER_INVOICE_LABEL.B1).toBe(
+      "All American Gummy Bears — 7.5 oz, 6-Bag Case, Local Delivery",
+    );
+  });
+
+  it("no label has any tier prefix (defense — every tier)", () => {
+    for (const tier of PRICING_TIERS) {
+      expect(TIER_INVOICE_LABEL[tier]).not.toMatch(/^B[12345]/);
+    }
+  });
+});
+
+describe("FulfillmentType mapping (LCD/MCL/MCBF/PL/PBF)", () => {
+  it("FULFILLMENT_TYPES contains exactly 5 codes in canonical order", () => {
+    expect(FULFILLMENT_TYPES).toEqual(["LCD", "MCL", "MCBF", "PL", "PBF"]);
+  });
+
+  it("B1 → LCD (Local Case, Delivered)", () => {
+    expect(FULFILLMENT_TYPE.B1).toBe("LCD");
+    expect(tierToFulfillmentType("B1")).toBe("LCD");
+  });
+
+  it("B2 → MCL (Master Carton, Landed)", () => {
+    expect(FULFILLMENT_TYPE.B2).toBe("MCL");
+    expect(tierToFulfillmentType("B2")).toBe("MCL");
+  });
+
+  it("B3 → MCBF (Master Carton, Buyer Freight)", () => {
+    expect(FULFILLMENT_TYPE.B3).toBe("MCBF");
+    expect(tierToFulfillmentType("B3")).toBe("MCBF");
+  });
+
+  it("B4 → PL (Pallet, Landed)", () => {
+    expect(FULFILLMENT_TYPE.B4).toBe("PL");
+    expect(tierToFulfillmentType("B4")).toBe("PL");
+  });
+
+  it("B5 → PBF (Pallet, Buyer Freight)", () => {
+    expect(FULFILLMENT_TYPE.B5).toBe("PBF");
+    expect(tierToFulfillmentType("B5")).toBe("PBF");
+  });
+
+  it("isFulfillmentType accepts every canonical code", () => {
+    for (const code of FULFILLMENT_TYPES) {
+      expect(isFulfillmentType(code)).toBe(true);
+    }
+  });
+
+  it("isFulfillmentType rejects unknown / lowercase / non-string", () => {
+    expect(isFulfillmentType("X")).toBe(false);
+    expect(isFulfillmentType("mcl")).toBe(false); // case-sensitive
+    expect(isFulfillmentType("B3")).toBe(false); // legacy code is NOT a fulfillment type
+    expect(isFulfillmentType("")).toBe(false);
+    expect(isFulfillmentType(null)).toBe(false);
+    expect(isFulfillmentType(undefined)).toBe(false);
+    expect(isFulfillmentType(42)).toBe(false);
+  });
+
+  it("fulfillmentTypeToTier reverses the mapping", () => {
+    expect(fulfillmentTypeToTier("LCD")).toBe("B1");
+    expect(fulfillmentTypeToTier("MCL")).toBe("B2");
+    expect(fulfillmentTypeToTier("MCBF")).toBe("B3");
+    expect(fulfillmentTypeToTier("PL")).toBe("B4");
+    expect(fulfillmentTypeToTier("PBF")).toBe("B5");
+  });
+
+  it("tierToFulfillmentType ↔ fulfillmentTypeToTier roundtrip is identity", () => {
+    for (const tier of PRICING_TIERS) {
+      expect(fulfillmentTypeToTier(tierToFulfillmentType(tier))).toBe(tier);
+    }
+  });
+});
+
+describe("unitNoun (canonical pluralization helper)", () => {
+  it("B1 (case): 1 case / N cases", () => {
+    expect(unitNoun("B1", 1)).toBe("case");
+    expect(unitNoun("B1", 5)).toBe("cases");
+  });
+
+  it("B2 / B3 (master carton): 1 master carton / N master cartons", () => {
+    expect(unitNoun("B2", 1)).toBe("master carton");
+    expect(unitNoun("B3", 3)).toBe("master cartons");
+  });
+
+  it("B4 / B5 (pallet): 1 pallet / N pallets", () => {
+    expect(unitNoun("B4", 1)).toBe("pallet");
+    expect(unitNoun("B5", 5)).toBe("pallets");
+  });
+
+  it("0 count is plural", () => {
+    expect(unitNoun("B2", 0)).toBe("master cartons");
   });
 });

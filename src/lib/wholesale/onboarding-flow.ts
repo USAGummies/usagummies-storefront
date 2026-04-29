@@ -22,7 +22,7 @@
  * **Doctrinal rules locked in code** (per the call recap):
  *   1. Atomic bag-level inventory — order types decrement bag
  *      inventory. No case/carton/pallet SKUs.
- *   2. Online MOQ = master carton. B1 (local case) is INTERNAL only.
+ *   2. Online MOQ = master carton. LCD (local case, Ben delivers) is INTERNAL only.
  *   3. Designators B1-B5 are stable identifiers across order line
  *      items, QBO invoices, Slack notifications, HubSpot deal
  *      properties.
@@ -491,7 +491,7 @@ export type ApplyStepResult =
  * fire as server-side transitions after the data-bearing step
  * completes.
  *
- * **Defense:** order-type step rejects B1 via `validateOrderLine`,
+ * **Defense:** order-type step rejects LCD via `validateOrderLine`,
  * so an attacker can't sneak the internal-only tier through this
  * surface even if they know the slug.
  */
