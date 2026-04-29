@@ -1,8 +1,8 @@
 # Wholesale Pricing — LOCKED
 
 **Status:** CANONICAL
-**Source:** Ben + Rene call recap 2026-04-27 §2 + §5 + §6 (v1.0); Rene + Viktor `#financials` thread 2026-04-28 batch-SKU session ratified by Ben (v2.0); Cindy/Redstone FOB-quote drift reconciliation 2026-04-28 PM ratified by Ben "option a" (v2.1).
-**Version:** 2.1 — 2026-04-28 PM
+**Source:** Ben + Rene call recap 2026-04-27 §2 + §5 + §6 (v1.0); Rene + Viktor `#financials` thread 2026-04-28 batch-SKU session ratified by Ben (v2.0); Cindy/Redstone FOB-quote drift reconciliation 2026-04-28 PM ratified by Ben "option a" (v2.1); Rene's promo-bag CoA mapping doctrine 2026-04-28 PM (v2.2).
+**Version:** 2.2 — 2026-04-28 PM
 **Replaces:** any ad hoc pricing scattered across previous outreach scripts. This is the single source of truth.
 
 ## What changed in v2.0 (2026-04-28)
@@ -259,8 +259,64 @@ Both scenarios are fully addressed above. Locked.
 
 ---
 
+## 13. Promo-bag + sample CoA mapping (added v2.2)
+
+Rene 2026-04-28 PM directive (`#financials` thread `1777266794.573699`): promo bags inside a customer order are a **COGS event**, not overhead. They map under the existing `500030 Samples - COGS` parent — NOT under `660010 Promotion & Entertainment` (which is overhead/marketing-flavored, wrong bucket).
+
+### CoA structure (created 2026-04-28 by Viktor; renamed per Rene's 2026-04-28 PM revision)
+
+```
+500030          Samples - COGS                       (parent — pre-existing)
+500030.05       Samples - Promo/Outreach             (NEW — QBO id 332, was "Outreach")
+500030.10       Samples - Order Promo                (NEW — QBO id 333, was "Order Promotion")
+500080.30       FI - Samples (Freight In, samples)   (pre-existing parallel)
+500090.30       FO - Samples (Freight Out, samples)  (pre-existing parallel)
+```
+
+### When to use each child
+
+| Sub-account | Use when | Memo template |
+|---|---|---|
+| **500030.05 Samples - Promo/Outreach** | Bags given away with NO invoice attached: trade-show booth bags, sample mailers to prospects, COSQ-001 welcome bags, internal staff samples, marketing outreach product. | `Show/Event: <name> · Date: <YYYY-MM-DD>` (or `Recipient: <name>` for individual sample mailers) |
+| **500030.10 Samples - Order Promo** | Free bags ON a paid customer invoice: Reunion-style "freight covered + bonus bags" specials, "buy 10 cartons, get 1 free" deals, any complimentary bags tied to a specific paid order. ALWAYS attached to a specific invoice + customer. | `Customer: <name> · Invoice: <#> · Deal: <deal-name>` |
+
+### Doctrinal hard rules
+
+1. **P&L impact is identical to single-bucket COGS** — both children roll up to parent `500030 Samples - COGS`. Gross Margin reporting unchanged. The split exists for *period-level visibility* only ("how much did we give away in pure outreach vs. tied-to-paid-orders this month?").
+
+2. **Inventory atomic-bag rule unchanged** — every bag (paid, sample, or promo) decrements bag inventory by 1. The CoA split is downstream allocation only, post-deduction. `/contracts/wholesale-pricing.md` §1 holds.
+
+3. **Memo discipline is non-optional.** Every line item routed to `500030.05` or `500030.10` carries its memo template. Without the memo, the line is unfindable at month-end review (the whole reason the split exists is post-hoc traceability).
+
+4. **The decision tree at line-item time:**
+   - Is there a paid customer invoice attached? → `500030.10 Samples - Order Promo`
+   - No invoice (give-away to prospect, internal use, trade show table) → `500030.05 Samples - Promo/Outreach`
+   - Customer paid for the bags → standard COGS path (`COGS - Wholesale` or `COGS - Trade Show` etc.) — *not* `500030`
+
+5. **`660010 Promotion & Entertainment` is OVERHEAD** — used for marketing meals, sponsorships, business-development hospitality. Never for product give-aways. Future Claude Code agents that auto-classify expenses must respect this distinction.
+
+### Example mappings (canonical)
+
+| Scenario | Sub-account | Memo |
+|---|---|---|
+| Mike (Thanksgiving Point) hypothetical 36 bonus bags on Invoice 1539 | `500030.10` | `Customer: Thanksgiving Point · Invoice: 1539 · Deal: Reunion 2026 freight comp` |
+| Trade show booth bags handed to walk-up prospects at Reunion 2026 | `500030.05` | `Show/Event: The Reunion 2026 · Date: 2026-04-14` |
+| Welcome packet COSQ-001 sample bag mailed to a new prospect | `500030.05` | `Recipient: <name> · Source: COSQ-001 welcome packet` |
+| Future "buy 10 master cartons get 1 free" promotion line on a paid invoice | `500030.10` | `Customer: <name> · Invoice: <#> · Deal: 10+1 promotion` |
+
+### Operator action remaining
+
+QBO API can create accounts but cannot set the account *number* or *parent* on creation (per the 2026-04-13 Trade Show CoA setup gotcha). Manual step in QBO Gear → Chart of Accounts → edit each:
+- 500030.05 Samples - Promo/Outreach → set `Number: 500030.05`, `Parent: Samples - COGS`
+- 500030.10 Samples - Order Promo → set `Number: 500030.10`, `Parent: Samples - COGS`
+
+Rene + Viktor coordinating on this directly (Rene: *"i can set up qbo with you"*).
+
+---
+
 ## Version history
 
+- **2.2 — 2026-04-28 PM** — Adds §13 *Promo-bag + sample CoA mapping*. Rene 2026-04-28 PM directive: promo bags inside customer orders = COGS event under `500030 Samples - COGS`, NOT overhead under `660010 Promotion & Entertainment`. Two new sub-accounts created in QBO by Viktor: `500030.05 Samples - Promo/Outreach` (id 332) for no-invoice give-aways + `500030.10 Samples - Order Promo` (id 333) for promo bags on paid invoices. Names finalized by Rene's 2026-04-28 PM revision (was "Outreach" / "Order Promotion"). Memo templates locked. Inventory atomic-bag rule unchanged — split is downstream allocation only. Source: Slack `#financials` thread `1777266794.573699` 2026-04-28 PM. Operator action: Rene + Viktor coordinate the QBO Gear → Chart of Accounts edit to set account numbers + parent linkage manually (API limitation).
 - **2.1 — 2026-04-28 PM** — Reconciles outbound pallet quantity (12 MC / 432 bags ❌ → 25 MC / 900 bags ✅) against `/contracts/outreach-pitch-spec.md` §5 + the actual outbound shipping skid spec. The v1.0/v2.0 figure was wrong: it pulled "12 MC = 432 bags" from `/CLAUDE.md`'s Uline *inbound* reorder pack-out and applied it to the *outbound* wholesale pallet. Outbound 48×40 LTL skids hold 25 master cartons (Ti×Hi 6×4 + 1 cap, ~530 lb packed). Also re-frames §3 freight modes to surface the **3+ pallet free-freight tier** (canonical, matching outreach spec §6) instead of "custom quote" — Ben re-confirmed via the Cindy/Redstone FOB thread 2026-04-28 PM. Code-side mirror: `pricing-tiers.ts` BAGS_PER_UNIT B4/B5 = 900 + invoice labels updated. Re-baselined 4 test files. No customer-facing reissues needed (Cindy was always told 25 MC; Phase 35.f flow has no live customers through B4/B5 yet — only Rene's Snow Leopard test ID).
 - **2.0 — 2026-04-28** — Adds fulfillment-type code layer (LCD/MCL/MCBF/PL/PBF), batch SKU pattern `UG-B[NNNN]-[YYMMDD]-[FT]`, customer-facing invoice description rule (no tier prefix in description, code lives in SKU column), and show-deal/promo-bag treatment. B-tier internal ids preserved unchanged for audit-trail continuity (Mike's flow `wf_a54616e3-...` resolves cleanly under both v1.0 and v2.0). Source: Rene + Viktor `#financials` thread 2026-04-28; ratified by Ben "we want to build it completely, following rene's feedback". Code-side mirror: `src/lib/wholesale/pricing-tiers.ts` (TIER_INVOICE_LABEL clean prose + FulfillmentType helpers + canonical unitNoun) + `src/lib/wholesale/batch-skus.ts` (new module).
 - **1.0 — 2026-04-27** — First canonical publication. Locks the 5-line-item pricing model + B1-B5 designators + 3 freight modes + atomic-bag inventory invariant per Ben + Rene call recap §1, §2, §3, §5, §6. Replaces ad-hoc pricing scattered across previous outreach scripts.
