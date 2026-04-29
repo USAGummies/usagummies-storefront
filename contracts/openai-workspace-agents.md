@@ -174,6 +174,18 @@ Implementation:
 - Returned payloads contain the route response (`approvalId`, Slack thread/permalink when the underlying route provides it).
 - The MCP layer never calls closers or direct write clients.
 
+Smoke test:
+
+```bash
+OPENAI_WORKSPACE_BASE_URL=https://www.usagummies.com \
+OPENAI_WORKSPACE_CONNECTOR_SECRET=<same value as Vercel> \
+node scripts/ops/smoke-openai-workspace-connector.mjs
+```
+
+The smoke is read-only unless `OPENAI_WORKSPACE_SMOKE_APPROVAL_TOOL` and
+`OPENAI_WORKSPACE_SMOKE_APPROVAL_ARG` are both set. Those optional vars
+open a real Slack approval and should only be used intentionally.
+
 Exposed request-approval tools:
 
 - `request_faire_direct_invite_approval`
