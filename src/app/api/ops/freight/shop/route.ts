@@ -114,6 +114,7 @@ export async function POST(req: Request): Promise<Response> {
   ]);
 
   const ssWinner = ssRate.ok ? ssRate.quote : null;
+  const ssAll = ssRate.ok ? ssRate.allRates : [];
   if (!ssRate.ok) degraded.push(`shipstation: ${ssRate.error}`);
 
   const psWinner = psRate.ok ? psRate.quote : null;
@@ -134,6 +135,7 @@ export async function POST(req: Request): Promise<Response> {
     ok: true,
     cheapest: candidates[0],
     shipstation: ssWinner,
+    shipstationAllRates: ssAll, // full ShipStation rate table (Media Mail / Library Mail filtered out per shipstation-client.ts RESTRICTED_SERVICE_CODES)
     pirateship: psWinner,
     degraded,
   });

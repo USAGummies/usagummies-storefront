@@ -353,7 +353,7 @@ export async function getCheapestShipStationRate(params: {
   quantity: number;
   residential?: boolean;
   weightOverrideLbs?: number;
-}): Promise<{ ok: true; quote: CheapestRateQuote } | { ok: false; error: string }> {
+}): Promise<{ ok: true; quote: CheapestRateQuote; allRates: CheapestRateQuote[] } | { ok: false; error: string }> {
   const auth = getAuthHeader();
   if (!auth) return { ok: false, error: "ShipStation credentials not configured" };
 
@@ -398,12 +398,22 @@ export async function getCheapestShipStationRate(params: {
     }),
   );
 
-  // Flatten + exclude any zero/unreasonable rates.
+  // Flatten + exclude any zero/unreasonable rates + restricted services.
+  // Restricted services (USPS Media Mail, Library Mail, etc.) are content-
+  // class-restricted and CANNOT carry confection product. They're returned
+  // by ShipStation as the "cheapest" rate but are illegal for our cargo.
+  // Locked 2026-04-29 (Mike Hippler shipment prep — Media Mail surfaced as
+  // winner for confection delivery, which violates USPS Domestic Mail Manual).
+  const RESTRICTED_SERVICE_CODES = new Set<string>([
+    "usps_media_mail",
+    "usps_library_mail",
+  ]);
   const candidates: CheapestRateQuote[] = [];
   for (const { carrier, rates } of rateResults) {
     for (const r of rates) {
       const perPackage = (r.shipmentCost ?? 0) + (r.otherCost ?? 0);
       if (!Number.isFinite(perPackage) || perPackage <= 0) continue;
+      if (RESTRICTED_SERVICE_CODES.has(r.serviceCode)) continue;
       candidates.push({
         provider: "shipstation",
         carrier: carrier.name,
@@ -423,9 +433,9 @@ export async function getCheapestShipStationRate(params: {
     };
   }
 
-  // Sort by total rate, return cheapest.
+  // Sort by total rate, return cheapest + the full table for inspection.
   candidates.sort((a, b) => a.rate - b.rate);
-  return { ok: true, quote: candidates[0] };
+  return { ok: true, quote: candidates[0], allRates: candidates };
 }
 
 // ---------------------------------------------------------------------------
