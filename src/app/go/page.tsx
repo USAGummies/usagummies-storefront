@@ -421,7 +421,7 @@ export default function GoLandingPage() {
             ACROSS AMERICA. ONE BAG.
           </div>
           <div style={{ fontSize: 14, color: "#5f5b56", marginTop: 8, marginBottom: 32 }}>
-            Six locations. Five states. From sea to shining sea.
+            Five locations. Five states. From sea to shining sea.
           </div>
 
           {/* Row 1 — Production */}
@@ -449,10 +449,9 @@ export default function GoLandingPage() {
           <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "2px", color: "#1B2A4A", marginBottom: 12 }}>
             HEADQUARTERS & SHIPPING
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12, maxWidth: 820, margin: "0 auto" }} className="sm:!grid-cols-3">
+          <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12, maxWidth: 540, margin: "0 auto" }} className="sm:!grid-cols-2">
             {[
               { state: "Wyoming", role: "Corporate offices" },
-              { state: "Ashford, WA", role: "Shipping warehouse" },
               { state: "Pennsylvania", role: "East Coast warehouse" },
             ].map((step) => (
               <div key={step.state} style={{ background: "#ffffff", border: "1px solid #e0dcd6", borderRadius: 12, padding: "20px 16px" }}>
