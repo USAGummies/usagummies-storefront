@@ -26,6 +26,21 @@ Rene + Viktor designed the operational naming + invoice-presentation layer in `#
 
 **Coding rule:** Claude Code MUST NOT create new "case" / "master carton" / "pallet" inventory SKUs. Order types are pricing/order abstractions; they decrement bag inventory.
 
+### Operating COGS (LOCKED 2026-04-29 PM)
+
+**$1.77 / bag** — final operating COGS for all margin / pricing / forecasting models.
+
+| Layer | Source | Per-bag |
+|---|---|---|
+| Manufacturing | Powers Confections | $1.52 |
+| Primary packaging (film/label) | Belmark (included above) | (in $1.52) |
+| Secondary packaging | Uline (master carton + inner cases + strip clips + S-hooks) | $0.25 |
+| **TOTAL operating COGS** | | **$1.77** |
+
+Per-master-carton Uline build: $2.68 (S-12605) + 6 × $0.61 (S-4315) + 6 × $0.32 (S-12559) + 6 × $0.10 (S-20269) = **$8.84 / 36 bags = ~$0.25 / bag**.
+
+Locked by Ben 2026-04-29 PM. Any margin/pricing model that uses a different COGS number is a doctrine violation.
+
 ---
 
 ## 2. The five core pricing line items
@@ -59,7 +74,8 @@ Three freight modes, deterministic:
 | **Landed** (`B2`, `B4`) | Default for online master-carton + 1-2 pallet orders | Higher per-bag price; freight is built in. The order's `freight_quote` is `0` (already in bag price). |
 | **Buyer pays freight** (`B3`, `B5`) | Buyer requests their own freight | Lower per-bag price; the order's `freight_quote = "buyer-paid"` and the customer arranges pickup or supplies their account. |
 | **Free freight (USA Gummies absorbs)** | 3+ pallet orders | We pay the LTL. Buyer pays $3.00/bag flat across the order; no separate freight line on the customer-facing total. Internally, the carrier invoice posts to `Freight Out / Shipping & Delivery Expense` per §12 (Scenario 1). |
-| **Custom quote** | Ben personally delivers (truck-route deals) | Manual quote based on Ben's fuel + time + opportunistic route value. Reserved for hand-delivery scenarios; the order is captured but `freight_quote = "custom-pending"` until Ben provides a number. |
+| **Founder-driven freight (LOCKED 2026-04-29 — our structural moat)** | Default for any landed-pricing order where Ben can drive the route | Ben pulls the load himself with the GMC 1500 Duramax + cargo trailer. At ~16 mpg loaded with diesel ~$3.95/gal, fuel-only cost beats LTL by 30-50% per pallet (e.g. WA → St. Louis: ~$321/pallet drive vs $475/pallet LTL). Multi-stop routing compounds the math via opportunistic sales calls + sample drops + additional pallet-level deliveries that amortize the trip cost. **Margin models for landed (Option 2 / B4) tier default to drive economics, not LTL.** LTL is the fallback when Ben can't make the trip. |
+| **LTL fallback** | When founder drive is infeasible (timing, multi-coast, etc.) | Real broker bid via Freightos / FreightCenter / our preferred LTL carrier. Cited in customer invoices; never fabricated. |
 
 **Hard rule (§3 of recap):** Free freight on sub-pallet quantities is RETIRED. Free freight only at 3+ pallet MOQ (75+ master cartons / 2,700+ bags). This is locked in `/contracts/outreach-pitch-spec.md` §4 (commit `4d3e2ed`) and re-confirmed by Ben on the Cindy/Redstone FOB thread 2026-04-28 PM.
 

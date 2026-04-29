@@ -73,7 +73,10 @@ These rules override all other behavior:
 ## Inventory & COGS Model
 
 - **Atomic bag-level inventory (LOCKED 2026-04-27).** All inventory tracked at the single 7.5 oz bag. Cases / master cartons / pallets are commercial + packaging abstractions that decrement bag inventory at order time. **Do NOT create case/carton/pallet inventory SKUs.** See [`/contracts/wholesale-pricing.md`](contracts/wholesale-pricing.md) §1.
-- Current unit cost: $1.52/unit (Powers $50K manufacturing + Belmark $26K packaging = $76K / 50,000 units). This is a PLACEHOLDER until final invoices arrive.
+- **Operating COGS: $1.77/bag** (LOCKED 2026-04-29 PM by Ben as final pricing for COGS). Build:
+  - **$1.52** — Powers manufacturing + Belmark primary packaging (gummies + film/label per bag)
+  - **$0.25** — Uline secondary packaging per bag (master carton + 6 inner cases + 6 strip clips + 6 hooks per master carton, $8.84 per master / 36 bags)
+  - All margin / pricing / forecasting models default to $1.77/bag going forward.
 - Inventory is an ASSET. When goods ship, inventory MOVES to COGS on Income Statement.
 - Revenue channels tracked separately: Amazon, Shopify DTC, Faire, Wholesale, Interbitzin, Glacier, AVG.
 - Amazon is consignment (FBA), not wholesale. Shipping TO Amazon = inventory transfer (still our asset). Revenue recorded when Amazon SELLS units.
@@ -103,10 +106,12 @@ Slack is the company's running tally board, not just chat:
 ## Packaging spec (canonical)
 
 - **Branded mailer** = 1 bag (7.5 oz) + 6×9 padded mailer, **~0.55 lb packed**, 9×6×2 in. Default for all single-bag Amazon FBM + Shopify DTC orders as of 2026-04-21.
-- **Inner case** = 6 bags (7.5 oz) per case, ~6 lb packed
-- **Master carton** = 6 cases per carton = **36 bags / carton**, **21 lb 2 oz packed** (= 21.125 lb, measured by Ben 2026-04-20). Canonical for all wholesale ship-label + rate-quote calls until a case-pack change is logged.
-- Dimensions: master 21×14×8 in; inner 14×10×8 in; mailer 9×6×2 in
-- **Strip clip** = 1 per case · **Metal hook** = 1 per strip clip
+- **Inner case** = 6 bags (7.5 oz) per case, ~6 lb packed · Uline S-4315 (7×7×7 in) · $0.61/EA
+- **Master carton** = 6 inner cases per carton = **36 bags / carton**, **21 lb 2 oz packed** (= 21.125 lb, measured by Ben 2026-04-20). Uline S-12605 (22×14×8 in) · $2.68/EA. Canonical for all wholesale ship-label + rate-quote calls until a case-pack change is logged.
+- Dimensions: **master 22×14×8 in (Uline S-12605); inner 7×7×7 in (Uline S-4315)**; mailer 9×6×2 in
+- **Strip clip** = 1 per inner case · Uline S-12559 (21" plastic display strip) · ~$0.32 each
+- **Metal hook** = 1 per strip clip · Uline S-20269 (S-hook, pinched) · ~$0.10 each
+- **Per-master-carton Uline secondary build cost:** $2.68 (master) + 6 × $0.61 (inner cases) + 6 × $0.32 (strips) + 6 × $0.10 (hooks) = **$8.84 / master = ~$0.25 / bag** (factored into $1.77 COGS above).
 - Uline reorder per run: `12 masters + 72 cases + 72 strip clips + 72 hooks` for 432 bags (reference: 2026-04-20 shipping batch). Branded mailer SKU separate — reorder based on Amazon FBM burn rate.
 - **⚠️ Uline 12-master pack-out is INBOUND packaging supply ONLY.** It is NOT the outbound shipping pallet. The wholesale outbound pallet is **25 master cartons / 900 bags** (Ti×Hi 6×4 + 1 cap, ~530 lb packed, 48×40×~52 in skid) per `/contracts/wholesale-pricing.md` §2 + `/contracts/outreach-pitch-spec.md` §5. Conflating the two was the v1.0 → v2.0 wholesale-pricing drift (corrected in v2.1 on 2026-04-28).
 - Full integration doctrine: [`/contracts/integrations/shipstation.md`](contracts/integrations/shipstation.md)
