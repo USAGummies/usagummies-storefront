@@ -82,6 +82,19 @@ These rules override all other behavior:
 - Amazon is consignment (FBA), not wholesale. Shipping TO Amazon = inventory transfer (still our asset). Revenue recorded when Amazon SELLS units.
 - PO = request from customer (not revenue). Invoice = our billing document (creates revenue + AR in QBO).
 
+## Cold B2B Outreach — Single Entry Point (LOCKED 2026-04-29)
+
+Every cold B2B outreach send MUST go through `scripts/sales/send-and-log.py`. It atomically chains: validator gate → `find_or_create_contact` → `find_or_create_deal` (search by company token, NEVER duplicate) → associate contact↔deal → SMTP send via `scripts/send-email.sh` (with the repeat guard) → create HubSpot email engagement → associate engagement↔deal AND engagement↔contact.
+
+```
+source .env.local && python3 scripts/sales/send-and-log.py \
+  --company "Buc-ee's" --email kevin@buc-ees.com \
+  --first Kevin --last McNabb --jobtitle "Sr Director Marketing" \
+  --subject "..." --body draft.txt
+```
+
+**Direct `POST /crm/v3/objects/deals` calls from a send script are a process violation** — the 2026-04-29 incident produced 5 duplicate deals because an inline batch bypassed search-before-create. Doctrine: `/contracts/outreach-pitch-spec.md` §11 + §11.1.
+
 ## Wholesale Pricing (LOCKED 2026-04-27 — see [`/contracts/wholesale-pricing.md`](contracts/wholesale-pricing.md))
 
 5 line items; designators `B1-B5` are stable identifiers in code, audit logs, QBO line text, Slack notifications, HubSpot deal properties:
