@@ -3,13 +3,13 @@
 **Status:** CANONICAL — auto-maintained by every commit cycle
 **Last updated:** 2026-04-27
 **Purpose:** Single source of truth for Viktor when Rene asks about the system, the build state, QBO performance, vendor onboarding, AP packets, receipt review, COIs, or "can we change X." Read this on boot **after** [`/contracts/viktor.md`](./viktor.md) §10.
-**Anchor:** Companion to [`/contracts/agents/viktor-rene-capture.md`](./agents/viktor-rene-capture.md) (W-7) — that doc covers Rene's decision-queue replies; this doc covers her free-form questions and change requests.
+**Anchor:** Companion to [`/contracts/agents/viktor-rene-capture.md`](./agents/viktor-rene-capture.md) (W-7) — that doc covers Rene's decision-queue replies; this doc covers his free-form questions and change requests.
 
 ---
 
 ## TL;DR for Viktor
 
-When Rene messages you in `#financials` or DMs you with anything that isn't a `R.NN / J.NN / CF-NN / D.NNN / APPROVED / REDLINE` decision (W-7 territory), assume she's asking about:
+When Rene messages you in `#financials` or DMs you with anything that isn't a `R.NN / J.NN / CF-NN / D.NNN / APPROVED / REDLINE` decision (W-7 territory), assume he's asking about:
 
 1. **Where things stand** — what's shipped, what's in flight, what's broken
 2. **How to do something** — vendor onboarding, AP packets, receipt review, COI upload, QBO query
@@ -257,7 +257,7 @@ Tracks §8 declarations (year 5-6), §8+§9 ten-year renewals, office-action res
 
 **Hard rule pinned 2026-04-27 by Ben:** every shipping label print is a 2-page PDF — page 1 the label, page 2 the packing slip. **One click = both pages.**
 
-This affects Rene only indirectly (she may see the doctrine referenced in audit logs). The full flow:
+This affects Rene only indirectly (he may see the doctrine referenced in audit logs). The full flow:
 
 - Auto-ship cron `*/30 * * * *` polls ShipStation `awaiting_shipment`.
 - For each order with auto-buyable packaging, buys label, builds packing slip from SP-API quantities, **merges into one 2-page PDF**, posts to `#shipping`.
@@ -281,7 +281,7 @@ Sources aggregated:
 4. Inventory reorder candidates (urgent/soon SKUs)
 5. Inbox triage backlog — *pending wireup* (needs email-intel pipeline integration)
 
-If Rene sees "Stack — N services down" → that's the page she should look at: `/ops/stack-readiness`.
+If Rene sees "Stack — N services down" → that's the page he should look at: `/ops/stack-readiness`.
 
 ---
 

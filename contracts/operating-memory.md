@@ -109,9 +109,9 @@ This is what `/api/ops/slack/events` + the W-7 Rene-capture route already do for
 - Sends to customers AFTER NCS-001 is returned + QBO customer record finalized (Rene has the AP info on file at that point; further visibility goes through standard QBO + AR aging surfaces)
 
 **Why:**
-- Finance has full visibility on intent + thread state without putting Rene on the To/CC line (which would invite the customer to reply-all to Rene, polluting her inbox)
+- Finance has full visibility on intent + thread state without putting Rene on the To/CC line (which would invite the customer to reply-all to Rene, polluting his inbox)
 - BCC keeps the customer-facing thread clean; CC `ben@` is the visible second recipient (matches Apr 13 CIF-001 v3 lock — Ben is the public face, Rene is the back-office)
-- Drift-detection-via-Slack: if Rene sees a BCC'd email and notices something off, her correction in `#financials` becomes the input to the next iteration cycle (per §"Drift detection via Slack corrections" above)
+- Drift-detection-via-Slack: if Rene sees a BCC'd email and notices something off, his correction in `#financials` becomes the input to the next iteration cycle (per §"Drift detection via Slack corrections" above)
 
 **Where this rule is wired in code:**
 - `src/lib/wholesale/onboarding-dispatch-prod.ts` — `RENE_BCC_EMAIL` constant, applied in `sendWholesaleApPacket()`
