@@ -113,6 +113,12 @@ interface Report {
   };
   wholesaleOnboarding: {
     inquiries: SourceState<{ total: number; lastSubmittedAt?: string }>;
+    day1Prospects: SourceState<{
+      total: number;
+      emailReady: number;
+      needsManualResearch: number;
+      priorityA: number;
+    }>;
     pipeline: SourceState<SalesPipelineSummary>;
     apPackets: SourceState<ApPacketCounts>;
     links: Array<{ href: string; label: string }>;
@@ -479,6 +485,25 @@ function WholesaleOnboardingSection({ report }: { report: Report }) {
                 last {v.lastSubmittedAt.slice(0, 10)}
               </span>
             ) : null}
+          </div>
+        ))}
+      </div>
+      <div style={{ marginBottom: 8 }}>
+        <SubLabel>Day 1 prospect playbook</SubLabel>
+        {renderSourceState(report.wholesaleOnboarding.day1Prospects, (v) => (
+          <div style={{ display: "flex", gap: 16, fontSize: 13, flexWrap: "wrap" }}>
+            <span>
+              Total: <strong>{v.total}</strong>
+            </span>
+            <span style={{ color: GREEN }}>
+              Email-ready: <strong>{v.emailReady}</strong>
+            </span>
+            <span style={{ color: AMBER }}>
+              Manual research: <strong>{v.needsManualResearch}</strong>
+            </span>
+            <span style={{ color: GOLD }}>
+              Priority A: <strong>{v.priorityA}</strong>
+            </span>
           </div>
         ))}
       </div>

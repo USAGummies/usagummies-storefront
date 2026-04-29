@@ -25,6 +25,8 @@
  * a subset without paying the cost of the others.
  */
 import { kv } from "@vercel/kv";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 
 import { listInvites, listInvitesByStatus } from "@/lib/faire/invites";
 import { reportFollowUps } from "@/lib/faire/follow-ups";
@@ -43,6 +45,7 @@ import {
   sourceError,
   sourceWired,
   type ApPacketCounts,
+  type Day1ProspectCounts,
   type FaireFollowUpRowSummary,
   type FaireInviteCounts,
   type LocationDraftCounts,
@@ -50,6 +53,7 @@ import {
   type SalesPipelineSummary,
   type SourceState,
 } from "@/lib/ops/sales-command-center";
+import { buildProspectPlaybookReport } from "@/lib/sales/prospect-playbook";
 import {
   classifyAgingInput,
   type AgingItem,
@@ -57,6 +61,7 @@ import {
 } from "@/lib/ops/sales-aging";
 
 const KV_AP_SENT_PREFIX = "ap-packets:sent:";
+const DAY1_PROSPECT_SOURCE = "docs/playbooks/wholesale-prospects-day1.csv";
 
 export async function readFaireInvites(): Promise<
   SourceState<FaireInviteCounts>
@@ -237,6 +242,28 @@ export async function readWholesaleInquiries(): Promise<
     return sourceError(`Wholesale inquiry archive read failed: ${result.reason}`);
   }
   return sourceWired(result.summary);
+}
+
+export async function readDay1Prospects(): Promise<
+  SourceState<Day1ProspectCounts>
+> {
+  try {
+    const csv = await readFile(join(process.cwd(), DAY1_PROSPECT_SOURCE), "utf8");
+    const report = buildProspectPlaybookReport(csv, {
+      generatedAt: new Date(0).toISOString(),
+      source: DAY1_PROSPECT_SOURCE,
+    });
+    return sourceWired({
+      total: report.summary.total,
+      emailReady: report.summary.emailReady,
+      needsManualResearch: report.summary.needsManualResearch,
+      priorityA: report.summary.priorityCounts.A ?? 0,
+    });
+  } catch (err) {
+    return sourceError(
+      `Day 1 prospect playbook read failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
 }
 
 export async function readSalesPipeline(

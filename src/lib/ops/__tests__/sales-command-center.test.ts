@@ -600,7 +600,13 @@ describe("buildSalesCommandCenter — aging section", () => {
   });
 
   it("empty inputs produce a clean empty aging section (no fabricated rows)", () => {
-    const report = buildSalesCommandCenter(emptyInput(), { now: NOW });
+    const report = buildSalesCommandCenter(
+      {
+        ...emptyInput(),
+        day1Prospects: sourceNotWired("Day 1 prospect playbook reader not wired."),
+      },
+      { now: NOW },
+    );
     expect(report.aging.counts).toEqual({
       critical: 0,
       overdue: 0,
@@ -961,5 +967,66 @@ describe("buildSalesCommandCenter — HubSpot sales pipeline section", () => {
       salesPipeline: sourceError("HubSpot down"),
     });
     expect(slice.salesPipelineLine).toBeNull();
+  });
+});
+
+describe("buildSalesCommandCenter — Day 1 prospect playbook", () => {
+  it("surfaces the wired Day 1 prospect counts under wholesale onboarding", () => {
+    const report = buildSalesCommandCenter(
+      {
+        ...emptyInput(),
+        day1Prospects: sourceWired({
+          total: 81,
+          emailReady: 18,
+          needsManualResearch: 63,
+          priorityA: 25,
+        }),
+      },
+      { now: NOW },
+    );
+
+    expect(report.wholesaleOnboarding.day1Prospects.status).toBe("wired");
+    if (report.wholesaleOnboarding.day1Prospects.status !== "wired") return;
+    expect(report.wholesaleOnboarding.day1Prospects.value.emailReady).toBe(18);
+    expect(report.wholesaleOnboarding.links).toContainEqual({
+      href: "/ops/sales/prospects/day1",
+      label: "Day 1 prospect playbook",
+    });
+  });
+
+  it("positive prospect counts do not trip anyAction by themselves", () => {
+    const report = buildSalesCommandCenter(
+      {
+        ...emptyInput(),
+        day1Prospects: sourceWired({
+          total: 81,
+          emailReady: 18,
+          needsManualResearch: 63,
+          priorityA: 25,
+        }),
+      },
+      { now: NOW },
+    );
+
+    expect(report.todaysRevenueActions.anyAction).toBe(false);
+  });
+
+  it("missing prospect reader is explicit in blockers, not silently zero", () => {
+    const report = buildSalesCommandCenter(
+      {
+        ...emptyInput(),
+        day1Prospects: sourceNotWired("Day 1 prospect playbook reader not wired."),
+      },
+      { now: NOW },
+    );
+    const note = report.blockers.notes.find(
+      (row) => row.source === "day1Prospects",
+    );
+    expect(note).toEqual(
+      expect.objectContaining({
+        state: "not_wired",
+        reason: expect.stringContaining("Day 1 prospect playbook"),
+      }),
+    );
   });
 });

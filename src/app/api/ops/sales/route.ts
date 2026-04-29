@@ -28,6 +28,7 @@ import { buildSalesCommandCenter } from "@/lib/ops/sales-command-center";
 import {
   readAllAgingItems,
   readApPackets,
+  readDay1Prospects,
   readFaireFollowUps,
   readFaireInvites,
   readLocationDrafts,
@@ -89,6 +90,7 @@ export async function GET(req: Request): Promise<Response> {
     aging,
     revenueChannels,
     wholesaleInquiries,
+    day1Prospects,
     salesPipeline,
   ] = await Promise.all([
     readFaireInvites(),
@@ -99,6 +101,7 @@ export async function GET(req: Request): Promise<Response> {
     readAllAgingItems(now),
     readAllChannelsLast7d(now),
     readWholesaleInquiries(),
+    readDay1Prospects(),
     readSalesPipeline(now),
   ]);
 
@@ -158,6 +161,7 @@ export async function GET(req: Request): Promise<Response> {
       apPackets,
       locationDrafts,
       wholesaleInquiries,
+      day1Prospects,
       salesPipeline,
       missingEnv: readMissingEnv(),
       agingItems: aging.items,
