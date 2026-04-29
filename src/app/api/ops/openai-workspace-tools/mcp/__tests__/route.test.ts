@@ -23,6 +23,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockedAuth.mockResolvedValue(true);
   delete process.env.OPENAI_WORKSPACE_CONNECTOR_SECRET;
+  delete process.env.CRON_SECRET;
+  vi.unstubAllGlobals();
 });
 
 describe("OpenAI workspace MCP route", () => {
@@ -41,8 +43,14 @@ describe("OpenAI workspace MCP route", () => {
       mode: string;
       tools: Array<{ name: string }>;
     };
-    expect(body.mode).toBe("read_only");
-    expect(body.tools.map((tool) => tool.name).sort()).toEqual(["fetch", "search"]);
+    expect(body.mode).toBe("read_and_approval_request");
+    expect(body.tools.map((tool) => tool.name).sort()).toEqual([
+      "fetch",
+      "request_faire_direct_invite_approval",
+      "request_faire_follow_up_approval",
+      "request_receipt_review_approval",
+      "search",
+    ]);
   });
 
   it("GET allows the dedicated OpenAI workspace connector bearer", async () => {
@@ -73,6 +81,9 @@ describe("OpenAI workspace MCP route", () => {
     };
     expect(body.result.tools.map((tool) => tool.name).sort()).toEqual([
       "fetch",
+      "request_faire_direct_invite_approval",
+      "request_faire_follow_up_approval",
+      "request_receipt_review_approval",
       "search",
     ]);
   });
@@ -162,6 +173,79 @@ describe("OpenAI workspace MCP route", () => {
       }),
     );
     expect(res.status).toBe(400);
+  });
+
+  it("approval-request tool fails closed when CRON_SECRET is missing", async () => {
+    const { POST } = await import("../route");
+    const res = await POST(
+      req({
+        jsonrpc: "2.0",
+        id: "approval",
+        method: "tools/call",
+        params: {
+          name: "request_faire_direct_invite_approval",
+          arguments: { id: "faire-1" },
+        },
+      }),
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      result: { content: Array<{ text: string }> };
+    };
+    const parsed = JSON.parse(body.result.content[0].text) as {
+      ok: boolean;
+      status: number;
+      body: { code: string };
+    };
+    expect(parsed.ok).toBe(false);
+    expect(parsed.status).toBe(503);
+    expect(parsed.body.code).toBe("cron_secret_missing");
+  });
+
+  it("approval-request tool proxies to the existing request-approval route", async () => {
+    process.env.CRON_SECRET = "cron-secret";
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      expect(init?.method).toBe("POST");
+      expect((init?.headers as Record<string, string>).authorization).toBe(
+        "Bearer cron-secret",
+      );
+      return new Response(
+        JSON.stringify({ ok: true, approvalId: "appr-123" }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { POST } = await import("../route");
+    const res = await POST(
+      req({
+        jsonrpc: "2.0",
+        id: "approval",
+        method: "tools/call",
+        params: {
+          name: "request_faire_follow_up_approval",
+          arguments: { id: "faire-1", requestedBy: "Ben" },
+        },
+      }),
+    );
+
+    expect(res.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost/api/ops/faire/direct-invites/faire-1/follow-up/request-approval",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ requestedBy: "Ben" }),
+      }),
+    );
+    const body = (await res.json()) as {
+      result: { content: Array<{ text: string }> };
+    };
+    const parsed = JSON.parse(body.result.content[0].text) as {
+      ok: boolean;
+      body: { approvalId: string };
+    };
+    expect(parsed.ok).toBe(true);
+    expect(parsed.body.approvalId).toBe("appr-123");
   });
 
   it("does not expose secret-shaped strings", async () => {

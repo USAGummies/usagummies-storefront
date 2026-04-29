@@ -1,6 +1,6 @@
 # OpenAI ChatGPT Workspace Agents Integration
 
-**Status:** Phase 1 shipped — read-only MCP search/fetch connector
+**Status:** Phase 2 shipped — MCP search/fetch + approval-request tools
 **Owner:** Ben  
 **Last updated:** 2026-04-29
 
@@ -57,7 +57,7 @@ Phase 1 adds the read-only MCP-compatible endpoint:
 - `GET /api/ops/openai-workspace-tools/mcp`
 - `POST /api/ops/openai-workspace-tools/mcp`
 
-The MCP endpoint supports `initialize`, `tools/list`, and `tools/call` for `search` / `fetch` only. It has no write tools.
+The MCP endpoint supports `initialize`, `tools/list`, and `tools/call` for `search`, `fetch`, and the approved request-approval tools. It has no direct execution tools.
 External ChatGPT connector auth uses `OPENAI_WORKSPACE_CONNECTOR_SECRET` as a dedicated bearer token. Existing internal ops auth remains supported.
 
 ## 4. Tool Classes
@@ -160,7 +160,21 @@ Acceptance:
 
 ### Phase 2 — Approval Request Tools
 
-Expose only request-approval tools:
+Shipped in this change:
+
+- `request_faire_direct_invite_approval(id, requestedBy?)`
+- `request_faire_follow_up_approval(id, requestedBy?)`
+- `request_receipt_review_approval(receiptId)`
+
+Implementation:
+
+- The MCP layer proxies to the existing request-approval routes.
+- It authenticates those internal calls with `CRON_SECRET`.
+- If `CRON_SECRET` is missing, tools fail closed with `cron_secret_missing`.
+- Returned payloads contain the route response (`approvalId`, Slack thread/permalink when the underlying route provides it).
+- The MCP layer never calls closers or direct write clients.
+
+Exposed request-approval tools:
 
 - `request_faire_direct_invite_approval`
 - `request_faire_follow_up_approval`

@@ -51,15 +51,18 @@ describe("OpenAI workspace MCP helpers", () => {
     });
   });
 
-  it("exposes only search and fetch tools", () => {
+  it("exposes search/fetch plus approval-request tools only", () => {
     expect(mcpToolDefinitions().map((tool) => tool.name).sort()).toEqual([
       "fetch",
+      "request_faire_direct_invite_approval",
+      "request_faire_follow_up_approval",
+      "request_receipt_review_approval",
       "search",
     ]);
   });
 
-  it("handles MCP initialize", () => {
-    const response = handleWorkspaceMcpRequest({
+  it("handles MCP initialize", async () => {
+    const response = await handleWorkspaceMcpRequest({
       jsonrpc: "2.0",
       id: 1,
       method: "initialize",
@@ -72,8 +75,8 @@ describe("OpenAI workspace MCP helpers", () => {
     );
   });
 
-  it("handles MCP tools/list", () => {
-    const response = handleWorkspaceMcpRequest({
+  it("handles MCP tools/list", async () => {
+    const response = await handleWorkspaceMcpRequest({
       jsonrpc: "2.0",
       id: 2,
       method: "tools/list",
@@ -82,8 +85,8 @@ describe("OpenAI workspace MCP helpers", () => {
     expect(response.result).toEqual({ tools: mcpToolDefinitions() });
   });
 
-  it("handles MCP tools/call search", () => {
-    const response = handleWorkspaceMcpRequest({
+  it("handles MCP tools/call search", async () => {
+    const response = await handleWorkspaceMcpRequest({
       jsonrpc: "2.0",
       id: "search-1",
       method: "tools/call",
@@ -100,8 +103,8 @@ describe("OpenAI workspace MCP helpers", () => {
     expect(parsed.results.some((item) => item.id.includes("receipt"))).toBe(true);
   });
 
-  it("handles MCP tools/call fetch", () => {
-    const response = handleWorkspaceMcpRequest({
+  it("handles MCP tools/call fetch", async () => {
+    const response = await handleWorkspaceMcpRequest({
       jsonrpc: "2.0",
       id: "fetch-1",
       method: "tools/call",
@@ -116,8 +119,8 @@ describe("OpenAI workspace MCP helpers", () => {
     expect(parsed.id).toBe("ops.faire.direct");
   });
 
-  it("returns structured error for unknown fetch id", () => {
-    const response = handleWorkspaceMcpRequest({
+  it("returns structured error for unknown fetch id", async () => {
+    const response = await handleWorkspaceMcpRequest({
       jsonrpc: "2.0",
       id: "bad-fetch",
       method: "tools/call",
@@ -134,8 +137,8 @@ describe("OpenAI workspace MCP helpers", () => {
     );
   });
 
-  it("rejects unsupported tools without exposing write tools", () => {
-    const response = handleWorkspaceMcpRequest({
+  it("rejects unsupported tools without exposing write tools", async () => {
+    const response = await handleWorkspaceMcpRequest({
       jsonrpc: "2.0",
       id: "write",
       method: "tools/call",
@@ -144,6 +147,93 @@ describe("OpenAI workspace MCP helpers", () => {
         arguments: {},
       },
     });
-    expect(response.error?.message).toContain("Only search and fetch");
+    expect(response.error?.message).toContain(
+      "Only search, fetch, and approval-request tools",
+    );
+  });
+
+  it("approval-request tools fail closed when no executor is configured", async () => {
+    const response = await handleWorkspaceMcpRequest({
+      jsonrpc: "2.0",
+      id: "approval",
+      method: "tools/call",
+      params: {
+        name: "request_faire_direct_invite_approval",
+        arguments: { id: "faire-1" },
+      },
+    });
+    expect(response.error).toEqual(
+      expect.objectContaining({
+        code: -32010,
+        message: expect.stringContaining("not configured"),
+      }),
+    );
+  });
+
+  it("approval-request tools call the injected executor exactly once", async () => {
+    const calls: Array<{ route: string; body: Record<string, unknown> }> = [];
+    const response = await handleWorkspaceMcpRequest(
+      {
+        jsonrpc: "2.0",
+        id: "approval",
+        method: "tools/call",
+        params: {
+          name: "request_faire_direct_invite_approval",
+          arguments: { id: "faire-1", requestedBy: "Ben" },
+        },
+      },
+      {
+        executeApprovalTool: async (input) => {
+          calls.push(input);
+          return {
+            ok: true,
+            status: 200,
+            body: { ok: true, approvalId: "appr-1" },
+          };
+        },
+      },
+    );
+
+    expect(calls).toEqual([
+      {
+        route: "/api/ops/faire/direct-invites/faire-1/request-approval",
+        body: { requestedBy: "Ben" },
+      },
+    ]);
+    const result = response.result as { content: Array<{ text: string }> };
+    expect(JSON.parse(result.content[0].text)).toEqual(
+      expect.objectContaining({
+        ok: true,
+        status: 200,
+        body: { ok: true, approvalId: "appr-1" },
+      }),
+    );
+  });
+
+  it("receipt approval-request tool routes by receiptId", async () => {
+    const calls: Array<{ route: string; body: Record<string, unknown> }> = [];
+    await handleWorkspaceMcpRequest(
+      {
+        jsonrpc: "2.0",
+        id: "receipt",
+        method: "tools/call",
+        params: {
+          name: "request_receipt_review_approval",
+          arguments: { receiptId: "rcpt-1" },
+        },
+      },
+      {
+        executeApprovalTool: async (input) => {
+          calls.push(input);
+          return { ok: true, status: 200, body: { ok: true } };
+        },
+      },
+    );
+    expect(calls).toEqual([
+      {
+        route: "/api/ops/docs/receipt/promote-review",
+        body: { receiptId: "rcpt-1" },
+      },
+    ]);
   });
 });

@@ -59,6 +59,33 @@ export interface JsonRpcResponse {
   };
 }
 
+type JsonRpcError = NonNullable<JsonRpcResponse["error"]>;
+
+export interface ApprovalToolExecutorInput {
+  route: string;
+  body: Record<string, unknown>;
+}
+
+export type ApprovalToolExecutor = (
+  input: ApprovalToolExecutorInput,
+) => Promise<{
+  ok: boolean;
+  status: number;
+  body: unknown;
+}>;
+
+export interface WorkspaceMcpOptions {
+  executeApprovalTool?: ApprovalToolExecutor;
+}
+
+const APPROVAL_TOOL_ROUTES = {
+  request_faire_direct_invite_approval:
+    "/api/ops/faire/direct-invites/{id}/request-approval",
+  request_faire_follow_up_approval:
+    "/api/ops/faire/direct-invites/{id}/follow-up/request-approval",
+  request_receipt_review_approval: "/api/ops/docs/receipt/promote-review",
+} as const;
+
 export function searchOpenAIWorkspaceDocuments(
   query: string,
   docs: readonly ConnectorDocument[] = connectorSearchDocuments(),
@@ -120,7 +147,12 @@ export function asMcpText(payload: unknown): McpContentResponse {
 }
 
 export function mcpToolDefinitions(): Array<{
-  name: "search" | "fetch";
+  name:
+    | "search"
+    | "fetch"
+    | "request_faire_direct_invite_approval"
+    | "request_faire_follow_up_approval"
+    | "request_receipt_review_approval";
   description: string;
   inputSchema: Record<string, unknown>;
 }> {
@@ -151,6 +183,53 @@ export function mcpToolDefinitions(): Array<{
         additionalProperties: false,
       },
     },
+    {
+      name: "request_faire_direct_invite_approval",
+      description:
+        "Open the existing Class B Slack approval for an approved Faire Direct invite. Does not send email.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          id: { type: "string", description: "Faire invite id." },
+          requestedBy: {
+            type: "string",
+            description: "Optional operator label for evidence.",
+          },
+        },
+        required: ["id"],
+        additionalProperties: false,
+      },
+    },
+    {
+      name: "request_faire_follow_up_approval",
+      description:
+        "Open the existing Class B Slack approval for a due Faire Direct follow-up. Does not send email.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          id: { type: "string", description: "Faire invite id." },
+          requestedBy: {
+            type: "string",
+            description: "Optional operator label for evidence.",
+          },
+        },
+        required: ["id"],
+        additionalProperties: false,
+      },
+    },
+    {
+      name: "request_receipt_review_approval",
+      description:
+        "Open Rene's existing receipt.review.promote approval packet. Does not create QBO bills.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          receiptId: { type: "string", description: "Receipt id." },
+        },
+        required: ["receiptId"],
+        additionalProperties: false,
+      },
+    },
   ];
 }
 
@@ -166,7 +245,77 @@ function extractToolCall(body: JsonRpcRequest): {
   };
 }
 
-export function handleWorkspaceMcpRequest(body: JsonRpcRequest): JsonRpcResponse {
+function stringArg(args: Record<string, unknown>, key: string): string | null {
+  const value = args[key];
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+async function handleApprovalRequestTool(
+  name: string,
+  args: Record<string, unknown>,
+  execute: ApprovalToolExecutor | undefined,
+): Promise<McpContentResponse | JsonRpcError> {
+  if (!execute) {
+    return {
+      code: -32010,
+      message: "Approval-request tools are not configured on this MCP surface.",
+    };
+  }
+
+  if (name === "request_faire_direct_invite_approval") {
+    const id = stringArg(args, "id");
+    if (!id) return { code: -32602, message: "id is required" };
+    const requestedBy = stringArg(args, "requestedBy");
+    const route = APPROVAL_TOOL_ROUTES.request_faire_direct_invite_approval.replace(
+      "{id}",
+      encodeURIComponent(id),
+    );
+    const result = await execute({
+      route,
+      body: requestedBy ? { requestedBy } : {},
+    });
+    return asMcpText({ route, ...result });
+  }
+
+  if (name === "request_faire_follow_up_approval") {
+    const id = stringArg(args, "id");
+    if (!id) return { code: -32602, message: "id is required" };
+    const requestedBy = stringArg(args, "requestedBy");
+    const route = APPROVAL_TOOL_ROUTES.request_faire_follow_up_approval.replace(
+      "{id}",
+      encodeURIComponent(id),
+    );
+    const result = await execute({
+      route,
+      body: requestedBy ? { requestedBy } : {},
+    });
+    return asMcpText({ route, ...result });
+  }
+
+  if (name === "request_receipt_review_approval") {
+    const receiptId = stringArg(args, "receiptId");
+    if (!receiptId) return { code: -32602, message: "receiptId is required" };
+    const route = APPROVAL_TOOL_ROUTES.request_receipt_review_approval;
+    const result = await execute({
+      route,
+      body: { receiptId },
+    });
+    return asMcpText({ route, ...result });
+  }
+
+  return {
+    code: -32602,
+    message: "Unsupported approval-request tool.",
+    data: { name },
+  };
+}
+
+export async function handleWorkspaceMcpRequest(
+  body: JsonRpcRequest,
+  options: WorkspaceMcpOptions = {},
+): Promise<JsonRpcResponse> {
   const id = body.id ?? null;
 
   if (body.method === "initialize") {
@@ -237,12 +386,37 @@ export function handleWorkspaceMcpRequest(body: JsonRpcRequest): JsonRpcResponse
     };
   }
 
+  if (
+    call.name === "request_faire_direct_invite_approval" ||
+    call.name === "request_faire_follow_up_approval" ||
+    call.name === "request_receipt_review_approval"
+  ) {
+    const resultOrError = await handleApprovalRequestTool(
+      call.name,
+      call.args,
+      options.executeApprovalTool,
+    );
+    if ("code" in resultOrError && "message" in resultOrError) {
+      return {
+        jsonrpc: "2.0",
+        id: call.id,
+        error: resultOrError,
+      };
+    }
+    return {
+      jsonrpc: "2.0",
+      id: call.id,
+      result: resultOrError,
+    };
+  }
+
   return {
     jsonrpc: "2.0",
     id: call.id,
     error: {
       code: -32602,
-      message: "Unsupported tool. Only search and fetch are exposed.",
+      message:
+        "Unsupported tool. Only search, fetch, and approval-request tools are exposed.",
       data: { name: call.name ?? null },
     },
   };

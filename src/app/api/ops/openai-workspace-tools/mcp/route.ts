@@ -1,14 +1,16 @@
 /**
  * Read-only MCP-compatible endpoint for ChatGPT custom connectors.
  *
- * Exposes only `search` and `fetch` over the approved workspace-tool
- * documents. It never executes tools, opens approvals, writes KV, calls
- * Gmail/QBO/ShipStation/Shopify/HubSpot/Faire, or reads raw env values.
+ * Exposes `search`, `fetch`, and approval-request tools. Approval
+ * tools proxy to existing request-approval routes; they never execute
+ * downstream closers, send Gmail, post QBO, buy labels, mutate
+ * Shopify/HubSpot/Faire, or read raw env values.
  */
 import { NextResponse } from "next/server";
 
 import { isOpenAIWorkspaceAuthorized } from "@/lib/ops/openai-workspace-tools/auth";
 import {
+  type ApprovalToolExecutor,
   handleWorkspaceMcpRequest,
   mcpToolDefinitions,
 } from "@/lib/ops/openai-workspace-tools/mcp";
@@ -24,7 +26,7 @@ export async function GET(req: Request): Promise<Response> {
   return NextResponse.json({
     ok: true,
     server: "usa-gummies-openai-workspace-tools",
-    mode: "read_only",
+    mode: "read_and_approval_request",
     tools: mcpToolDefinitions(),
   });
 }
@@ -59,7 +61,63 @@ export async function POST(req: Request): Promise<Response> {
     );
   }
 
-  const response = handleWorkspaceMcpRequest(body);
+  const response = await handleWorkspaceMcpRequest(body, {
+    executeApprovalTool: buildApprovalToolExecutor(req),
+  });
   const status = response.error?.code === -32004 ? 404 : 200;
   return NextResponse.json(response, { status });
+}
+
+function buildApprovalToolExecutor(req: Request): ApprovalToolExecutor {
+  return async ({ route, body }) => {
+    const cronSecret = process.env.CRON_SECRET?.trim();
+    if (!cronSecret) {
+      return {
+        ok: false,
+        status: 503,
+        body: {
+          ok: false,
+          code: "cron_secret_missing",
+          error:
+            "CRON_SECRET is required for the ChatGPT connector to call internal request-approval routes.",
+        },
+      };
+    }
+
+    const url = new URL(route, req.url);
+    let res: Response;
+    try {
+      res = await fetch(url.toString(), {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${cronSecret}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+    } catch (err) {
+      return {
+        ok: false,
+        status: 502,
+        body: {
+          ok: false,
+          code: "request_approval_fetch_failed",
+          error: err instanceof Error ? err.message : String(err),
+        },
+      };
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = await res.json();
+    } catch {
+      parsed = { ok: false, error: "Request-approval route returned non-JSON." };
+    }
+
+    return {
+      ok: res.ok,
+      status: res.status,
+      body: parsed,
+    };
+  };
 }
