@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { BAG_PRICE_USD, type PricingTier } from "@/lib/wholesale/pricing-tiers";
+
 type FormState = "idle" | "submitting" | "success" | "error";
 type Step = "capture" | "order";
 type PackagingType = "case" | "master_carton" | "pallet";
@@ -39,14 +41,30 @@ const BAGS_PER_PACK: Record<PackagingType, number> = {
   pallet: 900,
 };
 
-function getBasePrice(packagingType: PackagingType, qty: number) {
-  if (packagingType === "pallet") {
-    return 3;
-  }
-  if (packagingType === "master_carton") {
-    return qty >= 6 ? 3.1 : 3.25;
-  }
-  return 3.49;
+/**
+ * Resolve the canonical B-tier for a booth order. Single source of truth
+ * is `src/lib/wholesale/pricing-tiers.ts` (v2.2 doctrine LOCKED 2026-04-28).
+ *
+ * Booth-specific freight-mode mapping:
+ *   - delivery="shipping"  → we ship + we eat freight     → landed tier (B2 / B4)
+ *   - delivery="in_person" → buyer takes possession at booth → buyer-freight
+ *                              tier (B3 / B5) since they're moving it themselves
+ *   - case (B1) is internal-only per doctrine — booth shouldn't display it,
+ *     but if rendered, it follows the local-delivery price ($3.49/bag).
+ *
+ * NEVER hardcode prices here. Always read from `BAG_PRICE_USD` so a future
+ * tier reprice (Ben + Rene Class C `pricing.change`) doesn't drift this form.
+ */
+function resolveTier(packagingType: PackagingType, deliveryMethod: DeliveryMethod): PricingTier {
+  if (packagingType === "case") return "B1";
+  const isLanded = deliveryMethod === "shipping";
+  if (packagingType === "master_carton") return isLanded ? "B2" : "B3";
+  // pallet
+  return isLanded ? "B4" : "B5";
+}
+
+function getBasePrice(packagingType: PackagingType, deliveryMethod: DeliveryMethod): number {
+  return BAG_PRICE_USD[resolveTier(packagingType, deliveryMethod)];
 }
 
 export function BoothOrderForm() {
@@ -77,7 +95,8 @@ export function BoothOrderForm() {
   const qty = Math.max(1, Number(quantity) || 1);
   const bagsPerPack = BAGS_PER_PACK[packagingType];
   const totalBags = qty * bagsPerPack;
-  const basePrice = getBasePrice(packagingType, qty);
+  const basePrice = getBasePrice(packagingType, deliveryMethod);
+  const tier = resolveTier(packagingType, deliveryMethod);
   const prepayEligible = packagingType === "master_carton";
   const prepayMultiplier =
     paymentMethod === "pay_now" && prepayEligible ? 0.95 : 1;
@@ -211,6 +230,11 @@ export function BoothOrderForm() {
           packaging_type: packagingType,
           delivery_method: deliveryMethod,
           payment_method: paymentMethod,
+          // Surface the resolved canonical B-tier so the QBO audit trail
+          // ties back to /contracts/wholesale-pricing.md v2.2 unambiguously.
+          // Backend may ignore this field today; it's forward-looking.
+          tier,
+          base_price_per_bag: basePrice,
           notes: notes.trim(),
         }),
       });
@@ -476,8 +500,11 @@ export function BoothOrderForm() {
               <div className="grid grid-cols-1 gap-3">
                 {(["case", "master_carton", "pallet"] as PackagingType[]).map((option) => {
                   const selected = packagingType === option;
-                  const optionQty = option === "master_carton" ? Math.max(qty, 1) : 1;
-                  const optionBasePrice = getBasePrice(option, optionQty);
+                  // Per-option price preview reflects the CURRENTLY-selected
+                  // delivery method so the displayed prices match what the
+                  // buyer will actually be quoted. Switching delivery method
+                  // re-renders this list with updated prices.
+                  const optionBasePrice = getBasePrice(option, deliveryMethod);
                   return (
                     <button
                       key={option}
