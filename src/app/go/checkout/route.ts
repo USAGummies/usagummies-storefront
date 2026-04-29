@@ -1,5 +1,14 @@
 // /go/checkout — creates a Storefront API cart and redirects to the Shopify
-// checkout URL directly (bypasses the Shop Pay / shop.app redirect).
+// checkout URL.
+//
+// 2026-04-28 UPDATE — Shop Pay re-enable: 6 InitiateCheckouts → 0 Purchases on
+// 4/28 funnel. Root cause: Storefront API cartCreate cart URLs go through
+// `shop.app` callback which appends `skip_shop_pay=true` to the final
+// checkout URL, hiding the Shop Pay express checkout button (the highest-
+// converting one-tap path). Fix: follow the cart→shop.app redirect server-
+// side, extract the `ur_back_url` checkout target, strip skip_shop_pay=true,
+// and redirect users directly there. Bypasses the shop.app domain hop AND
+// restores the express button. Adds ~150ms server latency.
 //
 // Supports ?qty=N parameter (default: 5). Clamped to 1–12.
 //
@@ -66,6 +75,61 @@ function fallbackPermalink(qty: number, attribution: URLSearchParams) {
     url.searchParams.set(key, value);
   }
   return url.toString();
+}
+
+/**
+ * Resolve the Storefront-API-generated cart URL into a direct Shopify checkout
+ * URL with `skip_shop_pay=true` stripped, so the Shop Pay express button is
+ * visible at checkout. The cart URL on myshopify.com 302-redirects to a
+ * `shop.app` callback URL whose `ur_back_url` query param contains the actual
+ * checkout destination. We extract that, strip skip_shop_pay, and use it.
+ *
+ * If anything fails (network error, unexpected redirect chain, missing field),
+ * the caller falls back to the original cart URL — at worst the user lands on
+ * the same checkout they would have today (just with one extra hop through
+ * shop.app). This wrapper never throws.
+ */
+async function resolveShopPayFriendlyCheckoutUrl(
+  cartUrl: string,
+): Promise<string> {
+  try {
+    const res = await fetch(cartUrl, {
+      method: "GET",
+      redirect: "manual",
+      // Mimic a mobile browser so Shopify routes us through the same flow as
+      // real ad-traffic visitors (shop.app callback chain).
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+        Accept: "text/html",
+      },
+      cache: "no-store",
+    });
+    const location = res.headers.get("location");
+    if (!location) return cartUrl;
+
+    // The cart URL redirects to shop.app/checkout/.../shop_pay_callback?...&ur_back_url=...
+    const parsed = new URL(location);
+    if (!parsed.host.endsWith("shop.app")) {
+      // Already on Shopify checkout host — strip skip_shop_pay if present and use.
+      try {
+        parsed.searchParams.delete("skip_shop_pay");
+        return parsed.toString();
+      } catch {
+        return location;
+      }
+    }
+
+    const urBackUrl = parsed.searchParams.get("ur_back_url");
+    if (!urBackUrl) return cartUrl;
+
+    // urBackUrl is the actual checkout URL (already URL-decoded by URLSearchParams.get)
+    const checkout = new URL(urBackUrl);
+    checkout.searchParams.delete("skip_shop_pay");
+    return checkout.toString();
+  } catch {
+    return cartUrl;
+  }
 }
 
 function isTrustedReferrerHost(referrerHost: string, requestHost: string) {
@@ -219,13 +283,21 @@ export async function GET(req: NextRequest) {
     }
 
     const json = await res.json();
-    const checkoutUrl = json?.data?.cartCreate?.cart?.checkoutUrl;
+    const cartUrl = json?.data?.cartCreate?.cart?.checkoutUrl;
 
-    if (!checkoutUrl) {
+    if (!cartUrl) {
       return NextResponse.redirect(fallbackPermalink(qty, attribution), 302);
     }
 
-    return NextResponse.redirect(withAttribution(checkoutUrl, attribution), 302);
+    // Resolve the cart URL into a direct checkout URL with skip_shop_pay
+    // stripped — so the Shop Pay express button shows up at checkout. Falls
+    // back gracefully to the cart URL if resolution fails.
+    const shopPayFriendlyUrl = await resolveShopPayFriendlyCheckoutUrl(cartUrl);
+
+    return NextResponse.redirect(
+      withAttribution(shopPayFriendlyUrl, attribution),
+      302,
+    );
   } catch {
     return NextResponse.redirect(fallbackPermalink(qty, attribution), 302);
   }
