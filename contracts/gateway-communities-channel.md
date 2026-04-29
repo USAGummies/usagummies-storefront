@@ -123,6 +123,112 @@ Specific named-buyer research on:
 - HEB grocery — wholesale onboarding via vendor portal (massive TX grocer)
 - Fiesta / La Michoacana Meat Market chains
 
+### Tier 1-BEACH — Southern beach + tourist saturation lane (LOCKED 2026-04-29 PM)
+
+**Ben's strategic call:** *"There's so much business on all those beaches in the south, and the tourist areas etc, that's where we really shine. Let's make sure we are everywhere, then all we need to do is be picked up or noticed by the right person."*
+
+The southeastern beach + tourism corridor is a **saturation play** — pattern-fit independent gift shops cluster densely (10-30 shops per beach town) across hundreds of towns from the Outer Banks down through Florida, around the Gulf, and up the Texas coast. Every shop is a potential trial pickup. Ubiquity wins — when 30 stores in a region carry the bag, the right wholesale buyer (regional grocer, distributor, military exchange) notices and reaches out.
+
+**Coverage philosophy:** Hit every beach town + tourist destination + heritage cluster across the Southeast. The methodology stays the same (named buyer + verified email per Viktor's playbook), but the geographic scope is **all of it** — from Outer Banks NC down to Key West FL and around to South Padre Island TX.
+
+#### Florida (massive market — 130+ million annual tourists)
+
+| Region | Towns / Anchors |
+|---|---|
+| **Florida Keys** | Key West, Marathon, Islamorada, Key Largo, Big Pine Key |
+| **South FL coast** | Miami Beach / South Beach, Fort Lauderdale Beach, Hollywood Beach, Boca Raton, Delray Beach, Palm Beach, Jupiter Beach |
+| **Treasure Coast** | Stuart, Vero Beach, Sebastian, Cocoa Beach + Cape Canaveral (⭐ **Kennedy Space Center** = Made-in-USA hero target) |
+| **Daytona / Space Coast** | Daytona Beach, New Smyrna Beach, Flagler Beach |
+| **NE FL / Heritage** | St. Augustine ⭐ (oldest city, heritage retail), Amelia Island / Fernandina Beach, Jacksonville Beach, Ponte Vedra |
+| **Tampa Bay region** | Clearwater Beach ⭐, St. Pete Beach, Treasure Island, Indian Rocks Beach, Madeira Beach, Anna Maria Island |
+| **SW FL / Gulf** | Sarasota / Siesta Key ⭐, Venice, Naples / Marco Island, Sanibel / Captiva, Fort Myers Beach |
+| **Crystal Coast / Nature Coast** | Crystal River, Homosassa, Tarpon Springs (Greek heritage retail) |
+| **Panhandle / Emerald Coast** | Destin ⭐, Fort Walton Beach, Pensacola Beach (✓ Naval Aviation Valerie Miller in pipeline), Panama City Beach, 30A (Seaside, Rosemary Beach, WaterColor, Watersound — premium beach retail) |
+
+#### Georgia coast
+
+| Town | Notes |
+|---|---|
+| **Tybee Island** | Savannah-adjacent beach tourism, lighthouse + heritage retail |
+| **St. Simons Island + Sea Island** | Golden Isles luxury + heritage retail |
+| **Jekyll Island** | State-park-managed historic district (Jekyll Island Authority centralized buyer) |
+| **Cumberland Island NPS** | NPS visitor center retail (Wild Horse heritage) |
+
+#### South Carolina
+
+| Town / Region | Notes |
+|---|---|
+| **Myrtle Beach + North Myrtle Beach** | ⭐ MASSIVE tourism (~20M annual visitors), 60-mile Grand Strand with hundreds of beach shops |
+| **Pawleys Island, Litchfield, Garden City Beach** | Grand Strand independent shops |
+| **Charleston + Mt Pleasant** | Heritage retail + Patriots Point + Folly Beach + Isle of Palms + Sullivan's Island |
+| **Hilton Head + Beaufort** | Coastal + Marine Corps |
+| **Edisto Island** | Independent beach retail |
+
+#### North Carolina
+
+| Region | Towns |
+|---|---|
+| **Outer Banks** ⭐ | Corolla, Duck, Kitty Hawk, Kill Devil Hills (Wright Brothers NPS!), Nags Head, Hatteras, Ocracoke. Hundreds of independent gift shops, strong patriotic/heritage market. |
+| **Crystal Coast** | Atlantic Beach, Emerald Isle, Beaufort NC, Cape Lookout NS gateway towns |
+| **Cape Fear** | Wilmington (Battleship North Carolina!), Wrightsville Beach, Carolina Beach, Kure Beach, Topsail Beach |
+| **Heritage** | New Bern (Tryon Palace), Edenton |
+
+#### Virginia
+
+| Town | Notes |
+|---|---|
+| **Virginia Beach** | Major military + tourism beach |
+| **Chincoteague Island** | Wild ponies, Eastern Shore tourism |
+| **Williamsburg / Yorktown / Jamestown** | Colonial heritage triangle (already on Tier 2-S) |
+
+#### Alabama
+
+| Region | Notes |
+|---|---|
+| **Gulf Shores + Orange Beach + Fort Morgan** | Alabama beach corridor, growing tourism |
+| **Fairhope** | ✓ Ryan Mueller / Fairhope Snack Co. = collab partner per memory |
+| **Mobile + Dauphin Island** | Heritage + Gulf Coast |
+
+#### Mississippi
+
+| Town | Notes |
+|---|---|
+| **Biloxi + Gulfport + Ocean Springs + Bay St. Louis + Pass Christian** | Mississippi Gulf Coast tourism corridor + casinos |
+| **Vicksburg** | Civil War heritage tourism + NMP |
+| **Natchez** | Historic district + Mississippi River tourism |
+
+#### Louisiana
+
+| Region | Notes |
+|---|---|
+| **New Orleans (French Quarter, Magazine St)** | Massive heritage retail concentration |
+| **Lafayette + Cajun Country** | Heritage + cultural tourism |
+| **Grand Isle + Lake Pontchartrain** | Coastal Louisiana |
+
+#### Heritage / cultural anchors (inland southern)
+
+| Town | Notes |
+|---|---|
+| **Nashville TN** | Music heritage + family tourism |
+| **Memphis TN (Beale St + Graceland)** | Music heritage + Graceland gift shop |
+| **Branson MO** | Family entertainment + Made-in-USA themed retail (Kokopelli referral path) |
+| **Hot Springs AR** | Hot Springs NP + heritage tourism |
+| **Eureka Springs AR** | Christian heritage + indie gift retail |
+| **Bardstown KY** | Bourbon trail tourism |
+| **Mammoth Cave NP gateway (Cave City KY)** | NPS + cave-themed retail |
+| **Asheville + Boone + Blowing Rock NC** | Blue Ridge tourism (Tier 2 already) |
+| **Helen GA** | Bavarian-themed mountain town |
+| **Gatlinburg / Pigeon Forge / Sevierville TN + Cherokee NC** | ✓ Old Mill / Kelly Cross in pipeline. ~500+ gift shops on the Parkway. |
+
+**Saturation execution plan:**
+- Viktor research waves rotate by sub-region (Outer Banks → Charleston → Myrtle Beach → Savannah → Florida Keys → Florida Gulf Coast → Panhandle → Alabama Gulf → Mississippi → Louisiana → Texas Gulf)
+- Pace: 1 sub-region per Viktor batch, 2-3 batches per week, ~50-100 named-buyer prospects per region researched
+- Outreach pacing: 30-50 personalized cold sends per day max from `ben@usagummies.com` (sender-rep ceiling) — clustered by region for "Ben in town" reference consistency
+- Trip planning: Q3 2026 southern beach run = 21-day, multi-region, multi-pallet load. Founder-drive economics (per `/contracts/wholesale-pricing.md` §3) = $5K+ freight moat on a 17-pallet southern load.
+- Per-town saturation: hit every confirmed gift shop + visitor center + hotel-attached retail in each town. Target: 10-30 shops per town, 1-3 shops convert per town = 50-200 net-new accounts per sub-region.
+
+---
+
 ### Tier 2-S — Top southeastern gateway towns (post-Texas, follow-on lane)
 
 | Town | Anchor | Notes |
