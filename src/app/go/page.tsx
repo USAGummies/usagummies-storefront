@@ -1,19 +1,10 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { AMAZON_LISTING_URL } from "@/lib/amazon";
 import { AMAZON_REVIEWS } from "@/data/amazonReviews";
+import { US_MAP_SVG } from "@/lib/marketing/us-map-svg";
 import GoTracker from "./GoTracker.client";
-
-// Inline US map SVG for the supply-chain section. Read at build time.
-// We strip the SVG's internal <defs><style>...</style></defs> because Next's
-// SSR + client hydration encode <style> inside dangerouslySetInnerHTML
-// inconsistently, throwing a hydration error. We move the equivalent rules
-// to the page CSS instead.
-const US_MAP_SVG = readFileSync(resolve(process.cwd(), "public/us-map-states.svg"), "utf8")
-  .replace(/<defs>[\s\S]*?<\/defs>/, "");
 
 // API route that creates a Storefront API cart and redirects to checkout
 // (bypasses the Shop Pay / shop.app redirect that the raw cart permalink triggers)
