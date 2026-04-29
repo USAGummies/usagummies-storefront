@@ -516,6 +516,7 @@ export async function PUT(req: Request) {
   };
 
   if (body.docNumber) updatePayload.DocNumber = body.docNumber;
+  if (body.poNumber) updatePayload.PONumber = body.poNumber;
   if (body.txnDate) updatePayload.TxnDate = body.txnDate;
   if (body.dueDate) updatePayload.DueDate = body.dueDate;
   if (body.memo) updatePayload.PrivateNote = body.memo;
