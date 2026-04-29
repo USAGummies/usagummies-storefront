@@ -145,6 +145,45 @@ describe("OpenAI workspace MCP route", () => {
     expect(parsed.metadata.readOnly).toBe(true);
   });
 
+  it("POST fetch enriches read tools with live read-model payloads", async () => {
+    process.env.CRON_SECRET = "cron-secret";
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      expect(init?.method).toBe("GET");
+      expect((init?.headers as Record<string, string>).authorization).toBe(
+        "Bearer cron-secret",
+      );
+      return new Response(JSON.stringify({ ok: true, report: { total: 1 } }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { POST } = await import("../route");
+    const res = await POST(
+      req({
+        jsonrpc: "2.0",
+        id: "fetch-live",
+        method: "tools/call",
+        params: { name: "fetch", arguments: { id: "ops.sales.snapshot" } },
+      }),
+    );
+    expect(res.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost/api/ops/sales",
+      expect.objectContaining({ method: "GET" }),
+    );
+    const body = (await res.json()) as {
+      result: { content: Array<{ text: string }> };
+    };
+    const parsed = JSON.parse(body.result.content[0].text) as {
+      text: string;
+      metadata: { liveRead: { body: { report: { total: number } } } };
+    };
+    expect(parsed.text).toContain("Live read-model snapshot");
+    expect(parsed.metadata.liveRead.body.report.total).toBe(1);
+  });
+
   it("unknown fetch id returns a structured 404", async () => {
     const { POST } = await import("../route");
     const res = await POST(

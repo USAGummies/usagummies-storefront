@@ -28,6 +28,11 @@ export interface ConnectorFetchResult extends ConnectorDocument {
     backingRoute?: string;
     backingSurface?: string;
     blocker?: string;
+    liveRead?: {
+      ok: boolean;
+      status: number;
+      body: unknown;
+    } | null;
   };
 }
 
@@ -76,6 +81,9 @@ export type ApprovalToolExecutor = (
 
 export interface WorkspaceMcpOptions {
   executeApprovalTool?: ApprovalToolExecutor;
+  loadLiveReadModel?: (
+    doc: ConnectorFetchResult,
+  ) => Promise<{ ok: boolean; status: number; body: unknown } | null>;
 }
 
 const APPROVAL_TOOL_ROUTES = {
@@ -379,10 +387,25 @@ export async function handleWorkspaceMcpRequest(
         },
       };
     }
+    let enriched = doc;
+    if (doc.metadata.mode === "read" && options.loadLiveReadModel) {
+      const liveRead = await options.loadLiveReadModel(doc);
+      enriched = {
+        ...doc,
+        text:
+          liveRead === null
+            ? doc.text
+            : `${doc.text}\n\nLive read-model snapshot:\n${JSON.stringify(liveRead)}`,
+        metadata: {
+          ...doc.metadata,
+          liveRead,
+        },
+      };
+    }
     return {
       jsonrpc: "2.0",
       id: call.id,
-      result: asMcpText(doc),
+      result: asMcpText(enriched),
     };
   }
 

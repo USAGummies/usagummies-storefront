@@ -11,6 +11,7 @@ import { NextResponse } from "next/server";
 import { isOpenAIWorkspaceAuthorized } from "@/lib/ops/openai-workspace-tools/auth";
 import {
   type ApprovalToolExecutor,
+  type ConnectorFetchResult,
   handleWorkspaceMcpRequest,
   mcpToolDefinitions,
 } from "@/lib/ops/openai-workspace-tools/mcp";
@@ -63,9 +64,65 @@ export async function POST(req: Request): Promise<Response> {
 
   const response = await handleWorkspaceMcpRequest(body, {
     executeApprovalTool: buildApprovalToolExecutor(req),
+    loadLiveReadModel: buildLiveReadModelLoader(req),
   });
   const status = response.error?.code === -32004 ? 404 : 200;
   return NextResponse.json(response, { status });
+}
+
+function buildLiveReadModelLoader(req: Request) {
+  return async (doc: ConnectorFetchResult) => {
+    const route = doc.metadata.backingRoute;
+    if (!route || !route.startsWith("/api/ops/")) return null;
+
+    const cronSecret = process.env.CRON_SECRET?.trim();
+    if (!cronSecret) {
+      return {
+        ok: false,
+        status: 503,
+        body: {
+          ok: false,
+          code: "cron_secret_missing",
+          error:
+            "CRON_SECRET is required for the ChatGPT connector to fetch live ops read-models.",
+        },
+      };
+    }
+
+    const url = new URL(route, req.url);
+    let res: Response;
+    try {
+      res = await fetch(url.toString(), {
+        method: "GET",
+        headers: {
+          authorization: `Bearer ${cronSecret}`,
+        },
+      });
+    } catch (err) {
+      return {
+        ok: false,
+        status: 502,
+        body: {
+          ok: false,
+          code: "live_read_fetch_failed",
+          error: err instanceof Error ? err.message : String(err),
+        },
+      };
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = await res.json();
+    } catch {
+      parsed = { ok: false, error: "Live read-model route returned non-JSON." };
+    }
+
+    return {
+      ok: res.ok,
+      status: res.status,
+      body: parsed,
+    };
+  };
 }
 
 function buildApprovalToolExecutor(req: Request): ApprovalToolExecutor {

@@ -134,6 +134,7 @@ Shipped in this change:
 
 - `search(query)` over registry connector documents.
 - `fetch(id)` for one connector document with metadata.
+- Live read-model enrichment for read tools with `backingRoute` under `/api/ops/*`.
 - JSON-RPC-style `initialize`, `tools/list`, and `tools/call` handling.
 - Auth gate via existing ops auth OR `Authorization: Bearer <OPENAI_WORKSPACE_CONNECTOR_SECRET>`.
 - No write imports, no env value reads, no approval opening.
@@ -147,6 +148,7 @@ Current scope:
 
 - `search(query)` over registry documents.
 - `fetch(id)` for full registry-document details.
+- `fetch(id)` includes a live read-model snapshot when the tool is read-only and has a safe `/api/ops/*` backing route.
 - No write tools.
 - No raw env values.
 - Session or bearer auth through the existing ops `isAuthorized()` path.

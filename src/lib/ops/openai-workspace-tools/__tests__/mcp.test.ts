@@ -119,6 +119,35 @@ describe("OpenAI workspace MCP helpers", () => {
     expect(parsed.id).toBe("ops.faire.direct");
   });
 
+  it("enriches fetch with live read-model data when a loader is provided", async () => {
+    const response = await handleWorkspaceMcpRequest(
+      {
+        jsonrpc: "2.0",
+        id: "fetch-live",
+        method: "tools/call",
+        params: {
+          name: "fetch",
+          arguments: { id: "ops.sales.snapshot" },
+        },
+      },
+      {
+        loadLiveReadModel: async (doc) => ({
+          ok: true,
+          status: 200,
+          body: { source: doc.id, ok: true },
+        }),
+      },
+    );
+
+    const result = response.result as { content: Array<{ text: string }> };
+    const parsed = JSON.parse(result.content[0].text) as {
+      text: string;
+      metadata: { liveRead: { body: { source: string } } };
+    };
+    expect(parsed.text).toContain("Live read-model snapshot");
+    expect(parsed.metadata.liveRead.body.source).toBe("ops.sales.snapshot");
+  });
+
   it("returns structured error for unknown fetch id", async () => {
     const response = await handleWorkspaceMcpRequest({
       jsonrpc: "2.0",
