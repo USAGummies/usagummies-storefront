@@ -60,6 +60,7 @@ const NAV_SECTIONS: NavSection[] = [
       { href: "/ops/amazon-fbm", label: "Amazon FBM Queue", icon: "\u{1F4E6}", roles: ["admin", "employee"] },
       { href: "/ops/shopify-orders", label: "Shopify DTC Queue", icon: "\u{1F6D2}", roles: ["admin", "employee"] },
       { href: "/ops/agents/status", label: "Agent Status", icon: "\u{1F916}", roles: ["admin", "employee"] },
+      { href: "/ops/openai-workspace-tools", label: "ChatGPT Connector", icon: "\u{1F9E9}", roles: ["admin", "employee"] },
     ],
   },
 ];

@@ -1,6 +1,6 @@
 # OpenAI ChatGPT Workspace Agents Integration
 
-**Status:** Phase 2 shipped — MCP search/fetch + approval-request tools
+**Status:** Phase 3 shipped — MCP search/fetch + approval-request tools + ops cockpit
 **Owner:** Ben  
 **Last updated:** 2026-04-29
 
@@ -59,6 +59,12 @@ Phase 1 adds the read-only MCP-compatible endpoint:
 
 The MCP endpoint supports `initialize`, `tools/list`, and `tools/call` for `search`, `fetch`, and the approved request-approval tools. It has no direct execution tools.
 External ChatGPT connector auth uses `OPENAI_WORKSPACE_CONNECTOR_SECRET` as a dedicated bearer token. Existing internal ops auth remains supported.
+
+Phase 3 adds the operator cockpit:
+
+- `/ops/openai-workspace-tools`
+
+The cockpit summarizes the allowlist, connector readiness, blocked/prohibited doctrine, and runs a browser-session discovery probe against the MCP endpoint. It never exposes raw secret values and never calls write clients.
 
 ## 4. Tool Classes
 
@@ -200,19 +206,23 @@ Acceptance:
 - No downstream action occurs until Slack approval.
 - Unknown or missing slug fails closed.
 
-### Phase 3 — Operating Memory
+### Phase 3 — Operator Cockpit + Operating Memory
 
-Once the operating-memory worktree lands:
+Shipped in this change:
 
-- Add `operating_memory.search`.
-- Add transcript / doctrine fetch documents.
-- Use redaction before any connector output.
+- `/ops/openai-workspace-tools` cockpit.
+- Boolean-only connector readiness (`ready`, `missing_secret`, `no_tools`).
+- Grouped cards for read tools, approval-request tools, and prohibited tools.
+- Browser-session probe of `GET /api/ops/openai-workspace-tools/mcp`.
+- `ops.agent.packs` and `ops.operating-memory.search` are ready registry entries with backing routes.
 
 Acceptance:
 
-- ChatGPT can find the current doctrine.
-- ChatGPT can cite operating-memory records.
+- Ben can inspect exactly what ChatGPT workspace agents may read or request.
+- Blocked/prohibited actions remain visible as doctrine, not hidden.
+- ChatGPT can find current doctrine / operating-memory records through the allowlisted surfaces.
 - Corrections never silently mutate doctrine; they produce reviewable records.
+- The cockpit is read-only and imports no money/customer/shipping write clients.
 
 ## 7. Claude / Codex Continuation Prompt
 
