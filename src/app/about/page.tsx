@@ -72,6 +72,9 @@ const articleJsonLd = {
   "@type": "Article",
   headline: PAGE_TITLE,
   description: PAGE_DESCRIPTION,
+  // Conservative publish date — page predates audit but exact date unknown.
+  datePublished: "2026-01-01",
+  dateModified: "2026-04-29",
   mainEntityOfPage: {
     "@type": "WebPage",
     "@id": `${SITE_URL}/about`,

@@ -1,3 +1,15 @@
+// /api/subscriptions — POST creates a new subscription + Shopify cart.
+//
+// STATUS (2026-04-29): The customer-facing /subscribe page is currently
+// 302-redirected to /shop in next.config.ts (line 99), so this POST
+// endpoint has no live UI callers (SubscribeForm.client.tsx is unmounted).
+// It is RETAINED because (a) the sibling /api/subscriptions/manage route
+// is actively used by /subscribe/manage (a non-redirected page for
+// existing subscribers), (b) the KV-backed subscription store may still
+// hold active records that the manage flow operates on, and (c) emails
+// sent from prior enrollments link to /subscribe/manage. If/when
+// subscriptions are fully retired, delete the entire /api/subscriptions/
+// tree along with /subscribe/* pages and remove the redirect.
 import { NextResponse } from "next/server";
 import { kv } from "@vercel/kv";
 import {

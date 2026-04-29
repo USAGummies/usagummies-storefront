@@ -10,6 +10,9 @@ import { GuaranteeBlock } from "@/components/lp/GuaranteeBlock";
 import { FaqAccordion } from "@/components/lp/FaqAccordion";
 import { StickyBuyBar } from "@/components/lp/StickyBuyBar";
 import { FooterMini } from "@/components/lp/FooterMini";
+import ProductViewTracker from "@/components/tracking/ProductViewTracker.client";
+import { SINGLE_BAG_SKU } from "@/lib/bundles/atomic";
+import { BASE_PRICE } from "@/lib/bundles/pricing";
 
 export const metadata: Metadata = {
   title: "Dye-Free Gummy Bears — Made in U.S.A. | USA Gummies",
@@ -34,6 +37,16 @@ export const metadata: Metadata = {
 export default function DyeFreeGummiesLandingPage() {
   return (
     <main>
+      {/* Fire Meta Pixel ViewContent on /lp/dye-free-gummies — this is a
+       * paid Meta landing page; without ViewContent, the pixel can't
+       * optimize the Sales objective. Mirrors /shop's tracker (added
+       * 2026-04-29). */}
+      <ProductViewTracker
+        productId={SINGLE_BAG_SKU}
+        productName="All American Gummy Bears - 7.5 oz Bag"
+        price={BASE_PRICE}
+        currency="USD"
+      />
       <HeroSection />
       <ScarcityBar />
       <ThreePromises />

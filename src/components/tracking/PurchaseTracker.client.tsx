@@ -11,6 +11,19 @@ export default function PurchaseTracker() {
     if (fired.current) return;
     fired.current = true;
 
+    // Extract order info from URL params if available
+    const params = new URLSearchParams(window.location.search);
+    const totalParam = params.get("total");
+    const valueParam = params.get("value");
+    const orderParam = params.get("order") || params.get("order_id");
+
+    // Only fire a Purchase event when we actually have order data in the
+    // URL — without this guard, hitting /thank-you directly (e.g. test
+    // load, refresh, returning visitor) would fire a phantom $25 / qty 5
+    // conversion and pollute Meta + Google Ads attribution. Fixed
+    // 2026-04-29.
+    if (!totalParam && !valueParam && !orderParam) return;
+
     // Check if we already tracked this session
     try {
       const key = "usa_purchase_tracked";
@@ -20,10 +33,10 @@ export default function PurchaseTracker() {
       // continue anyway
     }
 
-    // Extract order info from URL params if available
-    const params = new URLSearchParams(window.location.search);
-    const orderId = params.get("order") || params.get("order_id") || `order_${Date.now()}`;
-    const value = Number(params.get("total") || params.get("value")) || 25.0;
+    const orderId = orderParam || `order_${Date.now()}`;
+    const parsedValue = Number(totalParam || valueParam);
+    if (!Number.isFinite(parsedValue) || parsedValue <= 0) return;
+    const value = parsedValue;
 
     // Reverse-engineer qty from order total against the canonical bundle pricing.
     // Try qty 1..12 and pick the one whose bundle total best matches `value`.

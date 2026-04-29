@@ -7,13 +7,17 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  // Only expose raw error.message in development — in production it
+  // can leak stack traces and internal paths to end users.
+  const isDev = process.env.NODE_ENV === "development";
+
   return (
     <html>
       <body>
         <div style={{ maxWidth: 720, margin: "0 auto", padding: 24, fontFamily: "system-ui" }}>
-          <h1 style={{ fontSize: 22, fontWeight: 700 }}>Global error</h1>
+          <h1 style={{ fontSize: 22, fontWeight: 700 }}>Something went wrong</h1>
           <p style={{ opacity: 0.8 }}>
-            This prevents the dev overlay from looping when required error components are missing.
+            Please refresh or contact support if the issue persists.
           </p>
           <button
             onClick={() => reset()}
@@ -28,9 +32,11 @@ export default function GlobalError({
           >
             Retry
           </button>
-          <pre style={{ marginTop: 16, whiteSpace: "pre-wrap", fontSize: 12 }}>
-            {String(error?.message || error)}
-          </pre>
+          {isDev ? (
+            <pre style={{ marginTop: 16, whiteSpace: "pre-wrap", fontSize: 12 }}>
+              {String(error?.message || error)}
+            </pre>
+          ) : null}
         </div>
       </body>
     </html>

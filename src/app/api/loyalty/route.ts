@@ -1,3 +1,13 @@
+// /api/loyalty — loyalty account lookup + enroll/redeem.
+//
+// STATUS (2026-04-29): The customer-facing /rewards page is currently
+// 302-redirected to /shop in next.config.ts (line 100), so this endpoint
+// has no in-app callers. It is RETAINED because (a) loyalty webhook
+// (./webhook/route.ts) still awards points on Shopify orders/paid events
+// and references the same KV-backed loyalty store, and (b) redemption
+// emails sent from prior enrollments may still link back here. If/when
+// loyalty is fully retired, delete the entire /api/loyalty/ tree along
+// with src/lib/loyalty.ts and the Shopify webhook registration.
 import { NextResponse } from "next/server";
 import {
   getAccount,

@@ -16,7 +16,10 @@ import { ScarcityBar } from "@/components/lp/ScarcityBar";
 import { ThreePromises } from "@/components/lp/ThreePromises";
 import { GuaranteeBlock } from "@/components/lp/GuaranteeBlock";
 import { FaqAccordion } from "@/components/lp/FaqAccordion";
-import { StickyBuyBar } from "@/components/lp/StickyBuyBar";
+// NOTE: StickyBuyBar intentionally NOT imported on PDP — BagSlider sticky
+// (richer info: bundle pricing + qty controls) is the single mobile sticky
+// on this route. Adding StickyBuyBar caused a z-index collision (both
+// fixed bottom-0) on mobile (2026-04-29).
 
 import Image from "next/image";
 import BagSlider from "@/components/purchase/BagSlider.client";
@@ -310,7 +313,9 @@ export default async function ProductPage({ params }: PageProps) {
         </div>
       </section>
 
-      <StickyBuyBar />
+      {/* Single mobile sticky CTA — BagSlider sticky (bundle pricing + qty
+       * controls). StickyBuyBar removed here to avoid a z-index collision
+       * (both render fixed bottom-0 on mobile). */}
       <BagSlider variant="sticky" defaultQty={5} />
 
       <ProductJsonLd

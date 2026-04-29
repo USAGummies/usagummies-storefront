@@ -36,6 +36,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${base}/no-artificial-dyes-gummy-bears`, lastModified: now, changeFrequency: "monthly", priority: 0.5 },
     { url: `${base}/made-in-usa`, lastModified: now, changeFrequency: "monthly", priority: 0.5 },
     { url: `${base}/made-in-usa-candy`, lastModified: now, changeFrequency: "monthly", priority: 0.6 },
+    // SEO landing pages — added to sitemap 2026-04-29 (audit gap).
+    { url: `${base}/best-gummy-bears`, lastModified: now, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${base}/natural-gummy-bears`, lastModified: now, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${base}/kids-safe-gummy-bears`, lastModified: now, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${base}/american-candy-gifts`, lastModified: now, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${base}/where-to-buy`, lastModified: now, changeFrequency: "monthly", priority: 0.5 },
+    { url: `${base}/learn`, lastModified: now, changeFrequency: "monthly", priority: 0.4 },
     { url: `${base}/contact`, lastModified: now, changeFrequency: "monthly", priority: 0.5 },
     { url: `${base}/help`, lastModified: now, changeFrequency: "monthly", priority: 0.5 },
     { url: `${base}/bundle-guides`, lastModified: now, changeFrequency: "monthly", priority: 0.6 },

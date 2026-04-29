@@ -20,6 +20,16 @@ Disallow: /_next/
 Disallow: /__seo
 Disallow: /routecheck
 Disallow: /command-center
+# Privacy-sensitive non-customer paths (audit fix 2026-04-29)
+Disallow: /booth/
+Disallow: /onboarding/
+Disallow: /vendor/
+Disallow: /wholesale/inquiry/
+Disallow: /upload/
+Disallow: /account/
+Disallow: /actions/
+Disallow: /thank-you
+Disallow: /review
 
 Sitemap: ${siteUrl}/sitemap.xml
 Host: ${host}
