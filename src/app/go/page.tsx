@@ -406,7 +406,7 @@ export default function GoLandingPage() {
               <div style={{ fontSize: 12, lineHeight: 1.6, color: "rgba(255,255,255,0.95)", textAlign: "left" }}>
                 ✓ Real fruit color<br />
                 ✓ 5 natural flavors<br />
-                ✓ Made in 3 US states<br />
+                ✓ Made across 5 US states<br />
                 ✓ Veteran-owned repack
               </div>
             </div>
