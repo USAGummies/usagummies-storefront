@@ -3,6 +3,16 @@
 //
 // Supports ?qty=N parameter (default: 5). Clamped to 1–12.
 //
+// 2026-04-28 — Shop Pay re-enable. 6 InitiateCheckouts → 0 Purchases on 4/28
+// because Storefront-API-generated cart URLs route through `shop.app` callback
+// which appends `skip_shop_pay=true` to the final checkout URL, hiding the
+// Shop Pay express button. Fix (validated via redirect-chain trace): append
+// `skip_shop_pay=false` to the cart URL — Shopify honors the override AND
+// skips the shop.app domain hop entirely. Result: user lands on
+// `/checkouts/cn/{id}/en?_r=…&skip_shop_pay=false` directly, with Shop Pay
+// express button visible. No server-side fetch (which would consume the
+// single-use cart token and break the flow — see reverted commit 1975911).
+//
 // Also fires a server-side GA4 event via Measurement Protocol so we get
 // 100% accurate checkout-redirect counts regardless of ad blockers.
 import { NextRequest, NextResponse } from "next/server";
@@ -110,6 +120,27 @@ function withAttribution(url: string, attribution: URLSearchParams) {
       if (!value || parsed.searchParams.has(key)) continue;
       parsed.searchParams.set(key, value);
     }
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+}
+
+/**
+ * Force the Shop Pay express button on by appending `skip_shop_pay=false` to
+ * the cart URL. Validated 2026-04-28 via redirect-chain trace: with this param
+ * appended to a Storefront-API-generated `…/cart/c/{token}?key=…` URL, Shopify
+ * routes the user DIRECTLY to `…/checkouts/cn/{id}/en?_r=…&skip_shop_pay=false`
+ * (skipping the shop.app callback entirely), where the Shop Pay express button
+ * renders. Without this override, the same flow lands on a checkout URL with
+ * `skip_shop_pay=true` because Shopify auto-adds it for Storefront-API carts.
+ */
+function withShopPayEnabled(url: string) {
+  try {
+    const parsed = new URL(url);
+    // Override Shopify's default skip_shop_pay=true behavior on Storefront-API
+    // cart URLs. `false` is honored end-to-end through the cart→checkout chain.
+    parsed.searchParams.set("skip_shop_pay", "false");
     return parsed.toString();
   } catch {
     return url;
@@ -225,7 +256,14 @@ export async function GET(req: NextRequest) {
       return NextResponse.redirect(fallbackPermalink(qty, attribution), 302);
     }
 
-    return NextResponse.redirect(withAttribution(checkoutUrl, attribution), 302);
+    // Append skip_shop_pay=false to force the Shop Pay express button on at
+    // checkout — see header comment for why. Then layer attribution params.
+    const shopPayFriendlyUrl = withShopPayEnabled(checkoutUrl);
+
+    return NextResponse.redirect(
+      withAttribution(shopPayFriendlyUrl, attribution),
+      302,
+    );
   } catch {
     return NextResponse.redirect(fallbackPermalink(qty, attribution), 302);
   }
