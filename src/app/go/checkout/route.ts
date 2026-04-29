@@ -29,6 +29,15 @@ const STOREFRONT_TOKEN =
 const GA4_MEASUREMENT_ID =
   process.env.NEXT_PUBLIC_GA4_ID?.trim() || "G-31X673PSVY";
 const GA4_API_SECRET = process.env.GA4_API_SECRET?.trim();
+// Meta Conversions API — server-side AddToCart so the event fires reliably
+// even when the BagSlider's client-side fbq beacon gets canceled by the
+// immediate page navigation, AND when ad blockers strip the pixel script.
+// Fired against the Shopify pixel (664545086717590) — the ID our ad sets
+// optimize on. Without this, ATC=0 in the audit even when users click Buy Now.
+const META_CAPI_ACCESS_TOKEN = process.env.META_CAPI_ACCESS_TOKEN?.trim();
+const META_PIXEL_ID_SHOPIFY = "664545086717590";
+const META_PIXEL_ID_WEBSITE = "26033875762978520";
+const SINGLE_BAG_PRICE_USD = 19.95; // matches the BagSlider's $19.95/bag default
 const DEFAULT_QTY = 5;
 const TRUSTED_REFERRER_HOSTS = new Set([
   "usagummies.com",
@@ -204,6 +213,82 @@ function fireGA4Event(
   ).catch(() => {});
 }
 
+/**
+ * Fire-and-forget server-side AddToCart via Meta Conversions API.
+ *
+ * Why server-side: BagSlider's client-side fbq("track", "AddToCart") fires
+ * synchronously then immediately calls window.location.href = "/go/checkout".
+ * Meta's pixel beacon is an HTTP request — when the page navigates, that
+ * request is canceled, so the event never reaches Meta. Plus 30%+ of users
+ * run ad blockers that strip the pixel script entirely. Result: ATC = 0 in
+ * the audit even when users click Buy Now (we see this in funnel data:
+ * 6 IC events, 0 ATC events for the same ~6 sessions).
+ *
+ * Server-side CAPI fires from /go/checkout itself, so it runs on every click
+ * regardless of navigation timing or ad blocker state. Fires to BOTH the
+ * Shopify pixel (664545086717590, what ad sets optimize on) and the website
+ * pixel (26033875762978520) so both event databases stay in sync.
+ *
+ * Event ID is included so when the client-side fbq DOES manage to send (no
+ * blocker, fast network), Meta deduplicates against this server event.
+ */
+function fireMetaCAPIAddToCart(req: NextRequest, qty: number) {
+  if (!META_CAPI_ACCESS_TOKEN) return;
+
+  const fbp = req.cookies.get("_fbp")?.value;
+  const fbc = req.cookies.get("_fbc")?.value;
+  const userIp =
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    req.headers.get("x-real-ip") ||
+    "";
+  const userAgent = req.headers.get("user-agent") || "";
+  const referer = req.headers.get("referer") || `${req.nextUrl.origin}/shop`;
+  // Stable event_id so client-side fbq AddToCart (when it fires at all) is
+  // deduplicated against this server event by Meta.
+  const eventId = `atc_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+  const eventTime = Math.floor(Date.now() / 1000);
+
+  const userData: Record<string, string> = {};
+  if (userIp) userData.client_ip_address = userIp;
+  if (userAgent) userData.client_user_agent = userAgent;
+  if (fbp) userData.fbp = fbp;
+  if (fbc) userData.fbc = fbc;
+
+  const payload = {
+    data: [
+      {
+        event_name: "AddToCart",
+        event_time: eventTime,
+        event_id: eventId,
+        event_source_url: referer,
+        action_source: "website",
+        user_data: userData,
+        custom_data: {
+          currency: "USD",
+          value: Number((qty * SINGLE_BAG_PRICE_USD).toFixed(2)),
+          content_ids: ["all-american-gummy-bears"],
+          content_type: "product",
+          content_name: "All American Gummy Bears - 7.5 oz Bag",
+          num_items: qty,
+        },
+      },
+    ],
+  };
+
+  // Fire to BOTH pixels concurrently. Failures are silently swallowed — we
+  // never block the user's redirect on a tracking call.
+  for (const pixelId of [META_PIXEL_ID_SHOPIFY, META_PIXEL_ID_WEBSITE]) {
+    fetch(
+      `https://graph.facebook.com/v21.0/${pixelId}/events?access_token=${META_CAPI_ACCESS_TOKEN}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      },
+    ).catch(() => {});
+  }
+}
+
 export async function GET(req: NextRequest) {
   const rawQty = req.nextUrl.searchParams.get("qty");
   const qty = rawQty ? Math.max(1, Math.min(12, Math.floor(Number(rawQty)) || DEFAULT_QTY)) : DEFAULT_QTY;
@@ -223,6 +308,9 @@ export async function GET(req: NextRequest) {
 
   // Server-side tracking — 100% accurate, no ad blocker can stop this
   fireGA4Event("go_checkout_redirect", ga4Params, req);
+  // Server-side AddToCart to Meta CAPI — see fireMetaCAPIAddToCart docstring
+  // for why this is needed (client-side beacon dies on navigation).
+  fireMetaCAPIAddToCart(req, qty);
   console.info("go_checkout_redirect", ga4Params);
 
   if (!STOREFRONT_TOKEN) {
