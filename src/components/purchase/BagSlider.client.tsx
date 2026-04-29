@@ -12,6 +12,7 @@ import {
   subscriptionPricingForQty,
 } from "@/lib/bundles/pricing";
 import { AMAZON_LISTING_URL } from "@/lib/amazon";
+import { AMAZON_REVIEWS } from "@/data/amazonReviews";
 import { trackEvent, trackAddToCart } from "@/lib/analytics";
 
 /* ------------------------------------------------------------------ */
@@ -314,7 +315,7 @@ export default function BagSlider({
         <div className="mx-auto max-w-xl">
           <div className="flex items-center justify-center gap-2 text-[10px] text-[var(--muted,#5f5b56)] mb-1.5">
             <span className="text-[var(--candy-yellow,#f5c842)]">&#9733;</span>
-            <span>5.0 stars</span>
+            <span>{AMAZON_REVIEWS.aggregate.rating.toFixed(1)} stars</span>
             <span className="text-[var(--border)]">&middot;</span>
             <span>Free shipping</span>
             <span className="text-[var(--border)]">&middot;</span>
@@ -531,7 +532,7 @@ export default function BagSlider({
       <div className="mt-3 text-center">
         <span className="text-[#c7a062] text-sm">★★★★★</span>
         <span className="ml-1.5 text-xs text-[#1B2A4A]/60">
-          5.0 from verified buyers
+          {AMAZON_REVIEWS.aggregate.rating.toFixed(1)} from {AMAZON_REVIEWS.aggregate.count} real reviews
         </span>
       </div>
 

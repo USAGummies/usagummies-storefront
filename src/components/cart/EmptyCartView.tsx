@@ -95,7 +95,7 @@ export function EmptyCartView({
           <span>&bull;</span>
           <span>{"\uD83D\uDE9A"} Free shipping</span>
           <span>&bull;</span>
-          <span>{"\u2B50"} 5.0 stars</span>
+          <span>{"\u2B50"} 4.7 stars</span>
         </div>
       </div>
     );

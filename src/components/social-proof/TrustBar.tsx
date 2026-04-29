@@ -11,8 +11,8 @@ const TRUST_ITEMS = [
   },
   {
     icon: "⭐",
-    label: "5.0 stars",
-    detail: "Verified buyer reviews",
+    label: "4.7 stars",
+    detail: "From 15 real reviews",
   },
   {
     icon: "🚚",
@@ -69,8 +69,8 @@ export function SocialProofStat({ className = "" }: { className?: string }) {
           <span key={i}>{s}</span>
         ))}
       </span>
-      <span className="font-semibold text-[var(--text,#1B2A4A)]">4.8</span>
-      <span className="text-[var(--muted,#5f5b56)]">from verified buyers</span>
+      <span className="font-semibold text-[var(--text,#1B2A4A)]">4.7</span>
+      <span className="text-[var(--muted,#5f5b56)]">from 15 real reviews</span>
       <span className="mx-1 text-[var(--border)]">|</span>
       <span className="font-semibold text-[var(--text,#1B2A4A)]">Made in USA</span>
     </div>

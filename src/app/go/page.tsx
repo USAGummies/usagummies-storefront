@@ -207,7 +207,7 @@ export default function GoLandingPage() {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 12 }}>
               <span style={{ color: "#c7a062", fontSize: 16 }}>★★★★★</span>
               <span style={{ fontSize: 13, fontWeight: 600, color: "#1B2A4A" }}>
-                {AMAZON_REVIEWS.aggregate.rating.toFixed(1)} from {AMAZON_REVIEWS.aggregate.count} verified buyers
+                {AMAZON_REVIEWS.aggregate.rating.toFixed(1)} from {AMAZON_REVIEWS.aggregate.count} real reviews
               </span>
             </div>
           </div>
@@ -259,7 +259,7 @@ export default function GoLandingPage() {
             🌿 No artificial dyes
           </span>
           <span style={{ fontSize: 12, fontWeight: 600, color: "#1B2A4A", display: "flex", alignItems: "center", gap: 5 }}>
-            ⭐ {AMAZON_REVIEWS.aggregate.rating.toFixed(1)} from {AMAZON_REVIEWS.aggregate.count} verified buyers
+            ⭐ {AMAZON_REVIEWS.aggregate.rating.toFixed(1)} from {AMAZON_REVIEWS.aggregate.count} real reviews
           </span>
           <span style={{ fontSize: 12, fontWeight: 600, color: "#1B2A4A", display: "flex", alignItems: "center", gap: 5 }}>
             🚚 Ships in 24 hours
@@ -489,7 +489,7 @@ export default function GoLandingPage() {
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 8 }}>
             <span style={{ color: "#c7a062", fontSize: 24, letterSpacing: 2 }}>★★★★★</span>
             <span style={{ fontSize: 14, fontWeight: 600, color: "#1B2A4A" }}>
-              {AMAZON_REVIEWS.aggregate.rating.toFixed(1)} stars from {AMAZON_REVIEWS.aggregate.count} verified buyers
+              {AMAZON_REVIEWS.aggregate.rating.toFixed(1)} stars from {AMAZON_REVIEWS.aggregate.count} real reviews
             </span>
           </div>
 
@@ -505,7 +505,9 @@ export default function GoLandingPage() {
                 </p>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 11 }}>
                   <span style={{ color: "#5f5b56", fontWeight: 600 }}>— {r.authorName}</span>
-                  <span style={{ color: "#2D7A3A", fontWeight: 600 }}>✓ Verified</span>
+                  <span style={{ color: r.program === "vine" ? "#5f5b56" : "#2D7A3A", fontWeight: 600 }}>
+                    {r.program === "vine" ? "Amazon Vine" : "✓ Verified buyer"}
+                  </span>
                 </div>
               </div>
             ))}
