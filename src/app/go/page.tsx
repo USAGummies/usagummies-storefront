@@ -189,16 +189,19 @@ export default function GoLandingPage() {
             <h1
               className="lp-display"
               style={{
-                fontSize: "clamp(32px, 5vw, 54px)",
+                fontSize: "clamp(28px, 4.5vw, 48px)",
                 lineHeight: 1.05,
                 color: "#1B2A4A",
                 margin: 0,
               }}
             >
-              American Gummy Bears.
+              No Red 40. No Yellow 5. No Blue 1.
               <br />
-              <span style={{ color: "#c7362c" }}>No Junk.</span>
+              <span style={{ color: "#c7362c" }}>Just real American gummy bears.</span>
             </h1>
+            <p style={{ fontSize: 14, lineHeight: 1.5, color: "#5f5b56", marginTop: 12, maxWidth: 440, marginLeft: "auto", marginRight: "auto" }}>
+              Made in three American states. Indiana, Wisconsin, and Spokane &mdash; at a veteran-owned facility.
+            </p>
 
             {/* Social proof stat */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 12 }}>
@@ -295,8 +298,11 @@ export default function GoLandingPage() {
                 5-BAG BUNDLE
               </span>
               <span style={{ background: "#c7362c", color: "#fff", fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 20 }}>
-                BEST DEAL
+                MOST POPULAR
               </span>
+            </div>
+            <div style={{ fontSize: 12, color: "#5f5b56", marginTop: 4, fontStyle: "italic" }}>
+              Half of our customers start here.
             </div>
 
             <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginTop: 4 }}>
@@ -404,8 +410,78 @@ export default function GoLandingPage() {
         </div>
       </section>
 
+      {/* Anti-villain band — Red 3 ban + dye-free framing */}
+      <section style={{ background: "#1B2A4A", color: "#ffffff", padding: "36px 20px", marginTop: 32 }}>
+        <div style={{ maxWidth: 800, margin: "0 auto", textAlign: "center" }}>
+          <div className="lp-display" style={{ fontSize: 22, letterSpacing: "1px", color: "#c7a062", marginBottom: 14 }}>
+            FDA BANNED RED 3 IN JANUARY 2025.
+          </div>
+          <div style={{ fontSize: 16, lineHeight: 1.55, color: "#ffffff", maxWidth: 580, margin: "0 auto" }}>
+            We never used it. We never used Red 40, Yellow 5, or Blue 1 either. The candy your grandparents ate
+            wasn&rsquo;t made with petroleum dyes. Ours isn&rsquo;t either.
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, maxWidth: 520, margin: "20px auto 0" }}>
+            <div style={{ background: "rgba(255,255,255,0.08)", padding: "14px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.12)" }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#c7a062", letterSpacing: "1px", marginBottom: 6 }}>COMMON GUMMY BEARS</div>
+              <div style={{ fontSize: 12, lineHeight: 1.6, color: "rgba(255,255,255,0.85)", textAlign: "left" }}>
+                ✗ Red 40<br />
+                ✗ Yellow 5<br />
+                ✗ Blue 1<br />
+                ✗ High-fructose corn syrup
+              </div>
+            </div>
+            <div style={{ background: "rgba(255,255,255,0.08)", padding: "14px 12px", borderRadius: 10, border: "1px solid #2D7A3A" }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#7BD898", letterSpacing: "1px", marginBottom: 6 }}>USA GUMMIES</div>
+              <div style={{ fontSize: 12, lineHeight: 1.6, color: "rgba(255,255,255,0.95)", textAlign: "left" }}>
+                ✓ Real fruit color<br />
+                ✓ 5 natural flavors<br />
+                ✓ Made in 3 US states<br />
+                ✓ Veteran-owned repack
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 3-state supply chain story */}
+      <section style={{ background: "#f8f5ef", padding: "36px 20px", borderBottom: "1px solid #e0dcd6" }}>
+        <div style={{ maxWidth: 800, margin: "0 auto", textAlign: "center" }}>
+          <div className="lp-display" style={{ fontSize: 20, letterSpacing: "1px", color: "#1B2A4A" }}>
+            THREE STATES. ONE PRODUCT.
+          </div>
+          <div style={{ fontSize: 14, color: "#5f5b56", marginTop: 8, marginBottom: 24 }}>
+            From sea to shining sea &mdash; American jobs, American workers.
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 16, maxWidth: 720, margin: "0 auto" }} className="sm:!grid-cols-3">
+            {[
+              { state: "INDIANA", role: "Gummies crafted", icon: "🌽" },
+              { state: "WISCONSIN", role: "Packaging printed at Belmark", icon: "🏭" },
+              { state: "SPOKANE, WA", role: "Repacked at a veteran-owned facility", icon: "🇺🇸" },
+            ].map((step, i) => (
+              <div key={step.state} style={{ background: "#ffffff", border: "1px solid #e0dcd6", borderRadius: 12, padding: "20px 16px", position: "relative" }}>
+                <div style={{ fontSize: 32 }}>{step.icon}</div>
+                <div className="lp-display" style={{ fontSize: 14, letterSpacing: "1.5px", color: "#1B2A4A", marginTop: 8 }}>
+                  {step.state}
+                </div>
+                <div style={{ fontSize: 12, color: "#5f5b56", marginTop: 4 }}>
+                  {step.role}
+                </div>
+                {i < 2 && (
+                  <div style={{ position: "absolute", right: -8, top: "50%", fontSize: 18, color: "#c7a062", fontWeight: 700 }} className="hidden sm:!block">
+                    →
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+          <div style={{ fontSize: 11, color: "#5f5b56", marginTop: 18, fontStyle: "italic" }}>
+            Most &ldquo;Made in USA&rdquo; brands won&rsquo;t tell you which states. We can.
+          </div>
+        </div>
+      </section>
+
       {/* Social Proof — Reviews */}
-      <section style={{ background: "#ffffff", borderTop: "1px solid #e0dcd6", borderBottom: "1px solid #e0dcd6", padding: "36px 20px", marginTop: 32 }}>
+      <section style={{ background: "#ffffff", borderTop: "1px solid #e0dcd6", borderBottom: "1px solid #e0dcd6", padding: "36px 20px" }}>
         <div style={{ maxWidth: 800, margin: "0 auto", textAlign: "center" }}>
           <div className="lp-display" style={{ fontSize: 22, letterSpacing: "1px", color: "#1B2A4A" }}>
             CUSTOMERS LOVE US

@@ -25,9 +25,9 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
-const PAGE_TITLE = "America 250 Gifts | Patriotic Candy";
+const PAGE_TITLE = "America's 250th Gifts | Patriotic Candy";
 const PAGE_DESCRIPTION =
-  "Gift made in USA candy for America 250 - dye-free gummies and no artificial dyes for patriotic celebrations.";
+  "Gift made in USA candy for America's 250th - dye-free gummies and no artificial dyes for patriotic celebrations.";
 const PAGE_URL = `${SITE_URL}/america-250/gifts`;
 const OG_IMAGE = `${SITE_URL}/opengraph-image`;
 const PUBLISHED_DATE = "2026-01-01T15:10:31-08:00";
@@ -76,7 +76,7 @@ export default function America250GiftsPage() {
       <BreadcrumbJsonLd
         items={[
           { name: "Home", href: "/" },
-          { name: "America 250", href: "/america-250" },
+          { name: "America's 250th", href: "/america-250" },
           { name: "Gifts", href: "/america-250/gifts" },
         ]}
       />
@@ -92,7 +92,7 @@ export default function America250GiftsPage() {
       />
 
       <PageHero
-        eyebrow="America 250 / Gifts"
+        eyebrow="America's 250th / Gifts"
         headline="Thank-yous, care packages,"
         scriptAccent="and celebrations."
         sub="Simple, gift-ready bag options with an Americana feel — built to show up looking premium."
@@ -156,7 +156,7 @@ export default function America250GiftsPage() {
               Shop gift bundles
             </Link>
             <Link href="/america-250" className="lp-cta lp-cta-light">
-              Back to America 250
+              Back to America's 250th
             </Link>
           </div>
         </div>
