@@ -158,6 +158,7 @@ The governing contracts live under [`/contracts/`](contracts/):
 
 - [`/contracts/governance.md`](contracts/governance.md) — system governance: non-negotiables, 6-layer stack, agent contract schema, graduation criteria, weekly drift audit, correction protocol, secret policy, doc canonicalization.
 - [`/contracts/approval-taxonomy.md`](contracts/approval-taxonomy.md) — Class A/B/C/D action registry with approvers.
+- [`/contracts/pricing-route-governance.md`](contracts/pricing-route-governance.md) — pricing governance, partner communication, landed-vs-pickup, route economics, escalation clauses, deal-check process. **For non-standard wholesale pricing, landed delivery offers, route economics, and partner communication rules, follow this doctrine.** Sits on top of the SKU/tier grid in `wholesale-pricing.md`.
 - [`/contracts/slack-operating.md`](contracts/slack-operating.md) — 9-channel map, thread rules, severity tiers.
 - [`/contracts/viktor.md`](contracts/viktor.md) — canonical Viktor contract (v3.0). Supersedes the old `/VIKTOR_OPERATING_CONTRACT.md`.
 - [`/contracts/agents/interviewer.md`](contracts/agents/interviewer.md) — pre-build spec disambiguation. **Active.** Before producing code/doctrine/external writes for any non-trivial under-specified request, ask 3-5 disambiguation questions with named defaults. Skip when the spec is already crisp. See contract for the under-specified predicate list.

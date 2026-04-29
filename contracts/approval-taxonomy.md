@@ -2,7 +2,7 @@
 
 **Status:** CANONICAL
 **Source:** Notion blueprint §15.3
-**Version:** 1.4 — 2026-04-27 (Phase 29 Drew sweep — "drew owns nothing" doctrine)
+**Version:** 1.6 — 2026-04-29 (cross-link to pricing-route-governance.md §7 deal-check)
 **Governing file:** Also defined in code at `src/lib/ops/control-plane/taxonomy.ts`. Code and this doc must stay in lockstep.
 
 **Doctrinal correction (Ben 2026-04-27):** Drew is not an approver. All approval slugs that previously named Drew (`qbo.po.draft`, `inventory.commit`, `run.plan.commit`, `inventory.adjustment.large`) have been reassigned. Drew remains a fulfillment node for samples + East Coast destinations per CLAUDE.md, but does not own approval lanes.
@@ -83,7 +83,7 @@ One approver. Request lands in `#ops-approvals` with tap-to-approve UX.
 | `approved-claims.retire` | Retire a claim from the Approved Claims list | Ben |
 | `faire-direct.invite` | Send a Faire Direct invite email (0% commission route) | Ben |
 | `faire-direct.follow-up` | Send a follow-up email to a retailer who already received a Faire Direct invite | Ben |
-| `account.tier-upgrade.propose` | Propose a retailer tier upgrade (follow-up `pricing.change` Class C if material) | Ben |
+| `account.tier-upgrade.propose` | Propose a retailer tier upgrade (follow-up `pricing.change` Class C if material). Deal-check fast path per [`pricing-route-governance.md`](pricing-route-governance.md) §7 when the offer matches the published B-grid + escalation clause. | Ben |
 | `retailer.onboard.company-create` | Create Shopify B2B company + HubSpot company + QBO customer in one pass | Ben |
 | `claim.counsel-review.request` | Send a proposed claim to Wyoming Attorneys for counsel review | Ben |
 
@@ -97,7 +97,7 @@ Two approvers. Request remains pending until both approve; any reject terminates
 | `payment.release` | Approve vendor payment / ACH | Ben + Rene |
 | `inventory.commit` | Commit inventory buy | Ben + Rene |
 | `vendor.financial.commit` | Major vendor financial commitment (new copacker, agency retainer) | Ben + Rene |
-| `pricing.change` | Structural pricing change (wholesale tier, MSRP) | Ben + Rene |
+| `pricing.change` | Structural pricing change (wholesale tier, MSRP). Includes any non-standard offer that diverges from the published B1–B5 grid per [`pricing-route-governance.md`](pricing-route-governance.md) §7.1 triggers (sub-grid price, landed freight on < 3 pallets, free freight on < 3 pallets, route-anchor pricing without route plan, reorder protection beyond default escalation window). Deal-check process documented in `pricing-route-governance.md` §7. | Ben + Rene |
 | `invoice.write-off.execute` | Execute a bad-debt write-off (above Rene-only threshold) | Ben + Rene |
 | `payment.batch.release` | Release the weekly AP payment batch (multiple bills in one batch) | Ben + Rene |
 | `credit-limit.expand` | Expand a retailer credit limit above the tier default | Ben + Rene |
@@ -145,6 +145,7 @@ The `qbo.class.create/modify` and `qbo.location.create/modify` slugs registered 
 
 ## Version history
 
+- **1.6 — 2026-04-29** — Cross-linked `account.tier-upgrade.propose` and `pricing.change` rows to [`pricing-route-governance.md`](pricing-route-governance.md) §7 deal-check process. No code change; doctrine cross-reference only. Companion to first publication of `pricing-route-governance.md` v1.0.
 - **1.5 — 2026-04-29** — Added `faire-direct.follow-up` (Class B, Ben) to doctrine doc to match taxonomy.ts (slug was already in code, missing from doc — caught by post-P0 architecture audit). No new behavior; lockstep correction so P0-7 lockstep auditor + P0-1 unknown-slug detector stop flagging the gap.
 - **1.3 — 2026-04-25** — Added `receipt.review.promote` (Class B, Rene). Phase 9 of the Sales Command receipt lane: acknowledges a Phase 7 OCR-suggested receipt as Rene-reviewed by transitioning the in-repo review packet from `draft` → `rene-approved`. Strictly NOT a QBO write — an eligible packet still flows through a separate Class B `qbo.bill.create` action later. Doc and code in lockstep at `src/lib/ops/control-plane/taxonomy.ts`.
 - **1.2 — 2026-04-20** — Finance extraction + Drive retrieval + CF-09 BOTH resolution. Added 44 new slugs across all four classes: 10 Class A (booke.categorize.suggest, qbo.invoice.partial-payment.apply, invoice.dispute.flag, research.post.tagged, brief.publish, audit.sample.score, coi.expiry-alert, connector.health.post, shipment.tracking-push, lead.enrichment.write); 21 Class B (booke.categorize.edit, qbo.class.create/modify, qbo.location.create/modify, qbo.credit-memo.create, qbo.invoice.void, qbo.bill.create, qbo.bill.approve-for-payment, vendor.master.create, invoice.write-off.draft, ar.hold.set/clear, legal.doc.expiry-override, shipstation.rule.modify, approved-claims.add/retire, faire-direct.invite, account.tier-upgrade.propose, retailer.onboard.company-create, claim.counsel-review.request); 7 Class C (invoice.write-off.execute, payment.batch.release, credit-limit.expand, qbo.period.close.final, ad.spend.launch, run.plan.commit, inventory.adjustment.large); 6 Class D (qbo.chart-of-accounts.modify, qbo.investor-transfer.recategorize, qbo.journal-entry.autonomous, qbo.period.close.reopen, ad.claim.publish-unreviewed, customer.data.export-external). Sourced from Finance Doctrine 05 + 22.C taxonomy queue + CF-09 resolution. Code and doc in lockstep at `src/lib/ops/control-plane/taxonomy.ts`.

@@ -3,6 +3,7 @@
 **Status:** CANONICAL — 2026-04-23
 **Source:** Ben's ruling 2026-04-23 (chat). Reconciles conflicts across `/src/app/**`, `SalesSheet.tsx`, `product-claims.ts`, `distributor-pricing-commitments.md`, and prior outbound emails.
 **Purpose:** Single source of truth for every cold B2B outreach email. Every fact in an outbound must come from this file. No exceptions. No pattern-matching from prior emails.
+**Pricing language pairs with:** [`/contracts/pricing-route-governance.md`](pricing-route-governance.md) — pricing language in any outbound MUST cite the role (anchor / fill / pickup) and ship the escalation clause from §6 of that doctrine. Non-standard offers run the deal-check (§7) before they are sent.
 
 ---
 

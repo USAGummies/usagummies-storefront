@@ -14,6 +14,9 @@ Single source of truth for live operating contracts in USA Gummies 3.0.
 | `governance.md` | System governance — non-negotiables, control plane, drift audit, secret policy, graduation. |
 | `slack-operating.md` | Slack operating contract — 9 active channels, thread rules, severity tiers. |
 | `approval-taxonomy.md` | Approval classes A/B/C/D with registered actions + approvers. |
+| `pricing-route-governance.md` | Pricing governance, partner communication (Ben ↔ Rene), landed-vs-pickup pricing, route economics, freight-as-route-cost, escalation clauses, deal-check process. Source-of-truth for non-standard wholesale offers; sits on top of `wholesale-pricing.md`. |
+| `wholesale-pricing.md` | The B1–B5 SKU/tier grid, batch SKU pattern, freight modes, atomic bag-level inventory model. v2.2. |
+| `distributor-pricing-commitments.md` | Sell-Sheet-v3 standing distributor commitments (Inderbitzin Option B, Glacier PO 140812, Reunion 2026 promos). |
 | `activation-triggers.md` | Measurable triggers + activation checklists for the 6 latent divisions. |
 | `divisions.json` | Machine-readable: 6 active + 6 latent divisions. |
 | `channels.json` | Machine-readable: 9 active + 5 latent Slack channels. |

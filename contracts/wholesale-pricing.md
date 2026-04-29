@@ -4,6 +4,7 @@
 **Source:** Ben + Rene call recap 2026-04-27 §2 + §5 + §6 (v1.0); Rene + Viktor `#financials` thread 2026-04-28 batch-SKU session ratified by Ben (v2.0); Cindy/Redstone FOB-quote drift reconciliation 2026-04-28 PM ratified by Ben "option a" (v2.1); Rene's promo-bag CoA mapping doctrine 2026-04-28 PM (v2.2 first half); Ben's payment-methods + signature-title locks 2026-04-28 PM (v2.2 second half — §13 + §14).
 **Version:** 2.2 — 2026-04-28 PM
 **Replaces:** any ad hoc pricing scattered across previous outreach scripts. This is the single source of truth.
+**Pairs with:** [`/contracts/pricing-route-governance.md`](pricing-route-governance.md) — the route-economics + deal-check + escalation-clause governance layer that overlays this SKU/tier grid. For non-standard wholesale offers, landed delivery pricing, route-anchor vs route-fill logic, and Ben↔Rene partner communication, follow that doctrine. Open reconciliations between v2.2 and the route-governance v1.0 numbers ($2.00 pickup floor, $3.00 landed route-anchor) are tracked in `pricing-route-governance.md` §11 for the next version bump here.
 
 ## What changed in v2.0 (2026-04-28)
 

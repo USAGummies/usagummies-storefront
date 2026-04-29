@@ -34,6 +34,17 @@
  *   - QBO invoice line text (future Phase 35.x) embeds the
  *     designator (`B2`, `B3`, etc.) so audit trails trace the
  *     price tier without ambiguity.
+ *
+ * **TODO (governance overlay):** This file is the SKU/tier mirror.
+ * The route-economics governance layer that determines WHEN to
+ * deviate from the published B-grid — pickup floor ($2.00/bag),
+ * route-anchor ($3.00/bag landed, 3-pallet min), route-fill
+ * ($3.25–$3.49+/bag), escalation clauses, deal-check process — is
+ * canonical at [`/contracts/pricing-route-governance.md`](../../../contracts/pricing-route-governance.md).
+ * Future calculator work that surfaces non-standard offers MUST emit
+ * a deal-check trigger per §7.1 of that doctrine before quoting.
+ * Open reconciliation between the B5 ($3.00 buyer-pays) and the
+ * route-anchor ($3.00 landed) is tracked in the doctrine's §11.
  */
 
 /** Closed enum — these five strings are the only valid tier ids. */
