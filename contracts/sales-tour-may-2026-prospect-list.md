@@ -1,9 +1,9 @@
 # Sales Tour May 2026 — Prospect List (Ashford → Grand Canyon)
 
 **Status:** WORKING
-**Trip dates:** May 11–13, 2026 (Mon–Wed)
+**Trip dates:** May 11–17, 2026 (Mon–Sun, **full week window — DO NOT cram into 2-3 days**). Ben can flex day-by-day inside the corridor; outreach should always offer a multi-day window so prospects pick what works on their end. **Anchor commitment: 5/11 Mike Hippler / Thanksgiving Point hand-delivery.** Everything else is flex.
 **Route:** Ashford WA → Pendleton OR → I-84 → Boise ID → SLC UT → I-15 south → Cedar City → St George → Las Vegas → Grand Canyon West (Hualapai) → optional Grand Canyon South Rim → return I-15/I-84
-**Total roundtrip:** ~3,000 mi (varies w/ detours) · ~$2,500 all-in trip cost
+**Total roundtrip:** ~3,000 mi (varies w/ detours) · ~$2,500 all-in trip cost. Ben drives every leg — no co-driver. Multi-stop fatigue + door-to-door minutes mean 2-day windows are unrealistic for 30+ prospect stops. **Always quote a week-long window in cold outreach so prospects pick a time that works on their end.** Ben can fill any in-between time with prospect drops, sample handoffs, or rest.
 **Truck/load:** 2025 GMC 1500 Duramax + cargo trailer · 15 master cartons confirmed delivery (Mike Hippler / Thanksgiving Point) + sample inventory for opportunistic stops
 **Lead-source rule:** Reunion show handoffs are **first priority** (warm). Cold prospects only after Reunion list is fully researched + outreached. **NO BLAST sends to generic info@ inboxes** — every send goes to a named, verified buyer per Viktor's company-first methodology.
 
@@ -296,7 +296,7 @@ We have ~12 days from today (4/29) to trip start (5/11). Cadence:
 - **Days 4–6 (May 2–4):** Send first outreach to Reunion warm priority list; cold prospects in parallel
 - **Days 7–9 (May 5–7):** Follow-up on non-replies; lock in confirmed in-person meetings on the calendar
 - **Days 10–11 (May 8–9):** Final confirmations; route plan finalized
-- **Days 12+ (May 11–13):** Trip executed
+- **Days 12+ (May 11–17):** Trip executed (full week window — Ben flexes day-by-day, prospects pick what works on their end)
 
 ---
 
@@ -306,13 +306,13 @@ Every wholesale conversation on this trip must reference the canonical freight d
 
 | Tier | When it applies | Freight handling on this trip | Why we win |
 |---|---|---|---|
-| **B2 / B4 (Landed)** — `$3.49/bag MC` or `$3.25/bag pallet` | Default for most online + first-touch wholesale orders | **Founder-driven freight** — Ben pulls the load with the GMC 1500 Duramax + cargo trailer. ~16 mpg loaded, diesel ~$3.95/gal. Marginal stops are near-zero cost. | Drive economics beat LTL by 30-50% per pallet on most lanes (e.g., WA → St. Louis: $321 drive vs $475 LTL). On the May 11-13 trip, every prospect within 30 mi of the route is a marginal-cost-zero add. |
+| **B2 / B4 (Landed)** — `$3.49/bag MC` or `$3.25/bag pallet` | Default for most online + first-touch wholesale orders | **Founder-driven freight** — Ben pulls the load with the GMC 1500 Duramax + cargo trailer. ~16 mpg loaded, diesel ~$3.95/gal. Marginal stops are near-zero cost. | Drive economics beat LTL by 30-50% per pallet on most lanes (e.g., WA → St. Louis: $321 drive vs $475 LTL). On the May 11-17 trip, every prospect within 30 mi of the route is a marginal-cost-zero add. |
 | **B3 / B5 (Buyer Freight)** — `$3.25/bag MC` or `$3.00/bag pallet` | Buyer arranges their own freight (their LTL account, their pickup) | We confirm pickup at 30027 SR 706 Ashford WA 98304. No driver cost to us. | Lowest per-bag price; gives margin headroom for the buyer to absorb their freight without losing on retail |
 | **Free freight (USA Gummies absorbs LTL)** — `$3.00/bag pallet`, no separate freight line | 3+ pallet orders ONLY (75+ master cartons / 2,700+ bags) | Real broker bid via Freightos / FreightCenter; carrier invoice posts to `Freight Out / Shipping & Delivery Expense` | Hard rule: free freight is **retired** for sub-pallet quantities. Locked in [`/contracts/outreach-pitch-spec.md` §4](outreach-pitch-spec.md). |
 
 **Strategic insight for sales-tour conversations:** The founder-driven freight model is our **structural moat** for landed-pricing tiers (B2 / B4). When a prospect asks "what's the freight cost?" on a master carton or 1-2 pallet order, the answer is built into the per-bag price — and our drive economics let us absorb that freight cheaper than any competitor running LTL. This is exactly why every additional verified door within 30 mi of the route is a high-leverage trip-economics add: marginal fuel + zero hourly labor (founder time) vs. ~$50 incremental LTL pickup fee per door.
 
-**Per-prospect script:** When asked about freight, the answer is one sentence: *"Master carton at $3.49/bag or $3.25/bag with you arranging pickup. On the May 11-13 trip I'm doing in-person delivery rounds across the I-84/I-15 corridor — happy to drop your sample case or a starter MC in person at no extra freight cost while I'm in the area."* Freight is a sales feature on this trip, not a friction.
+**Per-prospect script:** When asked about freight, the answer is one sentence: *"Master carton at $3.49/bag or $3.25/bag with you arranging pickup. On the May 11-17 trip I'm doing in-person delivery rounds across the I-84/I-15 corridor — happy to drop your sample case or a starter MC in person at no extra freight cost while I'm in the area."* Freight is a sales feature on this trip, not a friction.
 
 ---
 
@@ -403,7 +403,7 @@ Original master list entries 21-53 — full research delivered + actioned. Highl
 
 ### Priority F — Multi-property retail networks (entries 37-39)
 
-- **Caesars Entertainment** = corporate procurement is unreachable via cold email; play is ASD Market Week (March + Aug LV trade show). For 5/11-13: walk into floor-level Caesars boutiques (IT'SUGAR, Dylan's, Forum Shops gift shops) — managers often have independent purchasing authority.
+- **Caesars Entertainment** = corporate procurement is unreachable via cold email; play is ASD Market Week (March + Aug LV trade show). For 5/11-17: walk into floor-level Caesars boutiques (IT'SUGAR, Dylan's, Forum Shops gift shops) — managers often have independent purchasing authority.
 - **Sphere Las Vegas** = sphereguestrelations@msg.com BOUNCED → call (725) 258-6724 to find right path
 - **Vail Resorts** = already on Park City Mountain follow-through (B2 batch 1 covered)
 
@@ -426,4 +426,4 @@ Outreach-ready (named buyer or sent):
 
 ---
 
-*Locked 2026-04-29 PM by Ben + Claude Code as the canonical sales-tour planning doc. All outreach for the May 11–13 I-84/I-15 corridor trip references this list. Drafts MUST cite a verified named buyer + email source before send. Vicinity expansion (V-1 through V-41) + Priority D-H research + freight doctrine reference added 2026-04-29 PM (Viktor batch).*
+*Locked 2026-04-29 PM by Ben + Claude Code as the canonical sales-tour planning doc. All outreach for the May 11–17 I-84/I-15 corridor trip references this list. Drafts MUST cite a verified named buyer + email source before send. Vicinity expansion (V-1 through V-41) + Priority D-H research + freight doctrine reference added 2026-04-29 PM (Viktor batch).*
