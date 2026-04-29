@@ -106,7 +106,8 @@ Every cold outreach email MUST include:
 2. Opening line with single-sentence context (why this company)
 3. Bullet block with product + pricing facts from THIS file
 4. CTA (sample offer or 15-min call)
-5. Signature block: "Ben Stutman · Founder & CEO · USA Gummies · ben@usagummies.com · (307) 209-4928"
+5. Signature block: "Ben Stutman · Founding Father, USA Gummies · ben@usagummies.com · (307) 209-4928"
+   - **LOCKED 2026-04-28 PM (Ben):** Title is `Founding Father` everywhere. Never `Founder & CEO`, `Founder and CEO`, or `CEO`. The brand voice is American-made over corporate-tone.
 
 ---
 

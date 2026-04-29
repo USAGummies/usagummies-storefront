@@ -363,9 +363,10 @@ export function OnboardingPortal({ dealId, deal, contact }: Props) {
               />
             </Field>
 
+            {/* Locked 2026-04-28: USA Gummies does NOT accept checks. ACH and CC only. */}
             <Field label="Preferred payment method *">
-              <div className="grid grid-cols-3 gap-2">
-                {(["ach", "check", "cc_via_invoice"] as const).map((m) => (
+              <div className="grid grid-cols-2 gap-2">
+                {(["ach", "cc_via_invoice"] as const).map((m) => (
                   <button
                     key={m}
                     type="button"
@@ -376,7 +377,7 @@ export function OnboardingPortal({ dealId, deal, contact }: Props) {
                         : "border-gray-200 text-gray-700 hover:border-gray-300"
                     }`}
                   >
-                    {m === "ach" ? "ACH" : m === "check" ? "Check" : "CC (invoice link)"}
+                    {m === "ach" ? "ACH" : "CC (invoice link)"}
                   </button>
                 ))}
               </div>
