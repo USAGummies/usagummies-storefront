@@ -59,13 +59,127 @@ National-tier visitor volume; not on the May 11-17 corridor but very high priori
 | **Ashford, WA** | Mount Rainier NP | Ben's HQ town — local lock |
 | **St. Mary, MT + East Glacier, MT + Whitefish, MT** | Glacier NP | Gateway cluster |
 | **Bar Harbor, ME** | Acadia NP | High-density gift retail |
-| **Gatlinburg, TN + Pigeon Forge, TN + Cherokee, NC** | Great Smoky Mountains NP | ✓ The Old Mill / Kelly Cross already in pipeline (Pigeon Forge) |
-| **Asheville, NC** | Blue Ridge Parkway | Cultural retail concentration |
 | **Lone Pine, CA + Furnace Creek, CA** | Death Valley NP | Desert NPS gateway |
 | **Talkeetna, AK** | Denali NP | Tourism gateway |
 | **Hilo, HI + Volcano, HI** | Hawaii Volcanoes NP | Pacific NPS gateway |
 | **Provincetown, MA** | Cape Cod NS | New England seasonal retail |
 | **Mackinac Island, MI** | Mackinac Island St Park | Iconic Midwest retail |
+| **Moab, UT** | Arches NP + Canyonlands NP | ~20+ Main Street gift shops + NPS visitor center retail. Per Ben 2026-04-29: Tier 1 priority for next trip cycle. Viktor Batch 7 incoming. |
+
+---
+
+## 🇺🇸 Southern Strategic Lane — LOCKED 2026-04-29 PM (Ben directive)
+
+**Ben's strategic call:** *"We should really focus on the South — they are a patriotic crowd. The real place to focus in the south is Texas. Either dedicated trip or source production down there if real demand."*
+
+The Southeast is the highest pattern-fit market USA Gummies hasn't touched yet at scale — patriotic / heritage retail, military-adjacent gift shops, Made-in-USA brand-story buyers, and tourism-heavy gateway towns. **Texas is the spearhead** — it's its own brand of American patriotism + the population/economic gravity of the entire Southeast region in one state.
+
+### Tier 1-TX — Texas spearhead (PRIMARY southern focus)
+
+**Why Texas first:**
+- ⭐ "Don't mess with Texas" / Made-in-USA + Texas-state-pride aesthetic = double brand alignment
+- Population #2 in US (~30M) — economic gravity
+- Existing TX pipeline: **Redstone Foods (Cindy Vosberg, Carrollton — active pricing thread, sample 3/18)** + **Buc-ee's (Sandra Morales, Lake Jackson — sample 4/1)** + **Mitchell & Co Walmart broker (Sydney O'Neal — sample 4/27)**. Beachhead is real.
+- Texas military density: Joint Base San Antonio (largest single military command in DoD), Fort Cavazos (largest base by population), Fort Bliss El Paso, NAS Corpus Christi, NAS JRB Fort Worth, Goodfellow AFB, Sheppard AFB, Dyess AFB, Laughlin AFB
+- Heritage tourism: The Alamo, San Jacinto, LBJ Ranch, Fredericksburg German heritage, Goliad
+- Family destinations: Buc-ee's stores (~50 locations), Sea World, Six Flags, NASA Johnson, Magnolia Market (Waco)
+
+**Tier 1-TX gateway towns + retail clusters:**
+
+| Town / Region | Anchor | Notes |
+|---|---|---|
+| **San Antonio** | The Alamo + River Walk + Joint Base San Antonio | Multi-base military + heritage tourism + Buc-ee's HQ region |
+| **Austin** | State Capitol + university + festivals | Heritage retail + UT campus + 6th St / SoCo |
+| **Fredericksburg + Hill Country (Wimberley, Boerne, Gruene, Bandera)** | German heritage + Texas wine country | High tourism gift retail density, Made-in-USA fits perfectly |
+| **Galveston** | Pleasure Pier + Moody Gardens + beach | Coastal Texas tourism, Strand Historic District |
+| **Houston** | NASA Johnson Space Center + Port + medical center | Space center gift shop = perfect Made-in-USA fit |
+| **Dallas / Fort Worth** | Stockyards + JFK Sixth Floor Museum + NAS JRB | Fort Worth Stockyards = heritage retail anchor |
+| **Waco** | Magnolia Market (Chip + Joanna) + Dr Pepper Museum | Magnolia draws ~30k visitors/week — premium Made-in-USA fit |
+| **Big Bend region (Terlingua, Marathon, Alpine, Marfa)** | Big Bend NP gateway | Remote NPS gateway towns |
+| **Corpus Christi + Padre Island** | Padre Island NS + Texas State Aquarium | Coastal tourism + NAS Corpus Christi military |
+| **El Paso** | Fort Bliss + border tourism | Border heritage + military |
+| **Amarillo** | Cadillac Ranch + Big Texan + Route 66 | Route 66 tourism + Texas Panhandle |
+| **Lubbock** | Buddy Holly + Texas Tech | West Texas heritage |
+| **South Padre Island** | Beach tourism | Spring break + family destination |
+
+**Tier 1-TX existing relationships (already in pipeline):**
+- ✓ **Redstone Foods** (Carrollton) — Cindy Vosberg active, 3/18 sample, pricing thread
+- ✓ **Buc-ee's** (Lake Jackson HQ, ~50 stores) — Sandra Morales follow-up
+- ✓ **Mitchell & Co Walmart broker** (Mitchell family) — Sydney O'Neal sample 4/27
+- ✓ **National Naval Aviation Museum (Pensacola FL)** — Valerie Miller — adjacent (FL/TX gulf corridor)
+
+**Tier 1-TX next-batch research (Viktor Batch 8 — TX spearhead):**
+Specific named-buyer research on:
+- The Alamo Visitor Center / Daughters of the Republic of Texas Library retail
+- San Jacinto Battleground / Battleship Texas State Historic Site retail
+- LBJ Ranch / Pedernales State Park gift shops
+- NASA Johnson Space Center / Space Center Houston gift shop
+- Magnolia Market gift shop (Waco)
+- Buc-ee's wholesale program (beyond Sandra Morales — internal buyer team for new vendor onboarding)
+- Fort Worth Stockyards gift retail cluster (~20+ shops)
+- Fredericksburg Main Street gift shop sweep
+- Texas Parks & Wildlife centralized gift shop buyer (covers all state parks)
+- Big Bend area independents (Terlingua Trading Co. + Marfa boutiques)
+- HEB grocery — wholesale onboarding via vendor portal (massive TX grocer)
+- Fiesta / La Michoacana Meat Market chains
+
+### Tier 2-S — Top southeastern gateway towns (post-Texas, follow-on lane)
+
+| Town | Anchor | Notes |
+|---|---|---|
+| **Gatlinburg / Pigeon Forge / Sevierville TN + Cherokee NC** | Great Smoky Mountains NP (most-visited NPS in country) | ⭐ Old Mill / Kelly Cross already in pipeline. Hundreds of gift shops on the Parkway + Cherokee tribal retail. |
+| **Asheville NC** | Blue Ridge Parkway | Strong artisan + heritage retail concentration |
+| **Boone / Blowing Rock NC** | Blue Ridge | Mountain-heritage gift retail |
+| **Hot Springs AR** | Hot Springs NP | Historic tourism + Bathhouse Row retail |
+| **Eureka Springs AR** | Christian heritage tourism | Independent gift shop density |
+| **Branson MO** | Family entertainment + Made in USA General Store referral (via Kokopelli) | Heavy Made-in-USA-themed retail |
+| **Helen GA** | Bavarian-themed mountain town | Tourism gift retail |
+| **Charleston SC + Mt Pleasant SC** | Heritage + Patriots Point + military | Heritage retail + naval museum |
+| **Savannah GA** | Heritage + Tybee Island | Historic district gift retail |
+| **St. Augustine FL** | Oldest city heritage + Castillo de San Marcos | Heritage retail concentration |
+| **Williamsburg / Yorktown / Jamestown VA** | Colonial heritage triangle | Heritage gift retail, federal-tier |
+| **Mount Vernon / Monticello VA** | Founding fathers heritage | Premium heritage gift retail |
+| **Hilton Head SC + Beaufort SC** | Coastal + Marine Corps | Tourism + military-adjacent |
+| **Fairhope AL** | Coastal + heritage | Ryan Mueller / Fairhope Snack Co. = collab partner per memory |
+| **Pensacola FL** | Naval Aviation Museum (Valerie Miller in pipeline) + Pensacola Beach | ⭐ Already a deal in flight |
+| **Key West FL** | Heritage + Hemingway + tourism | Independent gift shop density |
+| **New Orleans LA + Natchez MS** | Heritage cultural retail | Historic district concentration |
+
+### Tier 2-MIL — Military-base gift exchange / commissary lane
+
+USA Gummies + Made-in-USA + dye-free + register-side impulse SKU = perfect fit for military exchange retail (AAFES, NEX, MCX, CGX). Patriotic story + military families + base-store volume.
+
+| Base / Region | Branch | Notes |
+|---|---|---|
+| **Fort Bragg NC + Pope AAF** | Army | Largest Army base, AAFES retail |
+| **Camp Lejeune NC + Cherry Point + Beaufort SC + Parris Island** | Marine Corps | Coastal MCX cluster |
+| **Norfolk Naval Base + JEB Little Creek VA** | Navy | Largest Navy base, NEX retail |
+| **Fort Stewart GA + Hunter AAF** | Army | Coastal Army |
+| **Eglin AFB + Hurlburt Field FL** | Air Force | Panhandle |
+| **Maxwell AFB AL** | Air Force | |
+| **Patrick SFB FL** | Space Force | |
+| **MacDill AFB FL** | Air Force | |
+| **Pearl Harbor / Hickam JBPHH HI** | Joint Base | Patriotic-tourism overlap |
+
+**Path:** Military exchanges have formal vendor portals (AAFES vendor.aafes.com, NEXCOM, etc.). Different procurement track from gift shops. Worth a separate research wave once gift-shop channel is humming.
+
+### Southern run — trip economics (LOCKED 2026-04-29 PM)
+
+**Capacity:** Founder drive with full pallet load = up to **17 pallets / ~415 master cartons / ~14,900 bags / ~$45K wholesale value** in the truck + cargo trailer at one time (per Ben 2026-04-29: `7000 lbs × 16 oz/lb ÷ 7.5 oz/bag = 14,933 bags`).
+
+**Trip math (WA → Southeast):**
+- ~5,600 mi roundtrip
+- Fuel: ~$1,400 (350 gal × $3.95)
+- Lodging + food + sample fulfillment: ~$2,000-3,000
+- **All-in trip cost: ~$3,500-4,500**
+- **vs LTL on 17 pallets WA → Charleston SC: ~$8,000-10,000**
+- **Founder-drive net moat: ~$5,000+ saved on freight, absorbed as margin**
+
+**Time:** 14-21 days roundtrip (vs 2-day Tier 1 corridor trips)
+
+**Break-even:** 5-10 paid orders @ ~$2,000 avg = $10-20K revenue covers trip + builds southern beachhead
+
+**Alternative — southern co-packing:** If southern demand becomes meaningful (e.g., 50K+ bags/month sustained), contract a southern co-packer (current: Powers Confections in Spokane WA + Belmark Wisconsin packaging). Cuts shipping cost to zero on southern channel. **This decision is downstream of demand confirmation — first prove the channel via founder-drive trip(s).**
 
 ---
 
