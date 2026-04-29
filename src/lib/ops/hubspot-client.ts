@@ -21,9 +21,18 @@
 const HUBSPOT_API = "https://api.hubapi.com";
 const PIPELINE_B2B_WHOLESALE = "1907159777";
 const STAGE_LEAD = "3017533129";
+const STAGE_CONTACTED = "3017718461";
+const STAGE_RESPONDED = "3017718462";
+const STAGE_SAMPLE_REQUESTED = "3017718463";
+const STAGE_SAMPLE_SHIPPED = "3017718464";
+const STAGE_QUOTE_PO_SENT = "3017718465";
+const STAGE_VENDOR_SETUP = "3502336729";
 const STAGE_PO_RECEIVED = "3017718466";
 const STAGE_SHIPPED = "3017718460";
+const STAGE_REORDER = "3485080311";
 const STAGE_CLOSED_WON = "3502336730";
+const STAGE_CLOSED_LOST = "3502659283";
+const STAGE_ON_HOLD = "3502659284";
 const DEFAULT_OWNER_ID = "87737986"; // Ben Stutman
 
 // Association type IDs (HUBSPOT_DEFINED)
@@ -39,9 +48,18 @@ const ASSOC_TASK_TO_DEAL = 216;
 export const HUBSPOT = {
   PIPELINE_B2B_WHOLESALE,
   STAGE_LEAD,
+  STAGE_CONTACTED,
+  STAGE_RESPONDED,
+  STAGE_SAMPLE_REQUESTED,
+  STAGE_SAMPLE_SHIPPED,
+  STAGE_QUOTE_PO_SENT,
+  STAGE_VENDOR_SETUP,
   STAGE_PO_RECEIVED,
   STAGE_SHIPPED,
+  STAGE_REORDER,
   STAGE_CLOSED_WON,
+  STAGE_CLOSED_LOST,
+  STAGE_ON_HOLD,
   DEFAULT_OWNER_ID,
   ASSOC_DEAL_TO_CONTACT,
   ASSOC_CONTACT_TO_DEAL,
@@ -52,6 +70,22 @@ export const HUBSPOT = {
   ASSOC_TASK_TO_CONTACT,
   ASSOC_TASK_TO_DEAL,
 };
+
+export const HUBSPOT_B2B_STAGES = [
+  { id: STAGE_LEAD, name: "Lead" },
+  { id: STAGE_CONTACTED, name: "Contacted" },
+  { id: STAGE_RESPONDED, name: "Responded" },
+  { id: STAGE_SAMPLE_REQUESTED, name: "Sample Requested" },
+  { id: STAGE_SAMPLE_SHIPPED, name: "Sample Shipped" },
+  { id: STAGE_QUOTE_PO_SENT, name: "Quote/PO Sent" },
+  { id: STAGE_VENDOR_SETUP, name: "Vendor Setup" },
+  { id: STAGE_PO_RECEIVED, name: "PO Received" },
+  { id: STAGE_SHIPPED, name: "Shipped" },
+  { id: STAGE_REORDER, name: "Reorder" },
+  { id: STAGE_CLOSED_WON, name: "Closed Won" },
+  { id: STAGE_CLOSED_LOST, name: "Closed Lost" },
+  { id: STAGE_ON_HOLD, name: "On Hold" },
+] as const;
 
 function getToken(): string | null {
   const token = process.env.HUBSPOT_PRIVATE_APP_TOKEN?.trim();
@@ -131,6 +165,178 @@ export async function findContactByEmail(email: string): Promise<string | null> 
   });
   if (!res.ok || !res.data?.results?.length) return null;
   return res.data.results[0].id;
+}
+
+export type HubSpotReadResult<T> =
+  | { ok: true; value: T }
+  | { ok: false; reason: string };
+
+export type HubSpotStageCount = {
+  id: string;
+  name: string;
+  count: number;
+};
+
+export type HubSpotDealPreview = {
+  id: string;
+  dealname: string | null;
+  lastModifiedAt: string | null;
+};
+
+export type HubSpotTaskPreview = {
+  id: string;
+  subject: string | null;
+  priority: string | null;
+  dueAt: string | null;
+};
+
+/**
+ * Read-only B2B pipeline stage counts. Uses HubSpot's search endpoint
+ * (POST transport, read semantics) and returns an explicit error on
+ * auth/network failure so callers never fabricate zero counts.
+ */
+export async function readB2BWholesaleStageCounts(): Promise<
+  HubSpotReadResult<HubSpotStageCount[]>
+> {
+  const out: HubSpotStageCount[] = [];
+  for (const stage of HUBSPOT_B2B_STAGES) {
+    const res = await hsRequest<{ total?: number }>(
+      "POST",
+      "/crm/v3/objects/deals/search",
+      {
+        filterGroups: [
+          {
+            filters: [
+              {
+                propertyName: "pipeline",
+                operator: "EQ",
+                value: PIPELINE_B2B_WHOLESALE,
+              },
+              {
+                propertyName: "dealstage",
+                operator: "EQ",
+                value: stage.id,
+              },
+            ],
+          },
+        ],
+        properties: ["dealname"],
+        limit: 1,
+      },
+    );
+    if (!res.ok) {
+      return {
+        ok: false,
+        reason: `HubSpot stage ${stage.name} read failed: ${res.error ?? `HTTP ${res.status}`}`,
+      };
+    }
+    out.push({
+      id: stage.id,
+      name: stage.name,
+      count: Number.isFinite(res.data?.total) ? Number(res.data?.total) : 0,
+    });
+  }
+  return { ok: true, value: out };
+}
+
+export async function readStaleSampleShippedDeals(
+  options: { now?: Date; olderThanDays?: number; limit?: number } = {},
+): Promise<HubSpotReadResult<HubSpotDealPreview[]>> {
+  const now = options.now ?? new Date();
+  const olderThanDays = Math.max(1, options.olderThanDays ?? 7);
+  const limit = Math.max(1, Math.min(50, options.limit ?? 20));
+  const cutoff = new Date(now.getTime() - olderThanDays * 86_400_000).toISOString();
+  const res = await hsRequest<{
+    results?: Array<{
+      id: string;
+      properties?: {
+        dealname?: string;
+        hs_lastmodifieddate?: string;
+      };
+    }>;
+  }>("POST", "/crm/v3/objects/deals/search", {
+    filterGroups: [
+      {
+        filters: [
+          {
+            propertyName: "pipeline",
+            operator: "EQ",
+            value: PIPELINE_B2B_WHOLESALE,
+          },
+          {
+            propertyName: "dealstage",
+            operator: "EQ",
+            value: STAGE_SAMPLE_SHIPPED,
+          },
+          {
+            propertyName: "hs_lastmodifieddate",
+            operator: "LT",
+            value: cutoff,
+          },
+        ],
+      },
+    ],
+    properties: ["dealname", "hs_lastmodifieddate"],
+    sorts: [{ propertyName: "hs_lastmodifieddate", direction: "ASCENDING" }],
+    limit,
+  });
+  if (!res.ok) {
+    return {
+      ok: false,
+      reason: `HubSpot stale Sample Shipped read failed: ${res.error ?? `HTTP ${res.status}`}`,
+    };
+  }
+  return {
+    ok: true,
+    value: (res.data?.results ?? []).map((d) => ({
+      id: d.id,
+      dealname: d.properties?.dealname ?? null,
+      lastModifiedAt: d.properties?.hs_lastmodifieddate ?? null,
+    })),
+  };
+}
+
+export async function readOpenHubSpotCallTasks(
+  options: { limit?: number } = {},
+): Promise<HubSpotReadResult<HubSpotTaskPreview[]>> {
+  const limit = Math.max(1, Math.min(50, options.limit ?? 25));
+  const res = await hsRequest<{
+    results?: Array<{
+      id: string;
+      properties?: {
+        hs_task_subject?: string;
+        hs_task_priority?: string;
+        hs_timestamp?: string;
+      };
+    }>;
+  }>("POST", "/crm/v3/objects/tasks/search", {
+    filterGroups: [
+      {
+        filters: [
+          { propertyName: "hs_task_type", operator: "EQ", value: "CALL" },
+          { propertyName: "hs_task_status", operator: "EQ", value: "NOT_STARTED" },
+        ],
+      },
+    ],
+    properties: ["hs_task_subject", "hs_task_priority", "hs_timestamp"],
+    sorts: [{ propertyName: "hs_task_priority", direction: "DESCENDING" }],
+    limit,
+  });
+  if (!res.ok) {
+    return {
+      ok: false,
+      reason: `HubSpot call task read failed: ${res.error ?? `HTTP ${res.status}`}`,
+    };
+  }
+  return {
+    ok: true,
+    value: (res.data?.results ?? []).map((t) => ({
+      id: t.id,
+      subject: t.properties?.hs_task_subject ?? null,
+      priority: t.properties?.hs_task_priority ?? null,
+      dueAt: t.properties?.hs_timestamp ?? null,
+    })),
+  };
 }
 
 /**

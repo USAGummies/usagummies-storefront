@@ -788,6 +788,10 @@ export function renderSalesCommandMarkdown(slice: SalesCommandSlice): string {
     `• Wholesale inquiries: ${formatCount(slice.wholesaleInquiries)}`,
   );
 
+  if (slice.salesPipelineLine) {
+    lines.push(`• ${slice.salesPipelineLine}`);
+  }
+
   // Phase 4 — Weekly Revenue KPI one-liner. NEVER fabricates a
   // number — the renderer in revenue-kpi.ts falls back to
   // "Revenue pace not fully wired." when no channel is wired.

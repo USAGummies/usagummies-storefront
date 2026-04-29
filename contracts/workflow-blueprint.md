@@ -332,6 +332,23 @@ Each row uses the schema:
 - **UI:** `/ops/sales` already consumes `report.wholesaleOnboarding.inquiries` via the existing dashboard renderer. With the source flipped from `not_wired` to `wired`, the dashboard tile auto-shows the real count + `lastSubmittedAt` timestamp. No client-side changes required.
 - **Monday MVP:** 🟢 — Wholesale inquiry pipeline is no longer a black box. Public form behavior unchanged. Real count visible in `/ops/sales`. Morning brief stays quiet (context, not action). KV outage surfaces as `error` with reason — never as a fake zero.
 
+#### Phase 6.1 — HubSpot B2B pipeline snapshot in Sales Command (NEW)
+- **Why:** The loose local `scripts/sales-morning-brief.mjs` surfaced a real missing signal — B2B pipeline stage counts, stale Sample Shipped deals, and open call tasks — but it duplicated the canonical `/api/ops/daily-brief` system and posted directly to Slack. Phase 6.1 moves that signal into the existing read-only Sales Command + morning brief surfaces instead of creating a second brief.
+- **Architecture:**
+  - `src/lib/ops/hubspot-client.ts` exports the full B2B stage registry (`HUBSPOT_B2B_STAGES`) and three read-only helpers: `readB2BWholesaleStageCounts`, `readStaleSampleShippedDeals`, `readOpenHubSpotCallTasks`. They use HubSpot search endpoints only; no contact/deal/task writes.
+  - `src/lib/ops/sales-pipeline.ts` is the pure projector. It computes `openDealCount` excluding `Closed Won` / `Closed Lost`, caps previews, normalizes malformed counts to 0 per row, and renders the one-line brief copy.
+  - `readSalesPipeline(now)` in `sales-command-readers.ts` composes those three HubSpot reads into one `SourceState<SalesPipelineSummary>`. Any auth/network failure becomes `status:"error"` with a reason; never `wired:0`.
+  - `/api/ops/sales` passes the pipeline source into `buildSalesCommandCenter`; `/api/ops/daily-brief` passes it into `composeSalesCommandSlice` for the morning-only Sales Command block.
+- **UI:** `/ops/sales` shows a new HubSpot B2B pipeline subsection under Wholesale / B2B onboarding: open deal count, stale Sample Shipped count, open call-task count, non-zero stage cards, and top stale Sample Shipped preview rows. It remains read-only; actions still happen in HubSpot/Slack approval flows.
+- **Brief:** Morning Sales Command adds one compact line when wired: `B2B pipeline: X open deals · Y stale samples · Z call tasks`. EOD still skips Sales Command entirely.
+- **Hard rules locked by tests:**
+  - **Read-only.** No HubSpot write helper is called; no Slack approval is opened; no email is drafted or sent.
+  - **No fabricated zero on HubSpot outage.** Reader failures return `SourceState.error` and surface in the dashboard blockers panel.
+  - **No duplicate brief.** The standalone local script is not committed; the canonical daily brief remains the single Slack publishing surface.
+  - **Pipeline counts are context, not an auto-action trigger.** The compact pipeline line does not set `anyAction` by itself; stale/call work stays visible without creating noisy false action state.
+- **Tests (Phase 6.1):** `sales-pipeline.test.ts` covers open-count math, malformed-count normalization, preview caps, and brief copy. `sales-command-readers-pipeline.test.ts` covers wired success, HubSpot failure → `error`, and thrown-client isolation. `sales-command-center.test.ts` covers dashboard surfacing, blockers behavior, and slice projection. `daily-brief.test.ts` covers the rendered pipeline line. Focused suite: 118 green before full verification.
+- **Monday MVP:** 🟢 — Ben sees B2B pipeline state in `/ops/sales` and the morning Slack brief without a second daily digest and without introducing HubSpot mutations.
+
 #### Phase 7 — Receipt OCR extraction (prepare-for-review only) (NEW)
 - **Why:** `/ops/finance/review` already aggregates the receipt review queue, but Rene/Ben were doing field-by-field data entry by hand. Phase 7 attaches a *suggestion* to each captured receipt so reviewers see vendor/date/amount/currency/tax/last4/payment hints proposed before they fill in the canonical fields. Promotion remains 100% human — no auto-fill, no QBO write.
 - **Architecture:**

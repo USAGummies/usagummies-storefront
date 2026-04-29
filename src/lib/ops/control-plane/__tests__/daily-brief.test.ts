@@ -172,6 +172,7 @@ describe("composeDailyBrief()", () => {
         retailDraftsNeedsReview: 4,
         retailDraftsAccepted: 12,
         wholesaleInquiries: null,
+        salesPipelineLine: "B2B pipeline: 5 open deals · 2 stale samples · 1 call tasks",
         anyAction: true,
       },
     });
@@ -185,6 +186,7 @@ describe("composeDailyBrief()", () => {
     expect(json).toContain("*5*"); // pending approvals
     // not_wired wholesale renders honestly.
     expect(json).toContain("Wholesale inquiries: _not wired_");
+    expect(json).toContain("B2B pipeline: 5 open deals");
     // Deep links present (they live in the footer line).
     expect(json).toContain("/ops/sales");
     expect(json).toContain("/ops/faire-direct");

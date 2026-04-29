@@ -50,6 +50,7 @@ import {
   readFaireInvites,
   readLocationDrafts,
   readPendingApprovals,
+  readSalesPipeline,
   readWholesaleInquiries,
 } from "@/lib/ops/sales-command-readers";
 import { listDivisions } from "@/lib/ops/control-plane/divisions";
@@ -290,6 +291,7 @@ async function composeAndPost(req: Request): Promise<Response> {
         apPackets,
         locationDrafts,
         wholesaleInquiries,
+        salesPipeline,
       ] = await Promise.all([
         readFaireInvites(),
         readFaireFollowUps(now),
@@ -297,6 +299,7 @@ async function composeAndPost(req: Request): Promise<Response> {
         readApPackets(),
         readLocationDrafts(),
         readWholesaleInquiries(),
+        readSalesPipeline(now),
       ]);
       salesCommand = composeSalesCommandSlice({
         faireInvites,
@@ -305,6 +308,7 @@ async function composeAndPost(req: Request): Promise<Response> {
         apPackets,
         locationDrafts,
         wholesaleInquiries,
+        salesPipeline,
       });
     } catch (err) {
       degradations.push(

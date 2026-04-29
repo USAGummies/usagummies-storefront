@@ -68,6 +68,27 @@ interface PendingApprovalSummary {
     createdAt: string;
   }>;
 }
+interface SalesPipelineSummary {
+  stages: Array<{ id: string; name: string; count: number }>;
+  openDealCount: number;
+  staleSampleShipped: {
+    total: number;
+    preview: Array<{
+      id: string;
+      dealname: string | null;
+      lastModifiedAt: string | null;
+    }>;
+  };
+  openCallTasks: {
+    total: number;
+    preview: Array<{
+      id: string;
+      subject: string | null;
+      priority: string | null;
+      dueAt: string | null;
+    }>;
+  };
+}
 
 interface Report {
   generatedAt: string;
@@ -92,6 +113,7 @@ interface Report {
   };
   wholesaleOnboarding: {
     inquiries: SourceState<{ total: number; lastSubmittedAt?: string }>;
+    pipeline: SourceState<SalesPipelineSummary>;
     apPackets: SourceState<ApPacketCounts>;
     links: Array<{ href: string; label: string }>;
   };
@@ -458,6 +480,68 @@ function WholesaleOnboardingSection({ report }: { report: Report }) {
               </span>
             ) : null}
           </div>
+        ))}
+      </div>
+      <div style={{ marginBottom: 8 }}>
+        <SubLabel>HubSpot B2B pipeline</SubLabel>
+        {renderSourceState(report.wholesaleOnboarding.pipeline, (v) => (
+          <>
+            <div style={{ display: "flex", gap: 16, fontSize: 13, flexWrap: "wrap" }}>
+              <span>
+                Open deals: <strong>{v.openDealCount}</strong>
+              </span>
+              <span style={{ color: RED }}>
+                Stale samples: <strong>{v.staleSampleShipped.total}</strong>
+              </span>
+              <span style={{ color: AMBER }}>
+                Call tasks: <strong>{v.openCallTasks.total}</strong>
+              </span>
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+                gap: 6,
+                marginTop: 8,
+              }}
+            >
+              {v.stages
+                .filter((s) => s.count > 0)
+                .map((s) => (
+                  <div
+                    key={s.id}
+                    style={{
+                      background: "#fff",
+                      border: `1px solid ${BORDER}`,
+                      borderRadius: 6,
+                      padding: "6px 8px",
+                      fontSize: 12,
+                    }}
+                  >
+                    <strong>{s.count}</strong>{" "}
+                    <span style={{ color: DIM }}>{s.name}</span>
+                  </div>
+                ))}
+            </div>
+            {v.staleSampleShipped.preview.length > 0 && (
+              <ul style={{ listStyle: "none", padding: 0, margin: "8px 0 0 0" }}>
+                {v.staleSampleShipped.preview.slice(0, 3).map((d) => (
+                  <li
+                    key={d.id}
+                    style={{
+                      borderTop: `1px dashed ${BORDER}`,
+                      padding: "5px 4px",
+                      fontSize: 12,
+                      color: DIM,
+                    }}
+                  >
+                    Sample follow-up: <strong>{d.dealname ?? d.id}</strong>
+                    {d.lastModifiedAt ? ` · ${d.lastModifiedAt.slice(0, 10)}` : ""}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
         ))}
       </div>
       <div>

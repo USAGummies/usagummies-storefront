@@ -157,6 +157,8 @@ export interface SalesCommandCenterInput {
   /** Reason to use when `dispatchRows` is omitted (e.g. ShipStation
    *  not configured). Defaults to "ShipStation not configured." */
   dispatchNotWiredReason?: string;
+  /** HubSpot B2B pipeline snapshot. Read-only: no stage/task writes. */
+  salesPipeline?: SourceState<SalesPipelineSummary>;
 }
 
 export interface SectionTodaysRevenueActions {
@@ -188,6 +190,7 @@ export interface SectionFollowUps {
 
 export interface SectionWholesaleOnboarding {
   inquiries: SourceState<{ total: number; lastSubmittedAt?: string }>;
+  pipeline: SourceState<SalesPipelineSummary>;
   apPackets: SourceState<ApPacketCounts>;
   links: Array<{ href: string; label: string }>;
 }
@@ -279,6 +282,12 @@ import {
   type RevenueKpiReport,
   type RevenueKpiSlice,
 } from "./revenue-kpi";
+import {
+  renderSalesPipelineBriefLine,
+  type SalesPipelineSummary,
+} from "./sales-pipeline";
+
+export type { SalesPipelineSummary } from "./sales-pipeline";
 
 export interface SectionAging {
   /** Top-N (default 10) actionable rows, sorted critical→overdue→watch,
@@ -337,6 +346,8 @@ export interface SalesCommandSlice {
    *  not_wired. Keeping the shape uniform lets a future writer flip
    *  this on without changing the renderer. */
   wholesaleInquiries: number | null;
+  /** Compact HubSpot B2B pipeline line for the morning brief. */
+  salesPipelineLine?: string | null;
   /** True when at least one wired count above is positive. The
    *  composer uses this to decide between the empty-state copy and
    *  the actionable rendering. */
@@ -384,6 +395,10 @@ export function composeSalesCommandSlice(
     input.wholesaleInquiries,
     (c) => c.total,
   );
+  const salesPipelineLine = wiredOrNull(
+    input.salesPipeline ?? sourceNotWired("HubSpot sales pipeline reader not wired."),
+    renderSalesPipelineBriefLine,
+  );
 
   // Phase 3 — derive up to 3 aging callouts from the input's
   // agingItems list. The aging stream is sorted critical→overdue→
@@ -426,6 +441,7 @@ export function composeSalesCommandSlice(
     retailDraftsNeedsReview,
     retailDraftsAccepted,
     wholesaleInquiries,
+    salesPipelineLine,
     agingCallouts,
     revenueKpi,
     anyAction,
@@ -517,6 +533,9 @@ export function buildSalesCommandCenter(
     ["apPackets", input.apPackets],
     ["locationDrafts", input.locationDrafts],
   ];
+  if (input.salesPipeline) {
+    checks.push(["salesPipeline", input.salesPipeline]);
+  }
   for (const [name, state] of checks) {
     if (state.status === "not_wired" || state.status === "error") {
       notes.push({ source: name, state: state.status, reason: state.reason });
@@ -552,6 +571,9 @@ export function buildSalesCommandCenter(
     },
     wholesaleOnboarding: {
       inquiries: input.wholesaleInquiries,
+      pipeline:
+        input.salesPipeline ??
+        sourceNotWired("HubSpot sales pipeline reader not wired."),
       apPackets: input.apPackets,
       links: [
         { href: "/ops/ap-packets", label: "AP packet dashboard" },

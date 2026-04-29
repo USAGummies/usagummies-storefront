@@ -903,3 +903,63 @@ describe("buildSalesCommandCenter — dispatchSummary section", () => {
     expect(r.dispatchSummary.dispatchedLast24h.value).toBe(0);
   });
 });
+
+describe("buildSalesCommandCenter — HubSpot sales pipeline section", () => {
+  it("surfaces the wired sales pipeline under wholesale onboarding", () => {
+    const report = buildSalesCommandCenter(
+      {
+        ...emptyInput(),
+        salesPipeline: sourceWired({
+          stages: [{ id: "lead", name: "Lead", count: 3 }],
+          openDealCount: 3,
+          staleSampleShipped: { total: 1, preview: [] },
+          openCallTasks: { total: 2, preview: [] },
+        }),
+      },
+      { now: NOW },
+    );
+    expect(report.wholesaleOnboarding.pipeline.status).toBe("wired");
+    if (report.wholesaleOnboarding.pipeline.status !== "wired") return;
+    expect(report.wholesaleOnboarding.pipeline.value.openDealCount).toBe(3);
+  });
+
+  it("adds salesPipeline errors to the blockers panel instead of fabricating counts", () => {
+    const report = buildSalesCommandCenter(
+      {
+        ...emptyInput(),
+        salesPipeline: sourceError("HubSpot unavailable"),
+      },
+      { now: NOW },
+    );
+    expect(report.wholesaleOnboarding.pipeline.status).toBe("error");
+    expect(report.blockers.notes).toContainEqual({
+      source: "salesPipeline",
+      state: "error",
+      reason: "HubSpot unavailable",
+    });
+  });
+
+  it("composeSalesCommandSlice includes a compact pipeline line when wired", () => {
+    const slice = composeSalesCommandSlice({
+      ...emptyInput(),
+      salesPipeline: sourceWired({
+        stages: [{ id: "lead", name: "Lead", count: 5 }],
+        openDealCount: 5,
+        staleSampleShipped: { total: 2, preview: [] },
+        openCallTasks: { total: 1, preview: [] },
+      }),
+    });
+    expect(slice.salesPipelineLine).toBe(
+      "B2B pipeline: 5 open deals · 2 stale samples · 1 call tasks",
+    );
+    expect(slice.anyAction).toBe(false);
+  });
+
+  it("composeSalesCommandSlice omits the pipeline line when source errors", () => {
+    const slice = composeSalesCommandSlice({
+      ...emptyInput(),
+      salesPipeline: sourceError("HubSpot down"),
+    });
+    expect(slice.salesPipelineLine).toBeNull();
+  });
+});

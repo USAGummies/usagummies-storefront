@@ -32,6 +32,12 @@ import { listReceipts } from "@/lib/ops/docs";
 import { approvalStore } from "@/lib/ops/control-plane/stores";
 import { getWholesaleInquirySummary } from "@/lib/wholesale/inquiries";
 import {
+  readB2BWholesaleStageCounts,
+  readOpenHubSpotCallTasks,
+  readStaleSampleShippedDeals,
+} from "@/lib/ops/hubspot-client";
+import { buildSalesPipelineSummary } from "@/lib/ops/sales-pipeline";
+import {
   sourceError,
   sourceWired,
   type ApPacketCounts,
@@ -39,6 +45,7 @@ import {
   type FaireInviteCounts,
   type LocationDraftCounts,
   type PendingApprovalSummary,
+  type SalesPipelineSummary,
   type SourceState,
 } from "@/lib/ops/sales-command-center";
 import {
@@ -228,6 +235,32 @@ export async function readWholesaleInquiries(): Promise<
     return sourceError(`Wholesale inquiry archive read failed: ${result.reason}`);
   }
   return sourceWired(result.summary);
+}
+
+export async function readSalesPipeline(
+  now: Date,
+): Promise<SourceState<SalesPipelineSummary>> {
+  try {
+    const [stages, staleSampleShipped, openCallTasks] = await Promise.all([
+      readB2BWholesaleStageCounts(),
+      readStaleSampleShippedDeals({ now, olderThanDays: 7, limit: 20 }),
+      readOpenHubSpotCallTasks({ limit: 25 }),
+    ]);
+    if (!stages.ok) return sourceError(stages.reason);
+    if (!staleSampleShipped.ok) return sourceError(staleSampleShipped.reason);
+    if (!openCallTasks.ok) return sourceError(openCallTasks.reason);
+    return sourceWired(
+      buildSalesPipelineSummary({
+        stages: stages.value,
+        staleSampleShipped: staleSampleShipped.value,
+        openCallTasks: openCallTasks.value,
+      }),
+    );
+  } catch (err) {
+    return sourceError(
+      `HubSpot sales pipeline read failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
