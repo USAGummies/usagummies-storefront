@@ -53,7 +53,7 @@ Simple, direct, high-trust.
 - Ingredients: /ingredients
 - Made in USA: /made-in-usa
 - Policies: /policies
-- America 250 hub: /america-250
+- America's 250th hub: /america-250
 
 ## Conversion model
 - Bag-count savings are the primary value driver.

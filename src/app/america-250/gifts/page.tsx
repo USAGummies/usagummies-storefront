@@ -18,9 +18,9 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
-const PAGE_TITLE = "America 250 Gifts | Patriotic Candy";
+const PAGE_TITLE = "America's 250th Gifts | Patriotic Candy";
 const PAGE_DESCRIPTION =
-  "Gift made in USA candy for America 250 - dye-free gummies and no artificial dyes for patriotic celebrations.";
+  "Gift made in USA candy for America's 250th - dye-free gummies and no artificial dyes for patriotic celebrations.";
 const PAGE_URL = `${SITE_URL}/america-250/gifts`;
 const OG_IMAGE = `${SITE_URL}/opengraph-image`;
 const PUBLISHED_DATE = "2026-01-01T15:10:31-08:00";
@@ -52,21 +52,21 @@ export default function America250GiftsPage() {
         <BreadcrumbJsonLd
           items={[
             { name: "Home", href: "/" },
-            { name: "America 250", href: "/america-250" },
+            { name: "America's 250th", href: "/america-250" },
             { name: "Gifts", href: "/america-250/gifts" },
           ]}
         />
 
         <div className="mb-6 flex items-center justify-between">
           <Link href="/america-250" className="text-sm text-[var(--muted)] hover:text-[var(--text)]">
-            Back to America 250
+            Back to America&apos;s 250th
           </Link>
           <Link href="/shop" className="text-sm text-[var(--muted)] hover:text-[var(--text)]">
             Shop now
           </Link>
         </div>
 
-        <h1 className="text-4xl font-semibold tracking-tight">America 250 gifts</h1>
+        <h1 className="text-4xl font-semibold tracking-tight">America&apos;s 250th gifts</h1>
         <p className="mt-4 text-[var(--muted)]">
           Simple, gift-ready bag options with an Americana feel and built to show up looking premium.
         </p>

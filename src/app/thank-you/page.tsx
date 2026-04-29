@@ -71,7 +71,7 @@ export default function ThankYouPage() {
 
         <div className="mt-6 grid gap-4 md:grid-cols-2">
           <Reveal className="candy-panel rounded-2xl border border-[var(--border)] p-5 space-y-3 text-[var(--text)]">
-            <div className="text-lg font-black text-[var(--text)]">America 250 perks</div>
+            <div className="text-lg font-black text-[var(--text)]">America&apos;s 250th perks</div>
             <ul className="list-disc list-inside text-sm text-[var(--muted)] space-y-1">
               <li>Early drops</li>
               <li>Savings deals</li>
@@ -81,7 +81,7 @@ export default function ThankYouPage() {
               href="/america-250"
               className="btn btn-candy pressable inline-flex w-fit"
             >
-              Claim America 250 perks
+              Claim America&apos;s 250th perks
             </Link>
           </Reveal>
 

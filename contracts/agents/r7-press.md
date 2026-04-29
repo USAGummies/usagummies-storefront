@@ -23,7 +23,7 @@ One job: identify press and media opportunities — journalists on candy / CPG /
 
 ## Boot ritual
 
-1. Scan Feedly feeds (when subscribed) or Google News for tracked terms (`dye-free candy`, `made in USA gummy`, `America 250`, `clean-label confection`).
+1. Scan Feedly feeds (when subscribed) or Google News for tracked terms (`dye-free candy`, `made in USA gummy`, `America's 250th`, `Semiquincentennial`, `clean-label confection`).
 2. Scan podcast directories (Apple Podcasts, Spotify) for CPG-founder-guest shows with recent episodes.
 3. Scan tracked journalists' beats (Muck Rack if subscribed; otherwise manual beat research).
 4. Scan trade publications (CandyIndustry, CSP Daily, Confectionery News).

@@ -255,7 +255,7 @@ const LEGACY_PILLAR_GUIDES: LegacyGuide[] = [
     guideSlug: "patriotic-candy",
     href: "/patriotic-candy",
     title: "Patriotic candy gifts",
-    description: "American made candy gifts for July 4th, Veterans Day, and America 250.",
+    description: "American made candy gifts for July 4th, Veterans Day, and America's 250th.",
     topic: "Patriotic",
     tags: ["patriotic candy", "american made candy", "gifts"],
     keywords: ["patriotic candy", "american made"],

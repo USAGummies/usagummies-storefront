@@ -275,7 +275,7 @@ export async function generateMarketingImage(
       "Natural lighting, warm tones. Outdoors or modern kitchen setting.",
     patriotic:
       "Patriotic American theme. Red, white, and blue color palette. " +
-      "Stars, stripes, or American landscapes. Uplifting and proud tone. America 250 celebration energy.",
+      "Stars, stripes, or American landscapes. Uplifting and proud tone. America's 250th celebration energy.",
     "health-wellness":
       "Health and wellness theme. Clean, fresh, natural ingredients visible. " +
       "Green and gold tones. Fruit, nature imagery. No artificial dyes, dye-free messaging.",

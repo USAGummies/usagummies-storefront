@@ -18,9 +18,9 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
-const PAGE_TITLE = "America 250 Celebrations | USA Gummies";
+const PAGE_TITLE = "America's 250th Celebrations | USA Gummies";
 const PAGE_DESCRIPTION =
-  "Plan America 250 celebrations with patriotic candy, made in USA gummies, and dye-free treats.";
+  "Plan America's 250th celebrations with patriotic candy, made in USA gummies, and dye-free treats.";
 const PAGE_URL = `${SITE_URL}/america-250/celebrations`;
 const OG_IMAGE = `${SITE_URL}/opengraph-image`;
 const PUBLISHED_DATE = "2026-01-01T15:10:31-08:00";
@@ -52,18 +52,18 @@ export default function America250CelebrationsPage() {
         <BreadcrumbJsonLd
           items={[
             { name: "Home", href: "/" },
-            { name: "America 250", href: "/america-250" },
+            { name: "America's 250th", href: "/america-250" },
             { name: "Celebrations", href: "/america-250/celebrations" },
           ]}
         />
 
         <div className="mb-6">
           <Link href="/america-250" className="text-sm text-[var(--muted)] hover:text-[var(--text)]">
-            Back to America 250
+            Back to America&apos;s 250th
           </Link>
         </div>
 
-        <h1 className="text-4xl font-semibold tracking-tight">America 250 celebrations</h1>
+        <h1 className="text-4xl font-semibold tracking-tight">America&apos;s 250th celebrations</h1>
         <p className="mt-4 text-[var(--muted)]">
           Built for parades, cookouts, road trips, and community events. Same premium gummies - just
           curated and positioned for the moment.

@@ -25,7 +25,7 @@ export const blogAuthors: Record<string, BlogAuthor> = {
     slug: "maria-santos",
     title: "Community & events lead",
     bio:
-      "Maria curates community celebrations and the small details that make America 250 moments feel personal.",
+      "Maria curates community celebrations and the small details that make America's 250th moments feel personal.",
     avatar: "/logo-winged.png",
   },
   "derek-cole": {

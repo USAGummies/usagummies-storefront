@@ -58,7 +58,7 @@ const GUIDES = [
   {
     href: "/patriotic-candy",
     title: "Patriotic candy gifts",
-    description: "American made candy gifts for July 4th, Veterans Day, and America 250.",
+    description: "American made candy gifts for July 4th, Veterans Day, and America's 250th.",
   },
   {
     href: "/bulk-gummy-bears",

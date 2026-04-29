@@ -18,9 +18,9 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
-const PAGE_TITLE = "America 250 Events | USA Gummies";
+const PAGE_TITLE = "America's 250th Events | USA Gummies";
 const PAGE_DESCRIPTION =
-  "Find America 250 event ideas and patriotic candy selections, including dye-free gummies made in the USA.";
+  "Find America's 250th event ideas and patriotic candy selections, including dye-free gummies made in the USA.";
 const PAGE_URL = `${SITE_URL}/america-250/events`;
 const OG_IMAGE = `${SITE_URL}/opengraph-image`;
 const PUBLISHED_DATE = "2026-01-01T15:10:31-08:00";
@@ -52,18 +52,18 @@ export default function America250EventsPage() {
         <BreadcrumbJsonLd
           items={[
             { name: "Home", href: "/" },
-            { name: "America 250", href: "/america-250" },
+            { name: "America's 250th", href: "/america-250" },
             { name: "Events", href: "/america-250/events" },
           ]}
         />
 
         <div className="mb-6">
           <Link href="/america-250" className="text-sm text-[var(--muted)] hover:text-[var(--text)]">
-            Back to America 250
+            Back to America&apos;s 250th
           </Link>
         </div>
 
-        <h1 className="text-4xl font-semibold tracking-tight">America 250 events</h1>
+        <h1 className="text-4xl font-semibold tracking-tight">America&apos;s 250th events</h1>
         <p className="mt-4 text-[var(--muted)]">
           A curated set of bundle sizes built for parades, community events, and patriotic gatherings.
         </p>
