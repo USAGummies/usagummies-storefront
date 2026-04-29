@@ -1,3 +1,17 @@
+// Hero v4 (2026-04-28 22:50 PT) — BUY-FIRST RESTRUCTURE. Clarity data
+// from 4/28 night audit: 1,167 of 1,203 (97%) of /shop visitors only
+// scroll 5% of the page. Avg session 11s. They land on /shop, see
+// header + a hero image area that takes 1-3s to paint on mobile, and
+// bounce before ever reaching the BUY widget below the H1. v3 put the
+// BagSlider after the hero image and H1 — that's still ~400-500px down
+// the page, lost to most bouncers.
+//
+// v4 fix: BagSlider (buy widget with price + qty + ATC button) is now
+// the FIRST thing rendered on mobile, ABOVE the hero image. Order on
+// mobile: BagSlider → Hero image → Eyebrow → H1 → description → flavors
+// → trust row. Image-load-wait no longer blocks the conversion path.
+// Desktop layout unchanged (slider stays in the right column).
+//
 // Hero v3 (2026-04-28) — MOBILE-FIRST RESTRUCTURE. Clarity data 4/28
 // showed 99.5% bounce on mobile because:
 //   - 540px of empty space + 96px H1 ate the entire viewport
@@ -74,10 +88,22 @@ export function HeroSection({ review }: { review?: ReviewAggregate } = {}) {
             empty space that was eating the entire mobile viewport.
             Desktop padding unchanged (md:pt-18). */}
         <div className="relative mx-auto grid max-w-[1200px] grid-cols-1 items-center gap-5 px-5 pb-10 pt-4 sm:gap-7 sm:px-8 sm:pb-16 sm:pt-10 md:grid-cols-[1.05fr_1fr] md:gap-12 md:pb-20 md:pt-18">
-          {/* MOBILE-ONLY product photo — must be FIRST in DOM order on
-              mobile (-order-1 in single-column grid). Height-capped
-              200/260px (was 360x360 square) so it doesn't eat the
-              fold. Sits BEFORE the copy column. */}
+          {/* MOBILE-ONLY buy widget — must be FIRST in DOM order on mobile
+              (order-[-2], more negative than the figure's -order-1) so the
+              price + qty + BUY NOW button render BEFORE the hero image. The
+              hero image takes 1-3s to paint on mobile networks; we don't
+              want that to block the conversion path. Hidden on desktop where
+              the buy widget already lives in the right column. */}
+          <div
+            data-reveal="0"
+            className="relative order-[-2] rounded-sm border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-3 shadow-[6px_6px_0_var(--lp-red)] sm:p-5 md:hidden"
+          >
+            <BagSlider variant="full" defaultQty={5} />
+          </div>
+
+          {/* MOBILE-ONLY product photo — sits BETWEEN the buy widget
+              (-order-2) and the copy column (default order). Height-capped
+              200/260px (was 360x360 square). */}
           <figure
             className="relative -order-1 mx-auto w-full max-w-[260px] overflow-hidden border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] sm:max-w-[320px] md:hidden"
             style={{ boxShadow: "6px 6px 0 var(--lp-red)" }}
@@ -134,15 +160,9 @@ export function HeroSection({ review }: { review?: ReviewAggregate } = {}) {
               </div>
             )}
 
-            {/* MOBILE BAG SLIDER — moved here (right after H1) so the
-                price + qty + ATC button are in the first viewport on
-                mobile. Was previously ~700px below this position. */}
-            <div
-              data-reveal="3"
-              className="relative mt-4 rounded-sm border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-3 shadow-[6px_6px_0_var(--lp-red)] sm:p-5 md:hidden"
-            >
-              <BagSlider variant="full" defaultQty={5} />
-            </div>
+            {/* MOBILE BAG SLIDER — relocated to be the FIRST grid child
+                in v4 (see header comment). The buy widget now renders
+                ABOVE the hero image so it's visible on first paint. */}
 
             {/* DESCRIPTION — pushed below the buy widget on mobile.
                 On desktop, sits in normal flow (Bag slider on desktop
