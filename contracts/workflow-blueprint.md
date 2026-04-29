@@ -196,7 +196,8 @@ Each row uses the schema:
   - Pending Slack approvals (wired via `approvalStore().listPending()`, bucketed by `targetEntity.type`, oldest-5 preview)
   - AP packets (wired via `listApPackets()` + best-effort KV scan of `ap-packets:sent:*` rows for the sent count)
   - Location drafts (wired via `listDraftsByStatus()`)
-  - Wholesale inquiries (**not_wired** — there is no internal list endpoint today; submissions land in `/api/leads` but aren't archived in a queryable store; surfaced honestly with reason in the Blockers panel)
+  - Wholesale inquiries (wired via the KV archive populated by `/api/leads`; empty archive is a real zero, KV outage is `error`)
+  - HubSpot B2B pipeline (wired via read-only HubSpot search: stage counts + stale Sample Shipped preview + open call tasks; no HubSpot writes)
 - **Hard rules locked by tests:**
   - **Read-only.** No KV / Gmail / HubSpot / Faire / Slack / QBO / Shopify mutation; no approval opened, no email drafted. The aggregator helper has zero I/O — pure functions, two identical inputs produce identical outputs.
   - **Never invents data.** A `not_wired` source surfaces as `null` in the top-of-page roll-ups (rendered as "—") and as a row in the Blockers panel with the caller's verbatim reason. Empty-but-wired sources surface as `0` (NOT null) so the dashboard distinguishes "wired but quiet" from "no API at all".
@@ -206,14 +207,14 @@ Each row uses the schema:
   1. *Today's revenue actions* — five stat cards (Faire invites awaiting review, follow-ups due/overdue, Slack approvals pending, AP packets action-required, retail drafts to review). Cards link to their respective workflow pages. A `Nothing demands action right now` green note appears when every wired count is zero.
   2. *Faire Direct* — invite counts by status with a "Open Faire Direct queue" deep-link.
   3. *Follow-ups awaiting Ben* — overdue / due_soon / sent-total counts plus top-5 most-stale rows (retailer, email, days-since-sent, bucket badge).
-  4. *Wholesale / B2B onboarding* — wholesale inquiry status (currently `not_wired`) + AP packet status.
+  4. *Wholesale / B2B onboarding* — wholesale inquiry count, HubSpot B2B pipeline snapshot, and AP packet status.
   5. *Retail proof / store locator pipeline* — draft counts + `/ops/locations` link.
   6. *Slack approvals awaiting Ben* — total pending + oldest-5 preview rows with `targetEntity.type`, action slug, and `createdAt`.
   7. *Blockers / missing envs* — collected `not_wired`/`error` notes plus any unset env vars from a curated short list (`FAIRE_ACCESS_TOKEN`, `HUBSPOT_PRIVATE_APP_TOKEN`); links to `/ops/readiness`.
 - **Approval class:** None. Phase 1 ships zero new approvals — the dashboard has no Send/Approve/Action buttons by contract.
 - **Tests (Phase 1):** 16 aggregator-helper tests covering: not_wired surfaces as null in roll-ups, empty-but-wired surfaces as 0, exact-count propagation (no inflation), `anyAction` true iff a wired count > 0, follow-up sort preservation, top-5 slice, blockers panel collection, missingEnv passthrough, defaults, purity (same input → same output). No route or page tests in Phase 1 — the aggregator is the contract surface; the route is a thin reader.
 - **UI:** `/ops/sales` page server component → `<SalesCommandCenterView>` client component → fetches the route once, renders six sections + a refresh button. Stat cards are clickable when they carry a deep-link. `not_wired` sources render with an explicit "NOT WIRED" amber badge + the reason verbatim.
-- **Monday MVP:** 🟢 — Ben gets one read-only browser surface for the day's revenue actions without leaving the storefront repo. Phase 2 (deferred): wire wholesale inquiry archive + add a "Slack permalink" deep-link helper to the awaiting-Ben section.
+- **Monday MVP:** 🟢 — Ben gets one read-only browser surface for the day's revenue actions without leaving the storefront repo. Later improvement: add a "Slack permalink" deep-link helper to the awaiting-Ben section.
 
 #### Phase 2 — Sales Command in the morning Slack brief (NEW)
 - **Trigger:** Existing morning daily-brief cron (Vercel cron + Make.com scenario) → `POST /api/ops/daily-brief?kind=morning` → composer renders one extra section in `#ops-daily`. EOD wraps skip the section to avoid duplicating the cumulative dashboard.
@@ -227,7 +228,7 @@ Each row uses the schema:
   - Section appears on `kind="morning"` only; EOD brief explicitly skips it (test-locked).
   - Empty-state → single quiet line: `*Sales Command*` + `_No sales actions queued._` + footer with deep links. No per-source bullets when nothing's actionable.
   - `null` numerics render as `_not wired_`, NEVER as `*0*`. Zero is a real wired-but-quiet count and earns its own line; null means missing source.
-  - Wholesale inquiries always renders honestly (currently `_not wired_` because no list endpoint exists). Locked so future wired→quiet flips don't accidentally erase the line.
+  - Wholesale inquiries always renders honestly. `null` renders `_not wired_`; a wired empty archive renders `*0*`.
   - Section bounded under 12 lines (header + ≤6 body lines + footer). Test asserts the worst case.
   - `anyAction` does NOT trip on a wholesale-inquiries-only positive count — that's contextual data, not an action item. Locked so a future not_wired→wired flip on inquiries doesn't noisify the morning brief.
 - **Deep links in footer line:** `<https://www.usagummies.com/ops/sales|/ops/sales>`, `<…/ops/faire-direct|Faire Direct>`, `<…/ops/ap-packets|AP packets>`, `<…/ops/locations|Store locator>`.

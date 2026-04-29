@@ -121,8 +121,8 @@ export interface SalesCommandCenterInput {
      *  top N for display. */
     actionable: FaireFollowUpRowSummary[];
   }>;
-  /** Wholesale inquiries — there is no list endpoint today. The
-   *  caller passes `not_wired` and we surface that honestly. */
+  /** Wholesale inquiries — KV-backed archive populated by `/api/leads`.
+   *  Error states still surface honestly as null/error, never fake zero. */
   wholesaleInquiries: SourceState<{ total: number; lastSubmittedAt?: string }>;
   pendingApprovals: SourceState<PendingApprovalSummary>;
   apPackets: SourceState<ApPacketCounts>;
@@ -342,9 +342,7 @@ export interface SalesCommandSlice {
   revenueKpi?: RevenueKpiSlice;
   retailDraftsNeedsReview: number | null;
   retailDraftsAccepted: number | null;
-  /** Wholesale inquiries — currently `null` because the source is
-   *  not_wired. Keeping the shape uniform lets a future writer flip
-   *  this on without changing the renderer. */
+  /** Wholesale inquiries — contextual, not an action trigger. */
   wholesaleInquiries: number | null;
   /** Compact HubSpot B2B pipeline line for the morning brief. */
   salesPipelineLine?: string | null;

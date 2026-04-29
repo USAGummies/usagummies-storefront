@@ -13,8 +13,10 @@
  *     mutation, no approval opened, no email drafted.
  *   - Per-source error isolation — a single source's failure becomes
  *     `{ status: "error" }` and never throws past the reader boundary.
- *   - Wholesale inquiries explicitly returns `not_wired` with reason;
- *     there is no internal list endpoint today.
+ *   - Wholesale inquiries read the KV archive populated by `/api/leads`.
+ *   - HubSpot B2B pipeline reads are context-only: stage counts,
+ *     stale Sample Shipped preview, and open call tasks. No HubSpot
+ *     stage/task writes happen here.
  *
  * Both `/api/ops/sales` (dashboard) and `/api/ops/daily-brief`
  * (morning Slack section) consume these. The readers are deliberately
