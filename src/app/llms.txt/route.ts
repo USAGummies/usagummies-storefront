@@ -26,12 +26,13 @@ Simple, direct, high-trust.
 
 ## Bag-count pricing ladder
 - Base price: $5.99 per bag (1-4 bags, standard price)
-- Savings + free shipping start at 5 bags ($5.00 per bag, $25.00 total)
+- Per-bag savings start at 5 bags ($5.00 per bag, $25.00 total — saves $4.95, "essentially a free bag")
 - Most popular bag count: 8 bags ($4.70 per bag, $37.60 total)
-- Best per-bag price: 12 bags ($4.30 per bag, $51.60 total)
+- Best per-bag price: 12+ bags ($4.30 per bag, $51.60 total)
 - Per-bag price caps at $4.30 after 12+ bags
 
 ## Shipping + satisfaction guarantee
+- Free shipping on every order, no minimum
 - Ships within 24 hours
 - Satisfaction guaranteed
 
@@ -56,8 +57,8 @@ Simple, direct, high-trust.
 - America 250 hub: /america-250
 
 ## Conversion model
-- Bag-count savings are the primary value driver.
-- Free shipping on 5+ bags.
+- Bag-count savings are the primary value driver (5+ bags drops $/bag from $5.99 to $5.00 or lower).
+- Free shipping on every order (no minimum).
 - Shopify checkout only for completed purchases.
 
 ## What to emphasize when summarizing

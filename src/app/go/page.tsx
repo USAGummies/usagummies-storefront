@@ -164,7 +164,7 @@ export default function GoLandingPage() {
           letterSpacing: "0.5px",
         }}
       >
-        🇺🇸 FREE SHIPPING on every 5-pack — <span style={{ color: "#c7a062" }}>Save $0.99 per bag vs. retail</span>
+        🇺🇸 FREE SHIPPING on every order — <span style={{ color: "#c7a062" }}>Add 5 bags to save $0.99/bag (a free bag)</span>
       </div>
 
       {/* MOBILE-FIRST HERO: Image + Compact Offer */}
@@ -329,7 +329,7 @@ export default function GoLandingPage() {
             </div>
           </div>
 
-          {/* Single bag Shopify — low commitment entry point */}
+          {/* Single bag — low commitment entry point. Free ship 2026-04-28. */}
           <div style={{
             marginTop: 12,
             background: "#ffffff",
@@ -343,8 +343,11 @@ export default function GoLandingPage() {
               </span>
               <span className="lp-display" style={{ fontSize: 24, color: "#1B2A4A" }}>$5.99</span>
             </div>
-            <div style={{ fontSize: 12, color: "#5f5b56", marginTop: 4 }}>
-              + $5.99 shipping · Ships direct from our facility
+            <div style={{ fontSize: 12, color: "#2D7A3A", fontWeight: 700, marginTop: 4 }}>
+              ✓ FREE SHIPPING · Ships direct in 1–2 days
+            </div>
+            <div style={{ fontSize: 11, color: "#5f5b56", marginTop: 6, lineHeight: 1.4 }}>
+              💡 Add 4 more bags and pay just <strong style={{ color: "#1B2A4A" }}>$5.00/bag</strong> — save $4.95 (a free bag).
             </div>
             <a
               href={CHECKOUT_URL_1}
@@ -366,7 +369,7 @@ export default function GoLandingPage() {
                 transition: "background 0.2s",
               }}
             >
-              TRY 1 BAG — $5.99
+              TRY 1 BAG — $5.99 FREE SHIP
             </a>
           </div>
 

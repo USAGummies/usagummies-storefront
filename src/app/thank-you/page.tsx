@@ -166,7 +166,7 @@ export default function ThankYouPage() {
             <span className="lp-script text-[var(--lp-red)]">bag count.</span>
           </h2>
           <p className="lp-sans mx-auto mt-4 max-w-[42ch] text-[1rem] text-[var(--lp-ink)]/82">
-            Free shipping on 5+ bags. Most customers go bigger on the next run.
+            Free shipping on every order. Add 5 bags to drop the per-bag price from $5.99 to $5.00 — basically a free bag.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
             <Link href="/shop" className="lp-cta">

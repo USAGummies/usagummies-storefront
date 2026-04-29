@@ -5,6 +5,7 @@ import Image from "next/image";
 import {
   BASE_PRICE,
   pricingForQty,
+  perBagForQty,
   DISCOUNT_START_QTY,
   FREE_SHIP_QTY,
   SHIPPING_COST,
@@ -567,21 +568,23 @@ export default function BagSlider({
           </div>
         )}
 
-        {/* Shipping note */}
+        {/* Shipping note — free on every order as of 2026-04-28 */}
         <div className="mt-1.5 text-xs font-medium">
-          {freeShip ? (
-            <span className="text-[#2D7A3A]">
-              <span className="mr-1">✓</span>Free shipping included
-            </span>
-          ) : (
-            <span className="text-[#c7362c]">
-              +{money(SHIPPING_COST)} shipping &middot;{" "}
-              <span className="text-[#2D7A3A] font-semibold">
-                Free at {FREE_SHIP_QTY}+ bags
-              </span>
-            </span>
-          )}
+          <span className="text-[#2D7A3A]">
+            <span className="mr-1">✓</span>Free shipping included
+          </span>
         </div>
+
+        {/* Next-tier nudge — only shown when qty is below the 5-bag savings
+            threshold. Drives upsell from 1-4 bags to the $5/bag tier. */}
+        {qty < DISCOUNT_START_QTY && (
+          <div className="mt-2 rounded-md border border-dashed border-[#c7362c]/40 bg-[#c7362c]/5 px-2.5 py-1.5 text-[11px] leading-snug text-[#1B2A4A]">
+            <span className="font-bold text-[#c7362c]">💡 Add {DISCOUNT_START_QTY - qty} more bag{DISCOUNT_START_QTY - qty === 1 ? "" : "s"}</span>{" "}
+            and the price drops to <strong>$5.00/bag</strong> — save{" "}
+            <strong>{money(BASE_PRICE * DISCOUNT_START_QTY - perBagForQty(DISCOUNT_START_QTY) * DISCOUNT_START_QTY)}</strong>{" "}
+            (a free bag).
+          </div>
+        )}
       </div>
 
       {/* CTA Buttons — /go page style */}

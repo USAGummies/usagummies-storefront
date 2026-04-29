@@ -4,9 +4,13 @@ export const BASE_PRICE = 5.99;
 export const MIN_PER_BAG = 4.30;
 export const DISCOUNT_START_QTY = 5;
 export const MAX_DISCOUNT_QTY = 12;
-export const FREE_SHIP_QTY = 5;
-export const SHIPPING_COST = 5.99;
-export const FREE_SHIPPING_PHRASE = "Free shipping on 5+ bags";
+// 2026-04-28 (Ben directive): free shipping on EVERYTHING. Even single bags.
+// Eat the ~$5/order ship cost as customer-acquisition spend on entry-level
+// orders. Cart messaging now sells the per-bag-savings ladder (5+ bags drops
+// from $5.99/bag to $5.00/bag = save ~$5 = "essentially a free bag").
+export const FREE_SHIP_QTY = 1;
+export const SHIPPING_COST = 0;
+export const FREE_SHIPPING_PHRASE = "Free shipping on every order";
 
 /** Subscription saves $0.50/bag below bundle pricing (min 5 bags) */
 export const SUBSCRIPTION_DISCOUNT_PER_BAG = 0.50;
