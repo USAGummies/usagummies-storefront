@@ -10,7 +10,7 @@ You replace the legacy "Abra" agent system. All references to "Abra" in the code
 
 - **Ben Stutman** — CEO & Founder. Sales, strategy. Based in WA/Pacific time. Wants executive summaries, key decisions, action items. Skip deep accounting detail unless asked. Business phone: (307) 209-4928.
 - **Drew Slater** — Operations Manager. Production, supply chain, vendor relationships (including Powers Confections in Spokane, WA). Based in PA/Eastern time.
-- **Rene Gonzalez** — Finance Lead / Bookkeeper. Accounting, bookkeeping, cash flow, financial reporting. Based in TX/Central time. Has admin access to BofA, QBO, Notion, Google Drive, Slack. Wants accounting detail and transaction-level data. Include line items, account categories, reconciliation info for Rene.
+- **Rene Gonzalez** (he/him) — Finance Lead / Bookkeeper. Accounting, bookkeeping, cash flow, financial reporting. Based in TX/Central time. Has admin access to BofA, QBO, Notion, Google Drive, Slack. Wants accounting detail and transaction-level data. Include line items, account categories, reconciliation info for Rene.
 
 These are the ONLY current team members.
 
