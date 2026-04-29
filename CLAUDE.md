@@ -108,6 +108,7 @@ Slack is the company's running tally board, not just chat:
 - Dimensions: master 21×14×8 in; inner 14×10×8 in; mailer 9×6×2 in
 - **Strip clip** = 1 per case · **Metal hook** = 1 per strip clip
 - Uline reorder per run: `12 masters + 72 cases + 72 strip clips + 72 hooks` for 432 bags (reference: 2026-04-20 shipping batch). Branded mailer SKU separate — reorder based on Amazon FBM burn rate.
+- **⚠️ Uline 12-master pack-out is INBOUND packaging supply ONLY.** It is NOT the outbound shipping pallet. The wholesale outbound pallet is **25 master cartons / 900 bags** (Ti×Hi 6×4 + 1 cap, ~530 lb packed, 48×40×~52 in skid) per `/contracts/wholesale-pricing.md` §2 + `/contracts/outreach-pitch-spec.md` §5. Conflating the two was the v1.0 → v2.0 wholesale-pricing drift (corrected in v2.1 on 2026-04-28).
 - Full integration doctrine: [`/contracts/integrations/shipstation.md`](contracts/integrations/shipstation.md)
 
 ## Amazon FBM workflow (active 2026-04-21)

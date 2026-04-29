@@ -1,8 +1,8 @@
 # Wholesale Pricing — LOCKED
 
 **Status:** CANONICAL
-**Source:** Ben + Rene call recap 2026-04-27 §2 + §5 + §6 (v1.0); Rene + Viktor `#financials` thread 2026-04-28 batch-SKU session ratified by Ben (v2.0).
-**Version:** 2.0 — 2026-04-28
+**Source:** Ben + Rene call recap 2026-04-27 §2 + §5 + §6 (v1.0); Rene + Viktor `#financials` thread 2026-04-28 batch-SKU session ratified by Ben (v2.0); Cindy/Redstone FOB-quote drift reconciliation 2026-04-28 PM ratified by Ben "option a" (v2.1).
+**Version:** 2.1 — 2026-04-28 PM
 **Replaces:** any ad hoc pricing scattered across previous outreach scripts. This is the single source of truth.
 
 ## What changed in v2.0 (2026-04-28)
@@ -44,7 +44,9 @@ The internal `B1`..`B5` designators (Rene's request, §5) are stable identifiers
 
 ### Pallet quantity convention
 
-Pallets are an order-type abstraction; the bag count per pallet is set by the warehouse pallet build (typically 12 master cartons = 432 bags per pallet, per `/CLAUDE.md` Uline reorder spec). When `B4` or `B5` is selected, the order line decrements `<pallet_count> × 432` bags.
+Pallets are an order-type abstraction; the bag count per pallet is set by our outbound shipping pallet build, **25 master cartons = 900 bags per pallet** (per `/contracts/outreach-pitch-spec.md` §5, locked 2026-04-23). When `B4` or `B5` is selected, the order line decrements `<pallet_count> × 900` bags.
+
+**⚠️ DO NOT confuse with Uline inbound reorder spec.** `/CLAUDE.md` "Packaging spec" says "Uline reorder per run: 12 masters... for 432 bags" — that is the *inbound packaging-supply* pack-out (cartons + cases + clips + hooks ordered from Uline to support 432 bags of finished-goods production). It is NOT the outbound shipping pallet. The outbound 48×40 skid we build for LTL freight to a buyer holds 25 master cartons (Ti×Hi 6×4 + 1 cap = 25, ~530 lb gross packed, ~52 in tall). Conflating the two was the v1.0 → v2.0 drift; the reconciliation pass on 2026-04-28 PM corrects it (v2.1).
 
 ---
 
@@ -56,9 +58,10 @@ Three freight modes, deterministic:
 |---|---|---|
 | **Landed** (`B2`, `B4`) | Default for online master-carton + 1-2 pallet orders | Higher per-bag price; freight is built in. The order's `freight_quote` is `0` (already in bag price). |
 | **Buyer pays freight** (`B3`, `B5`) | Buyer requests their own freight | Lower per-bag price; the order's `freight_quote = "buyer-paid"` and the customer arranges pickup or supplies their account. |
-| **Custom quote** | 3+ pallet orders, OR Ben personally delivers | Manual quote based on Ben's fuel + time + opportunistic route value. The order is captured but `freight_quote = "custom-pending"` until Ben provides a number. |
+| **Free freight (USA Gummies absorbs)** | 3+ pallet orders | We pay the LTL. Buyer pays $3.00/bag flat across the order; no separate freight line on the customer-facing total. Internally, the carrier invoice posts to `Freight Out / Shipping & Delivery Expense` per §12 (Scenario 1). |
+| **Custom quote** | Ben personally delivers (truck-route deals) | Manual quote based on Ben's fuel + time + opportunistic route value. Reserved for hand-delivery scenarios; the order is captured but `freight_quote = "custom-pending"` until Ben provides a number. |
 
-**Hard rule (§3 of recap):** Free freight on sub-pallet quantities is RETIRED. Free freight only at 3+ pallet MOQ. This is already locked in `/contracts/outreach-pitch-spec.md` §4 (commit `4d3e2ed`).
+**Hard rule (§3 of recap):** Free freight on sub-pallet quantities is RETIRED. Free freight only at 3+ pallet MOQ (75+ master cartons / 2,700+ bags). This is locked in `/contracts/outreach-pitch-spec.md` §4 (commit `4d3e2ed`) and re-confirmed by Ben on the Cindy/Redstone FOB thread 2026-04-28 PM.
 
 ---
 
@@ -201,8 +204,8 @@ The cleanup is enforced in `src/lib/wholesale/pricing-tiers.ts` `TIER_INVOICE_LA
 | B1 (LCD) | All American Gummy Bears — 7.5 oz, 6-Bag Case, Local Delivery |
 | B2 (MCL) | All American Gummy Bears — 7.5 oz, 36-Bag Master Carton, Freight Included |
 | B3 (MCBF) | All American Gummy Bears — 7.5 oz, 36-Bag Master Carton, Buyer Freight |
-| B4 (PL) | All American Gummy Bears — 7.5 oz, ~432-Bag Pallet, Freight Included |
-| B5 (PBF) | All American Gummy Bears — 7.5 oz, ~432-Bag Pallet, Buyer Freight |
+| B4 (PL) | All American Gummy Bears — 7.5 oz, ~900-Bag Pallet, Freight Included |
+| B5 (PBF) | All American Gummy Bears — 7.5 oz, ~900-Bag Pallet, Buyer Freight |
 
 Locked by tests in `src/lib/wholesale/__tests__/pricing-tiers.test.ts` ("TIER_INVOICE_LABEL — Rene 2026-04-28 lock").
 
@@ -258,5 +261,6 @@ Both scenarios are fully addressed above. Locked.
 
 ## Version history
 
+- **2.1 — 2026-04-28 PM** — Reconciles outbound pallet quantity (12 MC / 432 bags ❌ → 25 MC / 900 bags ✅) against `/contracts/outreach-pitch-spec.md` §5 + the actual outbound shipping skid spec. The v1.0/v2.0 figure was wrong: it pulled "12 MC = 432 bags" from `/CLAUDE.md`'s Uline *inbound* reorder pack-out and applied it to the *outbound* wholesale pallet. Outbound 48×40 LTL skids hold 25 master cartons (Ti×Hi 6×4 + 1 cap, ~530 lb packed). Also re-frames §3 freight modes to surface the **3+ pallet free-freight tier** (canonical, matching outreach spec §6) instead of "custom quote" — Ben re-confirmed via the Cindy/Redstone FOB thread 2026-04-28 PM. Code-side mirror: `pricing-tiers.ts` BAGS_PER_UNIT B4/B5 = 900 + invoice labels updated. Re-baselined 4 test files. No customer-facing reissues needed (Cindy was always told 25 MC; Phase 35.f flow has no live customers through B4/B5 yet — only Rene's Snow Leopard test ID).
 - **2.0 — 2026-04-28** — Adds fulfillment-type code layer (LCD/MCL/MCBF/PL/PBF), batch SKU pattern `UG-B[NNNN]-[YYMMDD]-[FT]`, customer-facing invoice description rule (no tier prefix in description, code lives in SKU column), and show-deal/promo-bag treatment. B-tier internal ids preserved unchanged for audit-trail continuity (Mike's flow `wf_a54616e3-...` resolves cleanly under both v1.0 and v2.0). Source: Rene + Viktor `#financials` thread 2026-04-28; ratified by Ben "we want to build it completely, following rene's feedback". Code-side mirror: `src/lib/wholesale/pricing-tiers.ts` (TIER_INVOICE_LABEL clean prose + FulfillmentType helpers + canonical unitNoun) + `src/lib/wholesale/batch-skus.ts` (new module).
 - **1.0 — 2026-04-27** — First canonical publication. Locks the 5-line-item pricing model + B1-B5 designators + 3 freight modes + atomic-bag inventory invariant per Ben + Rene call recap §1, §2, §3, §5, §6. Replaces ad-hoc pricing scattered across previous outreach scripts.

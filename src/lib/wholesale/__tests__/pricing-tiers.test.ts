@@ -4,7 +4,7 @@
  * Locks the contract from `/contracts/wholesale-pricing.md` v1.0:
  *   - Five stable designators only; ids unchanged.
  *   - Per-bag prices: B1=$3.49, B2=$3.49, B3=$3.25, B4=$3.25, B5=$3.00.
- *   - Bags per unit: B1=6, B2=36, B3=36, B4=432, B5=432.
+ *   - Bags per unit: B1=6, B2=36, B3=36, B4=900, B5=900.
  *   - Freight modes: B2/B4 landed, B3/B5 buyer-paid, B1 custom (Ben delivers).
  *   - Online exposure: B1 INTERNAL only; B2-B5 online.
  *   - Custom freight only at 3+ pallets (B4/B5 only); never on master carton.
@@ -73,9 +73,9 @@ describe("BAGS_PER_UNIT canonical case-pack math", () => {
     expect(BAGS_PER_UNIT.B2).toBe(36);
     expect(BAGS_PER_UNIT.B3).toBe(36);
   });
-  it("B4 / B5 = 432 bags (1 pallet, 12 master cartons × 36 bags)", () => {
-    expect(BAGS_PER_UNIT.B4).toBe(432);
-    expect(BAGS_PER_UNIT.B5).toBe(432);
+  it("B4 / B5 = 900 bags (1 pallet, 25 master cartons × 36 bags)", () => {
+    expect(BAGS_PER_UNIT.B4).toBe(900);
+    expect(BAGS_PER_UNIT.B5).toBe(900);
   });
 });
 
@@ -138,11 +138,11 @@ describe("bagsForOrderLine — atomic-bag math is exact", () => {
   it("3 master cartons (B2) → 108 bags", () => {
     expect(bagsForOrderLine("B2", 3)).toBe(108);
   });
-  it("1 pallet (B4) → 432 bags", () => {
-    expect(bagsForOrderLine("B4", 1)).toBe(432);
+  it("1 pallet (B4) → 900 bags", () => {
+    expect(bagsForOrderLine("B4", 1)).toBe(900);
   });
-  it("2 pallets (B5) → 864 bags", () => {
-    expect(bagsForOrderLine("B5", 2)).toBe(864);
+  it("2 pallets (B5) → 1800 bags", () => {
+    expect(bagsForOrderLine("B5", 2)).toBe(1800);
   });
   it("1 case (B1) → 6 bags", () => {
     expect(bagsForOrderLine("B1", 1)).toBe(6);
@@ -154,7 +154,7 @@ describe("bagsForOrderLine — atomic-bag math is exact", () => {
 
   it("floors fractional unitCount (defensive — order units are integer-only)", () => {
     expect(bagsForOrderLine("B2", 2.7)).toBe(72); // Math.floor(2.7) * 36 = 2 * 36
-    expect(bagsForOrderLine("B4", 1.99)).toBe(432); // 1 * 432
+    expect(bagsForOrderLine("B4", 1.99)).toBe(900); // 1 * 900
   });
 
   it("throws on negative unitCount (never sign a negative-bag invoice)", () => {
@@ -176,12 +176,12 @@ describe("lineSubtotalUsd — invoice-grade rounding", () => {
     expect(lineSubtotalUsd("B3", 1)).toBe(117.0);
   });
 
-  it("1 pallet B4 = 432 × $3.25 = $1404.00", () => {
-    expect(lineSubtotalUsd("B4", 1)).toBe(1404.0);
+  it("1 pallet B4 = 900 × $3.25 = $2925.00", () => {
+    expect(lineSubtotalUsd("B4", 1)).toBe(2925.0);
   });
 
-  it("1 pallet B5 = 432 × $3.00 = $1296.00", () => {
-    expect(lineSubtotalUsd("B5", 1)).toBe(1296.0);
+  it("1 pallet B5 = 900 × $3.00 = $2700.00", () => {
+    expect(lineSubtotalUsd("B5", 1)).toBe(2700.0);
   });
 
   it("zero unitCount → $0", () => {
@@ -190,8 +190,8 @@ describe("lineSubtotalUsd — invoice-grade rounding", () => {
 
   it("rounds to 2 decimals (no float-precision drift in invoices)", () => {
     // Synthetic case where IEEE-754 might drift; we round to cents.
-    const result = lineSubtotalUsd("B5", 7); // 7 * 432 * 3.00 = 9072
-    expect(result).toBe(9072);
+    const result = lineSubtotalUsd("B5", 7); // 7 * 900 * 3.00 = 18900
+    expect(result).toBe(18900);
     expect(Number.isInteger(result * 100)).toBe(true);
   });
 });
@@ -235,7 +235,7 @@ describe("shouldUseCustomFreightQuote — locked doctrine", () => {
 describe("Lookup helpers (single-tier accessors)", () => {
   it("bagsPerUnit returns canonical bag count", () => {
     expect(bagsPerUnit("B2")).toBe(36);
-    expect(bagsPerUnit("B4")).toBe(432);
+    expect(bagsPerUnit("B4")).toBe(900);
   });
 
   it("bagPriceUsd returns canonical price", () => {
@@ -284,16 +284,16 @@ describe("summarizeOrderLine — full structured projection", () => {
   it("B5 × 4 — pallet buyer-paid, hits custom freight (3+ pallets)", () => {
     const s = summarizeOrderLine("B5", 4);
     expect(s.tier).toBe("B5");
-    expect(s.bags).toBe(1728); // 4 × 432
-    expect(s.subtotalUsd).toBe(5184); // 1728 × 3.00
+    expect(s.bags).toBe(3600); // 4 × 900
+    expect(s.subtotalUsd).toBe(10800); // 3600 × 3.00
     expect(s.freightMode).toBe("buyer-paid"); // tier-level mode
     expect(s.customFreightRequired).toBe(true); // 3+ pallet escalation
   });
 
   it("B4 × 1 — pallet landed, NOT custom freight", () => {
     const s = summarizeOrderLine("B4", 1);
-    expect(s.bags).toBe(432);
-    expect(s.subtotalUsd).toBe(1404);
+    expect(s.bags).toBe(900);
+    expect(s.subtotalUsd).toBe(2925);
     expect(s.customFreightRequired).toBe(false);
   });
 
@@ -350,13 +350,13 @@ describe("TIER_INVOICE_LABEL — Rene 2026-04-28 lock (no tier-code prefix)", ()
 
   it("PL (B4) label is clean wholesale prose", () => {
     expect(TIER_INVOICE_LABEL.B4).toBe(
-      "All American Gummy Bears — 7.5 oz, ~432-Bag Pallet, Freight Included",
+      "All American Gummy Bears — 7.5 oz, ~900-Bag Pallet, Freight Included",
     );
   });
 
   it("PBF (B5) label is clean wholesale prose", () => {
     expect(TIER_INVOICE_LABEL.B5).toBe(
-      "All American Gummy Bears — 7.5 oz, ~432-Bag Pallet, Buyer Freight",
+      "All American Gummy Bears — 7.5 oz, ~900-Bag Pallet, Buyer Freight",
     );
   });
 

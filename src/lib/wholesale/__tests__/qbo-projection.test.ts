@@ -247,11 +247,11 @@ describe("projectQboInvoice — happy path", () => {
       buildState({
         orderLines: [
           summarizeOrderLine("B2", 2), // 72 × $3.49 = $251.28
-          summarizeOrderLine("B4", 1), // 432 × $3.25 = $1404.00
+          summarizeOrderLine("B4", 1), // 900 × $3.25 = $2925.00
         ],
       }),
     );
-    expect(r.subtotalUsd).toBeCloseTo(1655.28, 2);
+    expect(r.subtotalUsd).toBeCloseTo(3176.28, 2);
   });
 
   it("requiresCustomFreightQuote false for sub-3-pallet B4/B5 orders", () => {
@@ -328,13 +328,13 @@ describe("formatInvoiceLineText", () => {
   it("formats B4 × 1 pallet (singular)", () => {
     const text = formatInvoiceLineText(summarizeOrderLine("B4", 1));
     expect(text).toContain("1 pallet ");
-    expect(text).toContain("432 bags total");
+    expect(text).toContain("900 bags total");
   });
 
   it("formats B5 × 5 pallets", () => {
     const text = formatInvoiceLineText(summarizeOrderLine("B5", 5));
     expect(text).toContain("5 pallets");
-    expect(text).toContain("2160 bags total"); // 5 × 432
+    expect(text).toContain("4500 bags total"); // 5 × 900
   });
 
   it("formats B3 × 2 master cartons", () => {

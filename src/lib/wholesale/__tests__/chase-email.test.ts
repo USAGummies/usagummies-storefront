@@ -246,8 +246,8 @@ describe("orderLinesBlurb (internal)", () => {
         ],
       }),
     );
-    expect(blurb).toContain("468 bags"); // 36 + 432
-    expect(blurb).toMatch(/\$1\d{3}\.\d{2}/); // $1,529 ish
+    expect(blurb).toContain("936 bags"); // 36 + 900
+    expect(blurb).toMatch(/\$3\d{3}\.\d{2}/); // $3,050.64 (125.64 + 2925.00)
     expect(blurb).toContain("2 line items");
   });
 

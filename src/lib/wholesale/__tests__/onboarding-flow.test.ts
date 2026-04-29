@@ -427,8 +427,8 @@ describe("totalSubtotalUsd", () => {
   it("sums two B2 master cartons + one B4 pallet", () => {
     const lines = [buildOrderLine("B2", 2), buildOrderLine("B4", 1)];
     // B2 × 2 = 72 bags × $3.49 = $251.28
-    // B4 × 1 = 432 bags × $3.25 = $1,404.00
-    expect(totalSubtotalUsd(lines)).toBeCloseTo(251.28 + 1404.0, 2);
+    // B4 × 1 = 900 bags × $3.25 = $2,925.00
+    expect(totalSubtotalUsd(lines)).toBeCloseTo(251.28 + 2925.0, 2);
   });
 
   it("rounds to 2 decimals", () => {
@@ -471,9 +471,9 @@ describe("totalBags", () => {
   it("sums bag counts atomically (no case/carton/pallet rounding)", () => {
     const lines = [
       buildOrderLine("B2", 3), // 108 bags
-      buildOrderLine("B4", 2), // 864 bags
+      buildOrderLine("B4", 2), // 1800 bags (2 × 900)
     ];
-    expect(totalBags(lines)).toBe(108 + 864);
+    expect(totalBags(lines)).toBe(108 + 1800);
   });
 
   it("returns 0 for empty lines", () => {

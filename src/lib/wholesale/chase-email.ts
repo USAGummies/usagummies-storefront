@@ -175,7 +175,7 @@ function restateForStep(state: OnboardingState): string | null {
     case "pricing-shown":
       return `We sent over our wholesale pricing (B2-B5 tiers). Take a look when you have a minute — happy to walk through the math if it'd help.`;
     case "order-type":
-      return `You were picking which size order — our master carton is 36 bags ($3.49/bag landed) or a full pallet at 432 bags ($3.25/bag landed). Volume tiers + buyer-pays-freight options also available.`;
+      return `You were picking which size order — our master carton is 36 bags ($3.49/bag landed) or a full pallet at 900 bags ($3.25/bag landed). Volume tiers + buyer-pays-freight options also available.`;
     case "payment-path": {
       const linesBlurb = orderLinesBlurb(state);
       return linesBlurb

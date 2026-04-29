@@ -60,15 +60,24 @@ export const BAG_PRICE_USD: Readonly<Record<PricingTier, number>> = {
 /**
  * Bag count per order unit. Master carton = 36 bags
  * (per `/CLAUDE.md` Packaging spec — 6 cases × 6 bags). Pallet =
- * 432 bags (per Uline reorder spec — 12 master cartons per pallet
- * × 36 bags). Local case (B1) = 6 bags (one inner case).
+ * 900 bags (25 master cartons × 36 bags) per the outbound shipping
+ * skid build at our warehouse (Ti×Hi 6×4 + 1 cap, ~530 lb packed,
+ * 48×40×~52 in). Source: `/contracts/wholesale-pricing.md` v2.1 §2 +
+ * `/contracts/outreach-pitch-spec.md` §5. Local case (B1) = 6 bags
+ * (one inner case).
+ *
+ * **Drift note (corrected 2026-04-28 PM):** v1.0/v2.0 of the
+ * wholesale-pricing contract used 432 bags/pallet, which incorrectly
+ * applied the Uline *inbound* reorder pack-out (12 MC = 432 bags of
+ * packaging-supply for finished-goods production) as the outbound
+ * pallet build. Reconciled to 25 MC / 900 bags in v2.1.
  */
 export const BAGS_PER_UNIT: Readonly<Record<PricingTier, number>> = {
   B1: 6, // 1 inner case
   B2: 36, // 1 master carton
   B3: 36, // 1 master carton
-  B4: 432, // 1 pallet
-  B5: 432, // 1 pallet
+  B4: 900, // 1 pallet (25 master cartons × 36 bags)
+  B5: 900, // 1 pallet (25 master cartons × 36 bags)
 };
 
 export type FreightMode = "landed" | "buyer-paid" | "custom";
@@ -116,8 +125,8 @@ export const TIER_INVOICE_LABEL: Readonly<Record<PricingTier, string>> = {
   B1: "All American Gummy Bears — 7.5 oz, 6-Bag Case, Local Delivery",
   B2: "All American Gummy Bears — 7.5 oz, 36-Bag Master Carton, Freight Included",
   B3: "All American Gummy Bears — 7.5 oz, 36-Bag Master Carton, Buyer Freight",
-  B4: "All American Gummy Bears — 7.5 oz, ~432-Bag Pallet, Freight Included",
-  B5: "All American Gummy Bears — 7.5 oz, ~432-Bag Pallet, Buyer Freight",
+  B4: "All American Gummy Bears — 7.5 oz, ~900-Bag Pallet, Freight Included",
+  B5: "All American Gummy Bears — 7.5 oz, ~900-Bag Pallet, Buyer Freight",
 };
 
 /**
