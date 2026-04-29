@@ -31,9 +31,9 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
-const PAGE_TITLE = "Americas 250th Candy | USA Gummies";
+const PAGE_TITLE = "America's 250th Candy | USA Gummies";
 const PAGE_DESCRIPTION =
-  "Americas 250th hub from USA Gummies with celebration treats, gummy gifts, and event-ready bundles.";
+  "America's 250th hub from USA Gummies with celebration treats, gummy gifts, and event-ready bundles.";
 const PAGE_URL = `${SITE_URL}/america-250`;
 const OG_IMAGE = `${SITE_URL}/opengraph-image`;
 const PUBLISHED_DATE = "2026-01-01T15:10:31-08:00";
@@ -90,9 +90,9 @@ const EVENTS = [
 
 const FAQS = [
   {
-    question: "What is Americas 250th candy?",
+    question: "What is America's 250th candy?",
     answer:
-      "Americas 250th candy refers to celebration-ready gummy assortments designed for the 250th anniversary moment and year-round gifting.",
+      "America's 250th candy refers to celebration-ready gummy assortments designed for the 250th anniversary moment and year-round gifting.",
   },
   {
     question: "Are USA Gummies products made in the USA?",
@@ -144,7 +144,7 @@ export default function America250HubPage() {
       <BreadcrumbJsonLd
         items={[
           { name: "Home", href: "/" },
-          { name: "Americas 250th", href: "/america-250" },
+          { name: "America's 250th", href: "/america-250" },
         ]}
       />
       <BlogPostingJsonLd
@@ -160,7 +160,7 @@ export default function America250HubPage() {
 
       <PageHero
         eyebrow="America's 250th / Hub"
-        headline="Americas 250th"
+        headline="America's 250th"
         scriptAccent="candy."
         sub="Celebration treats, gifts, and event-ready gummy bundles built for the 250th anniversary moment — and shareable, USA-made gummy candy for the everyday in between."
         ctas={[
@@ -265,9 +265,9 @@ export default function America250HubPage() {
             >
               <p className="lp-label mb-2 text-[var(--lp-red)]">★ Quick Links ★</p>
               <p className="lp-sans text-[1rem] leading-[1.65] text-[var(--lp-ink)]/85">
-                Explore <Link href="/america-250/gifts" className="underline decoration-[var(--lp-red)] underline-offset-2">Americas 250th gifts</Link>, plan{" "}
+                Explore <Link href="/america-250/gifts" className="underline decoration-[var(--lp-red)] underline-offset-2">America's 250th gifts</Link>, plan{" "}
                 <Link href="/america-250/celebrations" className="underline decoration-[var(--lp-red)] underline-offset-2">patriotic celebrations</Link>, or align with{" "}
-                <Link href="/america-250/events" className="underline decoration-[var(--lp-red)] underline-offset-2">Americas 250th events</Link>.
+                <Link href="/america-250/events" className="underline decoration-[var(--lp-red)] underline-offset-2">America's 250th events</Link>.
               </p>
               <p className="lp-sans mt-3 text-[1rem] leading-[1.65] text-[var(--lp-ink)]/85">
                 Prefer dye-free? Read{" "}

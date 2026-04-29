@@ -12,7 +12,7 @@ export function America250Blocks({ productTitle }: Props) {
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="text-lg font-semibold text-[var(--text)]">
-              Perfect for America 250
+              Perfect for America's 250th
             </h2>
             <p className="mt-2 text-[var(--muted)]">
               If you’re planning a 4th of July party, a parade, a community event,
@@ -28,7 +28,7 @@ export function America250Blocks({ productTitle }: Props) {
 
         <div className="mt-4 flex flex-wrap gap-2">
           <span className="rounded-full border border-[var(--border)] bg-[var(--surface-strong)] px-3 py-1 text-xs text-[var(--text)]">
-            America 250 gifts
+            America's 250th gifts
           </span>
           <span className="rounded-full border border-[var(--border)] bg-[var(--surface-strong)] px-3 py-1 text-xs text-[var(--text)]">
             patriotic party favors
@@ -49,7 +49,7 @@ export function America250Blocks({ productTitle }: Props) {
             href="/america-250/gifts"
             className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-3 text-sm font-semibold text-[var(--text)] hover:bg-white"
           >
-            America 250 gifts
+            America's 250th gifts
           </Link>
           <Link
             href="/america-250/celebrations"
@@ -73,7 +73,7 @@ export function America250Blocks({ productTitle }: Props) {
         </h3>
 
         <ul className="mt-3 grid gap-2 text-sm text-[var(--muted)] sm:grid-cols-2">
-          <li>• America 250 watch parties + BBQs</li>
+          <li>• America's 250th watch parties + BBQs</li>
           <li>• Parade bags + community giveaways</li>
           <li>• Family road trips + national park snacks</li>
           <li>• Teachers + classrooms (patriotic weeks)</li>

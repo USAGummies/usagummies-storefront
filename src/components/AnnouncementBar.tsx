@@ -19,7 +19,7 @@ export function AnnouncementBar() {
   const { left, right, href } = useMemo(() => {
     if (isAmerica250) {
       return {
-        left: "America 250: limited runs",
+        left: "America's 250th: limited runs",
         right: FREE_SHIPPING_PHRASE,
         href: "/shop?campaign=america250",
       };

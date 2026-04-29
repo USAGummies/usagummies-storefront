@@ -71,7 +71,7 @@ export default function ThankYouPage() {
         sub="Made in USA · All Natural Flavors · No Artificial Dyes — your bag of USA Gummies is on its way."
       />
 
-      {/* Two-card grid: America 250 perks + Instagram follow */}
+      {/* Two-card grid: America's 250th perks + Instagram follow */}
       <section className="bg-[var(--lp-cream-soft)] border-y-2 border-[var(--lp-ink)]">
         <div className="mx-auto max-w-[1200px] px-5 py-14 sm:px-8 sm:py-20">
           <div className="grid gap-6 md:grid-cols-2">
@@ -79,7 +79,7 @@ export default function ThankYouPage() {
               className="border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-6 sm:p-7"
               style={SHADOW_RED}
             >
-              <p className="lp-label mb-2 text-[var(--lp-red)]">★ America 250 Perks ★</p>
+              <p className="lp-label mb-2 text-[var(--lp-red)]">★ America's 250th Perks ★</p>
               <h2 className="lp-display text-[1.6rem] text-[var(--lp-ink)]">
                 Early drops, savings,
                 <br />
@@ -92,7 +92,7 @@ export default function ThankYouPage() {
               </ul>
               <div className="mt-5">
                 <Link href="/america-250" className="lp-cta">
-                  Claim America 250 perks
+                  Claim America's 250th perks
                 </Link>
               </div>
             </div>

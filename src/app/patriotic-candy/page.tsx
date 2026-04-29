@@ -31,7 +31,7 @@ function resolveSiteUrl() {
 const SITE_URL = resolveSiteUrl();
 const PAGE_TITLE = "Patriotic Candy Gifts | USA Gummies";
 const PAGE_DESCRIPTION =
-  "Shop patriotic candy made in USA, including dye-free gummies with no artificial dyes for July 4th, Veterans Day, and America 250.";
+  "Shop patriotic candy made in USA, including dye-free gummies with no artificial dyes for July 4th, Veterans Day, and America's 250th.";
 const PAGE_URL = `${SITE_URL}/patriotic-candy`;
 const OG_IMAGE = `${SITE_URL}/opengraph-image`;
 
@@ -85,11 +85,11 @@ const SEASONAL_MOMENTS = [
     cta: "Gift bag options",
   },
   {
-    title: "America 250 gifts",
+    title: "America's 250th gifts",
     date: "2026",
-    description: "Celebrate America 250 with patriotic candy gifts and themed bundles.",
+    description: "Celebrate America's 250th with patriotic candy gifts and themed bundles.",
     href: "/america-250",
-    cta: "America 250 hub",
+    cta: "America's 250th hub",
   },
 ];
 
@@ -104,14 +104,14 @@ const GIFT_SIZES = [
   },
   {
     title: "12-bag celebration stash",
-    description: "Built for big events, community groups, and America 250 tables.",
+    description: "Built for big events, community groups, and America's 250th tables.",
   },
 ];
 
 const IDEAS = [
   "Parade bags and fireworks-night share packs",
   "Veteran appreciation gifts for teams and volunteers",
-  "America 250 celebration tables and community events",
+  "America's 250th celebration tables and community events",
   "Corporate gifting with an all-American theme",
 ];
 
@@ -119,7 +119,7 @@ const RELATED_LINKS = [
   { href: "/made-in-usa", label: "Made in USA" },
   { href: "/gummy-gift-bundles", label: "Gift bag options" },
   { href: "/patriotic-party-snacks", label: "Patriotic party snacks" },
-  { href: "/america-250/gifts", label: "America 250 gifts" },
+  { href: "/america-250/gifts", label: "America's 250th gifts" },
 ];
 
 const articleJsonLd = {
@@ -167,7 +167,7 @@ export default function PatrioticCandyPage() {
         eyebrow="Patriotic Candy"
         headline="Patriotic candy &amp;"
         scriptAccent="American-made gifts."
-        sub="Shop American-made candy gifts built for July 4th, Veterans Day, and America 250. USA Gummies are made in the USA and packed for gifting or sharing."
+        sub="Shop American-made candy gifts built for July 4th, Veterans Day, and America's 250th. USA Gummies are made in the USA and packed for gifting or sharing."
         ctas={[
           { href: "/shop#bundle-pricing", label: "Shop &amp; save" },
           { href: "/made-in-usa", label: "Made in USA", variant: "light" },
@@ -357,7 +357,7 @@ export default function PatrioticCandyPage() {
               Shop patriotic candy
             </Link>
             <Link href="/america-250" className="lp-cta lp-cta-light">
-              America 250
+              America's 250th
             </Link>
           </div>
         </div>

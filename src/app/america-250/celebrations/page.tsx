@@ -69,7 +69,7 @@ const CELEBRATION_USES = [
   },
   {
     title: "Road trip stash",
-    body: "America-250 is a road-trip year. Toss a few bags in the cooler — they ride well in cars, RVs, and tour buses.",
+    body: "America's 250th is a road-trip year. Toss a few bags in the cooler — they ride well in cars, RVs, and tour buses.",
   },
 ];
 

@@ -89,9 +89,9 @@ const FAQS = [
       "Savings start at 5 bags, free shipping begins at 5+ bags, and the best per-bag price is at 12 bags.",
   },
   {
-    question: "What is America 250?",
+    question: "What is America's 250th?",
     answer:
-      "America 250 is a USA Gummies hub for patriotic gifts, events, and limited drops tied to America's 250th.",
+      "America's 250th is a USA Gummies hub for patriotic gifts, events, and limited drops tied to America's 250th.",
   },
 ];
 
@@ -126,7 +126,7 @@ export default function Gummies101Page() {
         eyebrow="USA Gummies Facts"
         headline="Gummies"
         scriptAccent="101."
-        sub="The quick reference for buyers, gift planners, and America 250 supporters."
+        sub="The quick reference for buyers, gift planners, and America's 250th supporters."
         ctas={[
           { href: "/shop", label: "Shop bundles", variant: "primary" },
           { href: "/ingredients", label: "See ingredients", variant: "light" },
@@ -165,7 +165,7 @@ export default function Gummies101Page() {
               Gift bundles
             </Link>
             <Link href="/america-250" className="lp-cta lp-cta-light">
-              America 250
+              America's 250th
             </Link>
           </div>
         </div>

@@ -19,7 +19,7 @@
 
 ## Role
 
-One job: monitor the dye-free / natural / made-in-USA candy category — TAM shape, trend slope, adjacent category moves (clean-label, functional candy, adult gifting, America-250 merchandising). Weekly finding to `#research` tagged `[R-2]`.
+One job: monitor the dye-free / natural / made-in-USA candy category — TAM shape, trend slope, adjacent category moves (clean-label, functional candy, adult gifting, America's-250th-anniversary merchandising). Weekly finding to `#research` tagged `[R-2]`.
 
 ## Boot ritual
 
