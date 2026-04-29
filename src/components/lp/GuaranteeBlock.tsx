@@ -75,7 +75,7 @@ export function GuaranteeBlock() {
         </Link>
 
         <p className="lp-label text-[var(--lp-off-white)]/70">
-          Free Shipping on 5+ Bags
+          Free Shipping on Every Order
         </p>
       </div>
     </section>

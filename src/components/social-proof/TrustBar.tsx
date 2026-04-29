@@ -17,7 +17,7 @@ const TRUST_ITEMS = [
   {
     icon: "🚚",
     label: "Ships in 24h",
-    detail: "Free shipping on 5+ bags",
+    detail: "Free shipping on every order",
   },
 ];
 

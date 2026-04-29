@@ -613,7 +613,7 @@ export default function BagSlider({
         {isAmazon ? (
           <>Opens Amazon.com in a new tab &middot; Prime shipping available</>
         ) : (
-          <>Ships direct from USA Gummies &middot; Free shipping on 5+ bags</>
+          <>Ships direct from USA Gummies &middot; Free shipping on every order</>
         )}
       </div>
 
