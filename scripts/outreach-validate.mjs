@@ -11,8 +11,11 @@
  * Flags (all required for a production pass):
  *   --email <addr>    Target recipient — must Apollo-verify
  *   --body <path>     Path to draft body (plain text)
+ *   --company <name>  Company / brand name — required for HubSpot deal-name dedup
+ *                     (catches the "different contact, same company" duplicate-deal class)
  *   --skip-apollo     Dev-only: skip Apollo verify
  *   --skip-hubspot    Dev-only: skip HubSpot dedup
+ *   --skip-deal       Dev-only: skip HubSpot company/deal-name dedup
  *   --skip-gmail      Dev-only: skip Gmail sent dedup
  *
  * Exit codes:
@@ -179,10 +182,60 @@ async function gmailSentDedup(email) {
   };
 }
 
+// 6b. HubSpot deal-name dedup by company/brand
+//     Closes the gap that produced the 2026-04-29 duplicate-deal incident:
+//     a fresh contact under an EXISTING company will pass the email-EQ check
+//     but still create a duplicate deal unless we also search by company name.
+async function dealDedupByCompany(company) {
+  const tok = process.env.HUBSPOT_PRIVATE_APP_TOKEN;
+  if (!tok) return { status: "missing_config", note: "No HUBSPOT_PRIVATE_APP_TOKEN" };
+  if (!company) return { status: "missing_company", note: "No --company argument supplied" };
+  // First token = brand-ish keyword (e.g. "Buc-ee's" → "Buc-ee's"; "Mount Rushmore Society" → "Mount")
+  const token = company.split(/[\s/]/)[0].replace(/[^A-Za-z0-9'-]/g, "");
+  if (!token || token.length < 3) {
+    return { status: "missing_company", note: `Company token '${token}' too short to dedup` };
+  }
+  try {
+    const r = await fetch("https://api.hubapi.com/crm/v3/objects/deals/search", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${tok}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        filterGroups: [
+          {
+            filters: [
+              { propertyName: "dealname", operator: "CONTAINS_TOKEN", value: token },
+              { propertyName: "pipeline", operator: "EQ", value: "1907159777" },
+            ],
+          },
+        ],
+        properties: ["dealname", "dealstage", "createdate", "pipeline"],
+        sorts: [{ propertyName: "createdate", direction: "ASCENDING" }],
+        limit: 25,
+      }),
+    });
+    const j = await r.json();
+    const open = (j.results || []).filter((d) => {
+      const s = d.properties?.dealstage;
+      // exclude closed-lost (3502659283) and on-hold (3502659284)
+      return s && s !== "3502659283" && s !== "3502659284";
+    });
+    if (open.length === 0) return { status: "clean", token };
+    return {
+      status: "existing_deals",
+      token,
+      count: open.length,
+      deals: open.map((d) => ({ id: d.id, name: d.properties?.dealname, stage: d.properties?.dealstage, created: d.properties?.createdate })),
+    };
+  } catch (e) {
+    return { status: "error", note: e.message };
+  }
+}
+
 // 7. Run async gates
 const asyncGates = [];
 if (!args["skip-apollo"]) asyncGates.push(apolloVerify(args.email).then((r) => ({ name: "APOLLO", result: r })));
 if (!args["skip-hubspot"]) asyncGates.push(hubspotDedup(args.email).then((r) => ({ name: "HUBSPOT", result: r })));
+if (!args["skip-deal"]) asyncGates.push(dealDedupByCompany(args.company).then((r) => ({ name: "DEAL_DEDUP", result: r })));
 if (!args["skip-gmail"]) asyncGates.push(gmailSentDedup(args.email).then((r) => ({ name: "GMAIL", result: r })));
 
 const asyncResults = await Promise.all(asyncGates);
@@ -208,6 +261,22 @@ for (const { name, result } of asyncResults) {
   if (name === "HUBSPOT" && result.status === "missing_config") {
     issues.push({ gate: "HUBSPOT_CONFIG_MISSING", detail: `${result.note}. DO NOT SEND until HubSpot dedup is run or explicitly skipped for draft-only/dev.` });
   }
+  if (name === "DEAL_DEDUP" && result.status === "existing_deals") {
+    const dealList = result.deals.map((d) => `${d.id} (${d.name}, stage=${d.stage}, created=${(d.created || "").slice(0, 10)})`).join("; ");
+    issues.push({ gate: "DEAL_DEDUP", detail: `${result.count} OPEN deal(s) already exist for company token '${result.token}': ${dealList}. Attach this send to the existing master deal — do NOT create a new one. If this is genuinely a different entity (e.g. NPS coop assoc vs Delaware North operator), pass --skip-deal and document why in the deal name.` });
+  }
+  if (name === "DEAL_DEDUP" && result.status === "clean") {
+    passes.push({ gate: "DEAL_DEDUP", detail: `No existing open deals match company token '${result.token}'` });
+  }
+  if (name === "DEAL_DEDUP" && result.status === "missing_company") {
+    issues.push({ gate: "DEAL_DEDUP_NO_COMPANY", detail: `${result.note}. Pass --company="<brand name>" so we can dedup against existing deals (catches the 'fresh contact under existing company' duplicate class). Or pass --skip-deal if intentional.` });
+  }
+  if (name === "DEAL_DEDUP" && result.status === "missing_config") {
+    issues.push({ gate: "DEAL_DEDUP_CONFIG_MISSING", detail: `${result.note}.` });
+  }
+  if (name === "DEAL_DEDUP" && result.status === "error") {
+    issues.push({ gate: "DEAL_DEDUP_ERROR", detail: `Deal dedup errored: ${result.note}. DO NOT SEND until checked.` });
+  }
   if (name === "GMAIL" && result.status !== "clean") {
     issues.push({ gate: "GMAIL_SENT_DEDUP_REQUIRED", detail: `${result.note}. DO NOT SEND until Gmail SENT dedup is run or explicitly skipped for draft-only/dev.` });
   }
@@ -218,6 +287,9 @@ if (args["skip-apollo"]) {
 }
 if (args["skip-hubspot"]) {
   console.warn("WARNING: --skip-hubspot used. This is draft-only/dev mode, not a production send pass.");
+}
+if (args["skip-deal"]) {
+  console.warn("WARNING: --skip-deal used. Deal-name dedup bypassed — only acceptable when the new deal is genuinely a distinct entity (e.g. NPS coop assoc vs Delaware North operator). Document the reason in the deal name.");
 }
 if (args["skip-gmail"]) {
   console.warn("WARNING: --skip-gmail used. This is draft-only/dev mode, not a production send pass.");

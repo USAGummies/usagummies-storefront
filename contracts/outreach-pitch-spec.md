@@ -114,16 +114,26 @@ Every cold outreach email MUST include:
 
 ## 11. Pre-send gate (MANDATORY — every email)
 
-Before any outbound send OR before suggesting an outbound action, run `scripts/outreach-validate.mjs <email_body.txt>`. It checks:
+Before any outbound send OR before suggesting an outbound action, run `scripts/outreach-validate.mjs --email=<addr> --body=<path> --company="<brand name>"`. It checks:
 
 - [ ] **Product claim scan** — every claim matches verified set in `product-claims.ts`. BLOCKED claims fail.
 - [ ] **Pricing regex scan** — prices match {$3.25, $3.49, $3.00} only. $2.49, $4.99-as-wholesale, $5.99 range-boundary values fail.
 - [ ] **Format scan** — "resealable" / "red white and blue" / "layton" / "utah" / "halal" / "kosher" blocked.
 - [ ] **Apollo email verification** — target email must return `email_status: verified` AND be unlocked (not `email_not_unlocked@domain.com`). Bare `/people/match?email=` lookups DO NOT count — must use `/mixed_people/search` with real person match.
-- [ ] **HubSpot dedup** — no active deal with prior email engagement on this address.
+- [ ] **HubSpot contact dedup** — no active deal with prior email engagement on this address.
+- [ ] **HubSpot deal-name dedup (`--company` required)** — no OPEN deal already exists in pipeline `1907159777` whose name contains the company brand token. Catches the "fresh contact under existing company" duplicate-deal class (the 2026-04-29 Buc-ee's / Kitty Hawk Kites / Space Center Houston / Eastern National / Mt Rushmore incident). If a hit is returned, the new send must be **attached to the existing master deal** — never create a new deal. The only legitimate `--skip-deal` case is when the new deal is genuinely a distinct entity (e.g. Yellowstone Forever the NPS coop assoc vs Yellowstone General Stores the Delaware North operator); the deal name must document why.
 - [ ] **Gmail sent folder dedup** — `search_threads(to:{email} OR from:{email})` returns zero hits in last 90 days.
 
 If ANY gate fails → HARD BLOCK. Do not send. Report to Ben.
+
+### 11.1. find_or_create_deal — required pattern for any send script
+
+Any script that creates HubSpot deals MUST use a `find_or_create_deal(company_name)` helper that:
+1. Searches `/crm/v3/objects/deals/search` for OPEN deals (exclude `dealstage` 3502659283 / 3502659284) in pipeline `1907159777` whose name contains the brand token.
+2. If a hit is found → return the existing deal ID and attach the new contact + email engagement to it. Do **not** call `POST /crm/v3/objects/deals` to create a new one.
+3. If no hit → create the new deal as normal.
+
+Direct calls to `POST /crm/v3/objects/deals` from a send script are a process violation. Same severity class as the 2026-04-23 pitch drift incident.
 
 ## 11a. Pre-ACTION gate (when responding to an inbound or suggesting a next step)
 
@@ -151,3 +161,4 @@ If a fact can't be cited to one of those sources, the draft is NOT READY.
 ## Version history
 
 - **1.0 — 2026-04-23** — Initial canonical publication after drift incident (resealable bag, $2.49 Exchange pricing, 100-MC pallet all flagged by Ben). Locks pitch spec; introduces §11 pre-send gate and §12 fact-source rule.
+- **1.1 — 2026-04-29** — Add §11 deal-name dedup gate (`--company` flag) and §11.1 `find_or_create_deal` requirement after the duplicate-deal incident: a send batch that bypassed search-before-create produced 4 duplicate deals (Buc-ee's, Kitty Hawk Kites, Space Center Houston, Eastern National, Mt Rushmore Society). All 4 cleaned up; validator now blocks the class.
