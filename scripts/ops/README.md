@@ -19,6 +19,7 @@ Override `CONTROL_PLANE_BASE_URL` (default `https://www.usagummies.com`) for loc
 | `append-correction.mjs` | `CRON_SECRET` | `POST /api/ops/control-plane/corrections` |
 | `list-paused.mjs` | `CRON_SECRET` | `GET /api/ops/control-plane/paused` |
 | `daily-brief.mjs` | `CRON_SECRET` | `POST /api/ops/daily-brief?kind=<morning\|eod>&post=<true\|false>` |
+| `smoke-openai-workspace-connector.mjs` | `OPENAI_WORKSPACE_CONNECTOR_SECRET` | `GET/POST /api/ops/openai-workspace-tools/mcp` |
 | `unpause-agent.mjs` | **`CONTROL_PLANE_ADMIN_SECRET`** | `POST /api/ops/control-plane/unpause` |
 | `control-plane.mjs` | — | Shared helpers (not invoked directly). |
 
@@ -56,4 +57,23 @@ curl -sH "Authorization: Bearer $CRON_SECRET" \
 # Violations in last 7 days, filtered by agent
 curl -sH "Authorization: Bearer $CRON_SECRET" \
   "$BASE/api/ops/control-plane/violations?agentId=viktor&windowDays=7" | jq .
+```
+
+## ChatGPT workspace connector smoke
+
+Read-only by default. It checks MCP discovery, `tools/list`, `search`, and `fetch`.
+
+```bash
+OPENAI_WORKSPACE_BASE_URL=https://www.usagummies.com \
+OPENAI_WORKSPACE_CONNECTOR_SECRET=... \
+node scripts/ops/smoke-openai-workspace-connector.mjs
+```
+
+Optional approval-tool smoke opens a real Slack approval; only set both vars intentionally:
+
+```bash
+OPENAI_WORKSPACE_SMOKE_APPROVAL_TOOL=request_receipt_review_approval \
+OPENAI_WORKSPACE_SMOKE_APPROVAL_ARG=rcpt_... \
+OPENAI_WORKSPACE_CONNECTOR_SECRET=... \
+node scripts/ops/smoke-openai-workspace-connector.mjs
 ```
