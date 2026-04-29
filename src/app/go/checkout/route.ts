@@ -17,6 +17,7 @@
 // 100% accurate checkout-redirect counts regardless of ad blockers.
 import { NextRequest, NextResponse } from "next/server";
 import { SINGLE_BAG_VARIANT_ID } from "@/lib/bundles/atomic";
+import { pricingForQty } from "@/lib/bundles/pricing";
 
 const STOREFRONT_API_VERSION = "2025-01";
 const STOREFRONT_ENDPOINT =
@@ -37,7 +38,6 @@ const GA4_API_SECRET = process.env.GA4_API_SECRET?.trim();
 const META_CAPI_ACCESS_TOKEN = process.env.META_CAPI_ACCESS_TOKEN?.trim();
 const META_PIXEL_ID_SHOPIFY = "664545086717590";
 const META_PIXEL_ID_WEBSITE = "26033875762978520";
-const SINGLE_BAG_PRICE_USD = 19.95; // matches the BagSlider's $19.95/bag default
 const DEFAULT_QTY = 5;
 const TRUSTED_REFERRER_HOSTS = new Set([
   "usagummies.com",
@@ -254,6 +254,12 @@ function fireMetaCAPIAddToCart(req: NextRequest, qty: number) {
   if (fbp) userData.fbp = fbp;
   if (fbc) userData.fbc = fbc;
 
+  // Use the canonical bundle pricing helper so this stays in sync with what
+  // the BagSlider shows the user (and what Shopify ultimately charges). Avoid
+  // hardcoded constants — see commit history for the bug where a stale 19.95
+  // constant got reported to Meta CAPI.
+  const { total } = pricingForQty(qty);
+
   const payload = {
     data: [
       {
@@ -265,7 +271,7 @@ function fireMetaCAPIAddToCart(req: NextRequest, qty: number) {
         user_data: userData,
         custom_data: {
           currency: "USD",
-          value: Number((qty * SINGLE_BAG_PRICE_USD).toFixed(2)),
+          value: Number(total.toFixed(2)),
           content_ids: ["all-american-gummy-bears"],
           content_type: "product",
           content_name: "All American Gummy Bears - 7.5 oz Bag",
