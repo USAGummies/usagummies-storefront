@@ -21,6 +21,7 @@ Single source of truth for live operating contracts in USA Gummies 3.0.
 | `divisions.json` | Machine-readable: 6 active + 6 latent divisions. |
 | `channels.json` | Machine-readable: 9 active + 5 latent Slack channels. |
 | `agents/` | Per-agent contracts (Booke, Finance Exception, Ops, Research Librarian, R-1..R-7, Viktor at `../viktor.md`). |
+| `proposals/` | In-flight contract amendments awaiting ratification (Class C `pricing.change`, etc.). Each proposal is a `Status: PROPOSAL` markdown file with named decision questions; the proposal graduates by being merged into the relevant canonical contract on approval. Currently: `pricing-grid-v2.3-route-reconciliation.md`. |
 
 ## Rules
 

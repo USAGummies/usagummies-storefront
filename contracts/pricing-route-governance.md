@@ -224,6 +224,8 @@ For machine-readable + checklist use:
 
 ## 11. Open reconciliations vs `/contracts/wholesale-pricing.md` v2.2
 
+> **Reconciliation proposal in flight:** [`/contracts/proposals/pricing-grid-v2.3-route-reconciliation.md`](proposals/pricing-grid-v2.3-route-reconciliation.md) v0.1 — six-class taxonomy proposal, awaiting Ben + Rene Class C `pricing.change` ratification in `#wholesale` (cross-post `#financials`). On ratification, this section is marked CLOSED and `wholesale-pricing.md` graduates to v2.3.
+
 The route-governance numbers in §1 do not yet reconcile cleanly with the SKU/tier grid in `/contracts/wholesale-pricing.md` §2. Tracked here for the next wholesale-pricing version bump:
 
 | Doctrine name (this file) | Per-bag | Closest current B-tier | Notes |
