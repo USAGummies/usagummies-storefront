@@ -300,4 +300,130 @@ We have ~12 days from today (4/29) to trip start (5/11). Cadence:
 
 ---
 
-*Locked 2026-04-29 PM by Ben + Claude Code as the canonical sales-tour planning doc. All outreach for the May 11–13 I-84/I-15 corridor trip references this list. Drafts MUST cite a verified named buyer + email source before send.*
+## Freight pricing doctrine on this trip (LOCKED 2026-04-29 PM)
+
+Every wholesale conversation on this trip must reference the canonical freight doctrine in [`/contracts/wholesale-pricing.md` §3](wholesale-pricing.md). Summary of how each customer tier maps to the route:
+
+| Tier | When it applies | Freight handling on this trip | Why we win |
+|---|---|---|---|
+| **B2 / B4 (Landed)** — `$3.49/bag MC` or `$3.25/bag pallet` | Default for most online + first-touch wholesale orders | **Founder-driven freight** — Ben pulls the load with the GMC 1500 Duramax + cargo trailer. ~16 mpg loaded, diesel ~$3.95/gal. Marginal stops are near-zero cost. | Drive economics beat LTL by 30-50% per pallet on most lanes (e.g., WA → St. Louis: $321 drive vs $475 LTL). On the May 11-13 trip, every prospect within 30 mi of the route is a marginal-cost-zero add. |
+| **B3 / B5 (Buyer Freight)** — `$3.25/bag MC` or `$3.00/bag pallet` | Buyer arranges their own freight (their LTL account, their pickup) | We confirm pickup at 30027 SR 706 Ashford WA 98304. No driver cost to us. | Lowest per-bag price; gives margin headroom for the buyer to absorb their freight without losing on retail |
+| **Free freight (USA Gummies absorbs LTL)** — `$3.00/bag pallet`, no separate freight line | 3+ pallet orders ONLY (75+ master cartons / 2,700+ bags) | Real broker bid via Freightos / FreightCenter; carrier invoice posts to `Freight Out / Shipping & Delivery Expense` | Hard rule: free freight is **retired** for sub-pallet quantities. Locked in [`/contracts/outreach-pitch-spec.md` §4](outreach-pitch-spec.md). |
+
+**Strategic insight for sales-tour conversations:** The founder-driven freight model is our **structural moat** for landed-pricing tiers (B2 / B4). When a prospect asks "what's the freight cost?" on a master carton or 1-2 pallet order, the answer is built into the per-bag price — and our drive economics let us absorb that freight cheaper than any competitor running LTL. This is exactly why every additional verified door within 30 mi of the route is a high-leverage trip-economics add: marginal fuel + zero hourly labor (founder time) vs. ~$50 incremental LTL pickup fee per door.
+
+**Per-prospect script:** When asked about freight, the answer is one sentence: *"Master carton at $3.49/bag or $3.25/bag with you arranging pickup. On the May 11-13 trip I'm doing in-person delivery rounds across the I-84/I-15 corridor — happy to drop your sample case or a starter MC in person at no extra freight cost while I'm in the area."* Freight is a sales feature on this trip, not a friction.
+
+---
+
+## Vicinity expansion (LOCKED 2026-04-29 PM by Viktor research drop)
+
+41 net-new venues identified within ~30 mi of every anchor location on the route. Methodology: see [`/contracts/research-methodology.md`](research-methodology.md) (Viktor's company-first playbook). Prospects are split by tier:
+
+### 🟢 Tier 1 — Named buyer confirmed, outreach already sent (6)
+
+| # | Venue | Buyer | Email | Sent |
+|---|---|---|---|---|
+| V-34 | Xanterra Grand Canyon Retail (8 properties) | Gift shop buyer | gifts-gcsr@xanterra.com | ✅ 4/29 |
+| V-17 | Park City Museum | Liza Shoell — Retail Mgr | retail@parkcityhistory.org | ✅ 4/29 |
+| V-5 | Old Idaho Penitentiary | Jacey Brain — Store Mgr | oldidahopen@ishs.idaho.gov | ✅ 4/29 |
+| V-4 | Zoo Boise | Maranda Tolman — Gift Shop | m.tolman@zooboise.org | ✅ 4/29 |
+| V-18 | Heber Valley Railroad | Mark Nelson — Exec Dir | mark@hebertrain.com | ✅ 4/29 |
+| V-14 | Clark Planetarium "Planet Fun" Gift Store | David Ortiz | (385) 468-1226 | ☎ Call task |
+
+### 🟡 Tier 2 — Gift shop confirmed, buyer TBD or generic email (20 — staged for next wave)
+
+| # | Venue | Contact path | Phone |
+|---|---|---|---|
+| V-39 | Bearizona (Williams AZ) | Phone-first | (928) 635-2289 |
+| V-38 | Tlaquepaque Arts & Shopping Village (Sedona AZ) | info@tlaq.com | (928) 282-4838 |
+| V-30 | Discovery Children's Museum (Las Vegas) | info@DiscoveryKidsLV.org | (702) 382-3445 |
+| V-12 | Natural History Museum of Utah (SLC) | Phone | (801) 581-6927 |
+| V-13 | Tracy Aviary (SLC) | info@tracyaviary.org | (801) 596-8500 |
+| V-21 | Utah Shakespeare Festival (Cedar City) | Phone | (435) 586-7878 |
+| V-24 | Tuacahn Amphitheatre (Ivins UT) | Phone | (435) 652-3218 |
+| V-1 | Hamley & Co. (Pendleton OR) | info@hamley.com (CTUIR-owned) | (541) 278-1100 |
+| V-9 | Idaho State Museum (Boise) | shseducation@ishs.idaho.gov (ask Jacey for intro) | (208) 780-5193 |
+| V-7 | Discovery Center of Idaho (Boise) | Phone | (208) 343-9895 |
+| V-6 | Idaho Botanical Garden (Boise) | info@idahobotanicalgarden.org | (208) 343-8649 |
+| V-10 | Sun Valley Resort gift shop (cold-call) | Phone (existing Alison Enoch contact in HubSpot) | (208) 622-4111 |
+| V-22 | Cedar Breaks NM (Zion Forever ops) | Phone — same buyer as Zion NP / Kimberlee Henderson | (435) 986-7120 |
+| V-23 | Brian Head Resort (vicinity confirm) | info@brianhead.com | (435) 677-2035 |
+| V-15 | Discovery Gateway Children's Museum (SLC) | Addison Dover ✅ already sent | (801) 456-5437 |
+| V-29 | Las Vegas Natural History Museum | aglenn@lvnhm.org | (702) 384-3466 |
+| V-36 | Grand Canyon Conservancy (4 GCC stores) | Clover Morell ✅ already sent | (928) 638-7154 |
+| V-8 | Basque Museum (Boise) | info@basquemuseum.eus | (208) 343-2671 |
+| V-31 | AREA15 Las Vegas | info@area15.com | n/a |
+| V-27 | Wahweap Marina (ARAMARK) | (800) 528-6154 — same ARAMARK pitch as Lake Powell + Davis Dam + Lake Mead | (928) 645-2433 |
+
+### 🔵 Supplemental routing stops — contact only, no email send (12)
+
+| # | Venue | Notes |
+|---|---|---|
+| V-28 | Antelope Canyon Gift Shop (Page AZ) | Walk-in |
+| V-40 | Planes of Fame Air Museum (Valle AZ) | Williams → GC South Rim route |
+| V-2 | A Piece of Pendleton (Pendleton OR) | Main St walk-in |
+| V-25 | Snow Canyon SP (Ivins UT) | UT State Parks central buyer |
+| V-16 | Wheeler Farm (Murray UT) | Family farm retail |
+| V-3 | Fort Walla Walla Museum (WA) | I-84 corridor detour |
+| V-11 | Herrett Center (Twin Falls ID) | I-84 drive-through stop |
+| V-32 | Clark County Museum (Henderson NV) | ccmuseum@clarkcountynv.gov |
+| V-37 | Nevada State Railroad Museum (Boulder City) | Hoover Dam add-on |
+| V-35 | Hopi House (Grand Canyon AZ) | Same buyer as V-34 (Xanterra) — covered |
+| V-41 | Sedona Heritage Museum (Sedona AZ) | (928) 282-7038 |
+| V-33 | TITANIC Exhibition (Luxor LV) | Lower fit, walk-in only |
+
+**Deprioritized (Viktor recommendation):** V-26 Dead Horse Point SP (off-route), V-20 Homestead Midway Resort (renovation), V-19 Canyons Village (Vail centralized — focus on Park City Museum instead), Pinball Hall of Fame (no retail channel), Bear River Bird Refuge (fit too low), Kaibab Paiute (too small).
+
+---
+
+## Priority D-H findings (LOCKED 2026-04-29 PM by Viktor)
+
+Original master list entries 21-53 — full research delivered + actioned. Highlights:
+
+### Priority D — NPS / state-park visitor centers (entries 21-32)
+
+**Key structural finding:** Almost no NPS unit buys product directly. Routes through cooperating association (BCA, GCC, WNPA, Friends of Red Rock) or private concessioner (ARAMARK, Xanterra). Cooperating association director or store manager is the actual buyer.
+
+- **V-27 → Verkamp's + 3 other GCC stores** = Clover Morell @ Grand Canyon Conservancy ✅ sent
+- **Bryce Canyon NP** = Bryce Canyon Association (BCA), 888-362-2642 — call task ☎
+- **Mt Timpanogos Cave** = WNPA vendor portal at wnpa.org — call task ☎ (one WNPA relationship = many parks)
+- **Glen Canyon NRA + Davis Dam + Lake Mead** = ARAMARK national accounts (800) 528-6154 — call task ☎ (single pitch, 3 marina destinations)
+- **Red Rock Canyon NCA** = Friends of Red Rock, info@friendsredrock.org ✅ sent
+- **Cedar Breaks NM, Tuzigoot, Montezuma Castle, Pipe Spring, Antelope Island** = NPS direct or state-parks centralized — call tasks ☎
+
+### Priority E — Tribal lane (entries 33-36)
+
+**Key finding:** Tribal gift shops are run by separate enterprise arms (not tribal government). Contact the enterprise.
+
+- **Hualapai Lodge / Skywalk** = (928) 769-2230 — ⭐ HIGHEST priority for 5/11 in-person at Skywalk; same enterprise = both doors with one conversation
+- **NACE / Navajo Arts & Crafts Enterprise** = info@gonavajo.com ✅ sent (covers 6 Navajo Nation stores)
+- **Shoshone-Bannock Hotel & Trading Post** = (208) 237-8774 — call task ☎ (Fort Hall ID, on I-15 corridor, zero detour)
+- **Kaibab Paiute** = deprioritize (too small)
+
+### Priority F — Multi-property retail networks (entries 37-39)
+
+- **Caesars Entertainment** = corporate procurement is unreachable via cold email; play is ASD Market Week (March + Aug LV trade show). For 5/11-13: walk into floor-level Caesars boutiques (IT'SUGAR, Dylan's, Forum Shops gift shops) — managers often have independent purchasing authority.
+- **Sphere Las Vegas** = sphereguestrelations@msg.com BOUNCED → call (725) 258-6724 to find right path
+- **Vail Resorts** = already on Park City Mountain follow-through (B2 batch 1 covered)
+
+### Priority G — Themed-attraction stragglers (entries 40-52)
+
+Outreach-ready (named buyer or sent):
+- **Discovery Gateway / Addison Dover** ✅ sent
+- **Clark Planetarium / David Ortiz** — call task ☎
+- **St. George Dinosaur / Jaleesa Spor** — bounce → call task ☎
+- **World Center for Birds of Prey, Idaho Botanical Garden** — call tasks ☎ (Boise cluster, V-6, V-7 in vicinity)
+- **Bedrock City (Williams AZ)** — call task ☎ (on Williams → GC route)
+- **Oatman AZ + Jerome AZ** — walk-in only, no centralized buyer; multiple independent shops
+- **Pinball Hall of Fame, Bear River Bird Refuge** — deprioritize per Viktor
+
+### Priority H — LDS heritage retail
+
+- **Deseret Book SLC / szaugg@deseretbook.com** ✅ sent (30+ Intermountain West stores possible scale)
+- **Temple Square / LDS visitor centers proper** = mission operation, NOT commercial gift retail — skip
+- **City Creek Center** = adjacent commercial retail, individual specialty tenants — walk-in target
+
+---
+
+*Locked 2026-04-29 PM by Ben + Claude Code as the canonical sales-tour planning doc. All outreach for the May 11–13 I-84/I-15 corridor trip references this list. Drafts MUST cite a verified named buyer + email source before send. Vicinity expansion (V-1 through V-41) + Priority D-H research + freight doctrine reference added 2026-04-29 PM (Viktor batch).*
