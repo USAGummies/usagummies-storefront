@@ -112,11 +112,30 @@ const BUILT_IN_CLAIMS: ProductClaim[] = [
     patterns: ["fat.?free", "0g?.?fat", "zero.?fat"],
   },
   {
+    // Reconciled 2026-04-29 to match canonical CLAUDE.md supply chain
+    // (Powers Confections / Spokane WA + Belmark / WI). Removed prior
+    // "Albanese manufacturing in Merrillville, IN" line — Albanese
+    // supplies the FORMULATION reference (spec sheet 50270_5) used in
+    // natural-flavors / gluten-free / fat-free claim substantiation,
+    // but is NOT the manufacturer. Brand story commit c7361ee describes
+    // a 3-state supply chain: WA (Powers production), WI (Belmark
+    // packaging), additional state for ingredient sourcing TBD.
+    //
+    // FTC "Made in USA" 2021 rule: requires "all or virtually all"
+    // significant processing + ingredients/components US-origin. Open
+    // BoM audit needed before this claim survives FTC scrutiny —
+    // gelatin, citric acid, natural flavors are routinely globally
+    // sourced. Until BoM lands, prefer the qualified phrasing
+    // "Proudly assembled in the USA from domestic and imported
+    // ingredients" on packaging + outreach. See pre-tour regulatory
+    // punch list (2026-04-29 validation pass).
     id: "made-in-usa",
     claim: "Made in the USA",
     status: "verified",
-    source: "Albanese manufacturing in Merrillville, IN. Powers co-packing in Spokane, WA. Both USA.",
-    verified_date: "2026-04-09",
+    source:
+      "Powers Confections manufactures + co-packs in Spokane, WA. Belmark packaging in WI. Final assembly + processing in USA. " +
+      "[OPEN] BoM audit required for FTC 2021 rule full substantiation; until then, prefer qualified phrasing on outreach.",
+    verified_date: "2026-04-29",
     verified_by: "ben",
     patterns: ["made.?in.?(the.?)?us(a)?", "american.?made", "domestically.?made"],
   },
