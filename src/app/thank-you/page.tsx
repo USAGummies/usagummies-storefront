@@ -24,7 +24,7 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
-const PAGE_TITLE = "Thank You | USA Gummies";
+const PAGE_TITLE = "Thank You";
 const PAGE_DESCRIPTION =
   "Thanks for your USA Gummies order. You are officially part of the movement.";
 const OG_IMAGE = "/opengraph-image";

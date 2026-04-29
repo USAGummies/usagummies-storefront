@@ -93,9 +93,9 @@ export function EmptyCartView({
         <div className="mt-2 flex items-center justify-center gap-3 text-[10px] text-[var(--muted)]">
           <span>{"\uD83C\uDDFA\uD83C\uDDF8"} Made in USA</span>
           <span>&bull;</span>
-          <span>{"\uD83D\uDE9A"} Free shipping 5+</span>
+          <span>{"\uD83D\uDE9A"} Free shipping</span>
           <span>&bull;</span>
-          <span>{"\u2B50"} 4.8 stars</span>
+          <span>{"\u2B50"} 5.0 stars</span>
         </div>
       </div>
     );

@@ -204,7 +204,7 @@ export default function GoLandingPage() {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 12 }}>
               <span style={{ color: "#c7a062", fontSize: 16 }}>★★★★★</span>
               <span style={{ fontSize: 13, fontWeight: 600, color: "#1B2A4A" }}>
-                {AMAZON_REVIEWS.aggregate.rating} from {AMAZON_REVIEWS.aggregate.count.toLocaleString()}+ verified buyers
+                {AMAZON_REVIEWS.aggregate.rating.toFixed(1)} from {AMAZON_REVIEWS.aggregate.count} verified buyers
               </span>
             </div>
           </div>
@@ -256,7 +256,7 @@ export default function GoLandingPage() {
             🌿 No artificial dyes
           </span>
           <span style={{ fontSize: 12, fontWeight: 600, color: "#1B2A4A", display: "flex", alignItems: "center", gap: 5 }}>
-            ⭐ 4.8 stars ({AMAZON_REVIEWS.aggregate.count.toLocaleString()}+ reviews)
+            ⭐ {AMAZON_REVIEWS.aggregate.rating.toFixed(1)} from {AMAZON_REVIEWS.aggregate.count} verified buyers
           </span>
           <span style={{ fontSize: 12, fontWeight: 600, color: "#1B2A4A", display: "flex", alignItems: "center", gap: 5 }}>
             🚚 Ships in 24 hours
@@ -413,7 +413,7 @@ export default function GoLandingPage() {
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 8 }}>
             <span style={{ color: "#c7a062", fontSize: 24, letterSpacing: 2 }}>★★★★★</span>
             <span style={{ fontSize: 14, fontWeight: 600, color: "#1B2A4A" }}>
-              {AMAZON_REVIEWS.aggregate.rating} stars from {AMAZON_REVIEWS.aggregate.count.toLocaleString()}+ verified buyers
+              {AMAZON_REVIEWS.aggregate.rating.toFixed(1)} stars from {AMAZON_REVIEWS.aggregate.count} verified buyers
             </span>
           </div>
 

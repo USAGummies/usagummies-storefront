@@ -225,17 +225,17 @@ export default function MadeInUsaPage() {
         <div className="mx-auto max-w-[1200px] px-5 py-14 sm:px-8 sm:py-20">
           <div className="grid items-center gap-10 lg:grid-cols-[0.95fr_1.05fr]">
             <div>
-              <p className="lp-label mb-3 text-[var(--lp-red)]">★ American Landscape ★</p>
+              <p className="lp-label mb-3 text-[var(--lp-red)]">★ American Supply Chain ★</p>
               <h2 className="lp-display text-[clamp(2rem,5vw,3.4rem)] leading-[1] text-[var(--lp-ink)]">
-                Sourced &amp; packed
+                Three states.
                 <br />
-                <span className="lp-script text-[var(--lp-red)]">in our backyard.</span>
+                <span className="lp-script text-[var(--lp-red)]">one product.</span>
               </h2>
               <p className="lp-sans mt-5 text-[1.1rem] leading-[1.6] text-[var(--lp-ink)]/85">
-                Every bag of USA Gummies is sourced, manufactured, and
-                packed in the United States — a lot of it within sight of
-                Mount Rainier, where the Pacific Northwest&rsquo;s biggest
-                trees and biggest stories live.
+                Our gummies are crafted in <strong>Indiana</strong>. Our
+                packaging is printed in <strong>Wisconsin</strong>. Each bag
+                is repacked in <strong>Spokane, Washington</strong> at a
+                veteran-owned facility. 100% American.
               </p>
               <p className="lp-sans mt-3 text-[1rem] leading-[1.55] text-[var(--lp-ink)]/75">
                 Real American work, in real American places. The bag goes

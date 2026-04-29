@@ -17,7 +17,7 @@ const PRODUCT_FAQS = [
   {
     question: "Are USA Gummies gluten-free?",
     answer:
-      "Yes, our gummy bears are gluten-free. They contain gelatin, cane sugar, corn syrup, citric acid, natural flavors, fruit and vegetable extracts, and carnauba wax.",
+      "We do not make a gluten-free claim. Our ingredients are gelatin, cane sugar, corn syrup, citric acid, natural flavors, fruit and vegetable extracts, and carnauba wax. Please review the ingredient panel on the bag if you have a gluten sensitivity.",
   },
   {
     question: "What is the 5-pack deal?",

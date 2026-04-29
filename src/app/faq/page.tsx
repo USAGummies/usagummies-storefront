@@ -104,7 +104,7 @@ const FAQS: FaqItem[] = [
   {
     question: "Can I buy a single bag?",
     answer:
-      "Yes. You can order 1-3 bags on our site at standard price, or save more per bag on 4+ bags.",
+      "Yes. You can order any quantity with free shipping on every order. 1-4 bags ship at $5.99 per bag. Bundle savings kick in at 5 bags ($5.00 per bag) and grow with quantity.",
   },
   {
     question: "How do bag count savings work?",
@@ -238,7 +238,7 @@ export default function FaqPage() {
             <span className="lp-script text-[var(--lp-red)]">value bundles.</span>
           </h2>
           <p className="lp-sans mx-auto mt-6 max-w-[52ch] text-[1.05rem] leading-[1.6] text-[var(--lp-ink)]/85">
-            Save more per bag when you add 4+ bags. {FREE_SHIPPING_PHRASE}.
+            Save more per bag when you add 5+ bags. {FREE_SHIPPING_PHRASE}.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
             <Link href="/shop" className="lp-cta">

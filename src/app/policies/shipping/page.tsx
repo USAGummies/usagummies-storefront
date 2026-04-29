@@ -18,7 +18,7 @@ function resolveSiteUrl() {
 }
 
 const SITE_URL = resolveSiteUrl();
-const PAGE_TITLE = "Shipping Policy | USA Gummies";
+const PAGE_TITLE = "Shipping Policy";
 const PAGE_DESCRIPTION =
   "Shipping details for USA Gummies orders, delivery times, and carrier info for made in USA candy.";
 const OG_IMAGE = "/opengraph-image";
@@ -46,7 +46,7 @@ const SECTIONS = [
   {
     title: "Free shipping",
     body:
-      "Free shipping on 5+ bags. The product page and cart will reflect this automatically.",
+      "Free shipping on every order — no minimum, no hidden fees. The product page and cart show $0 shipping at checkout for any quantity.",
   },
   {
     title: "Processing time",
@@ -84,7 +84,7 @@ export default function ShippingPolicyPage() {
         eyebrow="Policies"
         headline="Shipping"
         scriptAccent="policy."
-        sub="Orders ship within 24 hours, with tracking sent fast. Free shipping on 5+ bags."
+        sub="Orders ship within 24 hours, with tracking sent fast. Free shipping on every order."
       />
 
       <section className="bg-[var(--lp-cream)]">

@@ -4,13 +4,13 @@ import Image from "next/image";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 
 export const metadata: Metadata = {
-  title: "Welcome to USA Gummies",
+  title: "Welcome",
   description:
     "Thanks for choosing USA Gummies! Leave a review, reorder your favorites, or share with friends.",
   robots: { index: false, follow: true },
 };
 
-const REVIEW_URL = "https://www.amazon.com/review/create-review?asin=B0DY19T5KB";
+const REVIEW_URL = "https://www.amazon.com/review/create-review?asin=B0G1JK92TJ";
 
 const ACTIONS = [
   {
@@ -25,7 +25,7 @@ const ACTIONS = [
   {
     icon: "🔄",
     title: "Reorder & save",
-    description: "Stock up with bundle pricing. Free shipping on 5+ bags.",
+    description: "Stock up with bundle pricing. Free shipping on every order.",
     href: "/shop",
     cta: "Shop bundles",
     external: false,

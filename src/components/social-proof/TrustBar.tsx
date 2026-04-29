@@ -11,7 +11,7 @@ const TRUST_ITEMS = [
   },
   {
     icon: "⭐",
-    label: "4.8 stars",
+    label: "5.0 stars",
     detail: "Verified buyer reviews",
   },
   {

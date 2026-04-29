@@ -314,7 +314,7 @@ export default function BagSlider({
         <div className="mx-auto max-w-xl">
           <div className="flex items-center justify-center gap-2 text-[10px] text-[var(--muted,#5f5b56)] mb-1.5">
             <span className="text-[var(--candy-yellow,#f5c842)]">&#9733;</span>
-            <span>4.8 stars</span>
+            <span>5.0 stars</span>
             <span className="text-[var(--border)]">&middot;</span>
             <span>Free shipping</span>
             <span className="text-[var(--border)]">&middot;</span>
@@ -531,7 +531,7 @@ export default function BagSlider({
       <div className="mt-3 text-center">
         <span className="text-[#c7a062] text-sm">★★★★★</span>
         <span className="ml-1.5 text-xs text-[#1B2A4A]/60">
-          4.8 from verified buyers
+          5.0 from verified buyers
         </span>
       </div>
 
