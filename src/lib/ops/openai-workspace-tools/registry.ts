@@ -71,6 +71,20 @@ export const OPENAI_WORKSPACE_TOOLS: readonly OpenAIWorkspaceTool[] = Object.fre
     safetyNotes: READ_ONLY_NOTES,
   },
   {
+    id: "ops.sales.day1-prospects",
+    name: "Day 1 wholesale prospect playbook",
+    description:
+      "Read the curated Day 1 wholesale prospect list, including email-ready vs RangeMe/phone/manual-research buckets. Read-only; no sends, HubSpot writes, Apollo lookups, or synthetic emails.",
+    mode: "read",
+    status: "ready",
+    audience: "Ben",
+    readOnly: true,
+    requiresHumanApproval: false,
+    backingRoute: "/api/ops/sales/prospects/day1",
+    backingSurface: "/ops/sales/prospects/day1",
+    safetyNotes: READ_ONLY_NOTES,
+  },
+  {
     id: "ops.readiness.snapshot",
     name: "Ops readiness snapshot",
     description:

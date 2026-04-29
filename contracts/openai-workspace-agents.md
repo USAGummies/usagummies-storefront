@@ -73,6 +73,7 @@ The cockpit summarizes the allowlist, connector readiness, blocked/prohibited do
 Allowed:
 
 - `/api/ops/sales`
+- `/api/ops/sales/prospects/day1`
 - `/api/ops/readiness`
 - `/ops/finance/review`
 - `/api/ops/docs/receipt-review-packets`
@@ -119,6 +120,7 @@ The repo is already close to a ChatGPT workspace-agent architecture:
 
 - Agent contracts and packs define who owns what.
 - `/ops/sales`, `/ops/readiness`, `/ops/finance/review`, `/ops/faire-direct`, and receipt review-packet routes are already curated read surfaces.
+- `/ops/sales/prospects/day1` exposes the checked-in Day 1 wholesale prospect playbook as read-only context; sends still require the canonical validator + Class B approval path.
 - Slack approval cards and closers already enforce Class B / Class C boundaries.
 - Operating-memory and agent-pack work is present in the active worktree and should become the second phase once stabilized.
 

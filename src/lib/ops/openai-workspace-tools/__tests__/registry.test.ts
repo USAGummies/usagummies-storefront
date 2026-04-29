@@ -50,6 +50,17 @@ describe("OpenAI workspace tool registry", () => {
     expect(t?.blocker).toBeUndefined();
   });
 
+  it("ops.sales.day1-prospects is exposed as a read-only prospect playbook", () => {
+    const t = getOpenAIWorkspaceTool("ops.sales.day1-prospects");
+    expect(t).toBeDefined();
+    expect(t?.status).toBe("ready");
+    expect(t?.mode).toBe("read");
+    expect(t?.readOnly).toBe(true);
+    expect(t?.requiresHumanApproval).toBe(false);
+    expect(t?.backingRoute).toBe("/api/ops/sales/prospects/day1");
+    expect(t?.description).toMatch(/no sends/i);
+  });
+
   it("all read tools are actually read-only and never require approval", () => {
     const readTools = OPENAI_WORKSPACE_TOOLS.filter((tool) => tool.mode === "read");
     expect(readTools.length).toBeGreaterThan(0);
