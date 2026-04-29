@@ -1,16 +1,17 @@
 # USA Gummies — Email Capture & Recovery Launch Plan
 
-**Status:** Content drafted + 3 discount codes pre-created. Ready for paste-and-launch.
+**Status:** Content drafted (no-discount version). Ready for paste-and-launch.
 **Tool:** Shopify Email (native, free up to 10K emails/mo)
 **Owner:** Ben (Shopify Admin UI work)
-**Estimated launch time:** 30-45 min tomorrow morning (codes already done)
+**Estimated launch time:** 30-45 min tomorrow morning
 
-> **Update 2026-04-28 18:35 PT (Claude prep):** All 3 discount codes are
-> pre-created in Shopify. Two manual tweaks needed in admin UI: (1) confirm
-> `WELCOME10` value = 10% (already existed in store from prior setup), and
-> (2) add `$20 minimum spend` to `REFER5` (MCP can't set min-spend; the code
-> is created at $5 off with no min so it must be tightened before launch).
-> See § DISCOUNT CODES STATUS below.
+> **2026-04-28 19:00 PT — strategy revised by Ben:** No discount codes in
+> any flow. The hook is the product story (made in USA, no artificial dyes,
+> real-fruit color, the candy your grandparents would have recognized) —
+> NOT a 10% off coupon. If a discount is ever added later, it caps at 10%.
+>
+> See § DISCOUNT CODE CLEANUP at the bottom for the codes Claude created
+> earlier today that Ben needs to delete in Shopify admin.
 
 ---
 
@@ -20,20 +21,21 @@
 TODAY:    38 visitors landed, 0 captured, 0 followups → all lost forever
 GOAL:     Capture emails on exit, recover carts, nurture buyers
 EXPECTED: Recover 8-15% of would-be-lost visitors (industry std)
+LEVER:    Brand story (USA, dye-free, real fruit) — NOT discounting
 ```
 
 ---
 
 ## 📧 EMAIL #1 — Welcome Series
 
-**Trigger:** Email captured via popup OR newsletter signup OR first purchase
+**Trigger:** Email captured via popup OR newsletter signup
 **Sends:** Email 1 immediately, Email 2 at +24h, Email 3 at +72h
 
 ### Email 1 (sent within 5 min of opt-in)
 
-**Subject:** `🇺🇸 Welcome to USA Gummies — your 10% off is inside`
+**Subject:** `🇺🇸 Welcome to USA Gummies — the candy your grandparents would have recognized`
 
-**Preview text:** `Made in America. No artificial dyes. The candy your grandparents would have recognized.`
+**Preview text:** `Made in America. No artificial dyes. Five real flavors.`
 
 **Body:**
 
@@ -45,8 +47,6 @@ EXPECTED: Recover 8-15% of would-be-lost visitors (industry std)
 > ✅ Colored with real fruit and vegetable extracts (no Red 3, no Red 40)
 > ✅ 5 classic flavors — Cherry, Lemon, Green Apple, Orange, Watermelon
 >
-> **Your 10% off code:** `WELCOME10`
->
 > [SHOP NOW →]({{shop_url}})
 >
 > — Ben Stutman, Founder
@@ -55,7 +55,7 @@ EXPECTED: Recover 8-15% of would-be-lost visitors (industry std)
 
 **Subject:** `Why we stopped using Red 40 (and why the FDA finally agrees)`
 
-**Preview text:** `Real story. The FDA banned Red Dye No. 3 in January 2025. We never used it.`
+**Preview text:** `The FDA banned Red Dye No. 3 in January 2025. We never used it.`
 
 **Body:**
 
@@ -67,15 +67,13 @@ EXPECTED: Recover 8-15% of would-be-lost visitors (industry std)
 >
 > The result: gummies that taste like the ones your grandparents would have eaten. No mystery, no chemistry-degree label.
 >
-> **Reminder: your 10% off `WELCOME10` is valid for the next 5 days.**
->
 > [SHOP NOW →]({{shop_url}})
 
 ### Email 3 (+72h)
 
-**Subject:** `What our customers say (and a final reminder)`
+**Subject:** `What our customers say`
 
-**Preview text:** `Real reviews from real customers — your code expires in 48 hours.`
+**Preview text:** `Real reviews from real customers.`
 
 **Body:**
 
@@ -86,8 +84,6 @@ EXPECTED: Recover 8-15% of would-be-lost visitors (industry std)
 > ⭐⭐⭐⭐⭐ **Beau M:** *"Quick order fulfillment and shipping, with a great tasting, soft, and fresh gummy bears."*
 >
 > ⭐⭐⭐⭐⭐ **Niki L:** *"Just tried USA Gummies and they are amazing. The flavor and texture is next level and addicting."*
->
-> Your 10% off `WELCOME10` expires in 48 hours.
 >
 > [SHOP NOW →]({{shop_url}})
 
@@ -120,19 +116,19 @@ EXPECTED: Recover 8-15% of would-be-lost visitors (industry std)
 
 ### Email 2 (+24h after abandonment)
 
-**Subject:** `Last call: 10% off your cart, just for you`
+**Subject:** `Your cart is still here`
 
-**Preview text:** `WELCOME10 still works — but only for the next 24 hours.`
+**Preview text:** `Real American gummy bears. No artificial anything.`
 
 **Body:**
 
 > Still thinking it over?
 >
-> Here's a one-time **10% off** code, just for you: `WELCOME10`
->
-> Your cart is waiting:
+> No pressure — but your cart is still here:
 >
 > {{cart_items}}
+>
+> Five real fruit-and-veg-colored flavors. Made in an SQF-certified American facility. The candy you remember from when candy was simpler.
 >
 > [COMPLETE YOUR ORDER →]({{checkout_url}})
 >
@@ -147,7 +143,7 @@ EXPECTED: Recover 8-15% of would-be-lost visitors (industry std)
 
 **Subject:** `Welcome to the squad, {{first_name}} 🇺🇸`
 
-**Preview text:** `Your order is on the way — here's what to expect, and how to get a friend hooked.`
+**Preview text:** `Your order is on the way — here's what to expect.`
 
 **Body:**
 
@@ -157,10 +153,6 @@ EXPECTED: Recover 8-15% of would-be-lost visitors (industry std)
 > - Your order ships from our Washington warehouse within 24 hours
 > - You'll get a tracking number by email
 > - Most orders arrive in 2-5 business days
->
-> **One favor to ask:**
->
-> If you love them, share with a friend. We'll give you both **$5 off** your next bag with code `REFER5`.
 >
 > Reply to this email if anything goes wrong — Ben (the founder, not a robot) reads every reply.
 >
@@ -178,21 +170,22 @@ EXPECTED: Recover 8-15% of would-be-lost visitors (industry std)
 ### Headline
 
 ```
-🇺🇸 GET 10% OFF YOUR FIRST BAG
+🇺🇸 THE CANDY YOUR GRANDPARENTS
+WOULD HAVE RECOGNIZED
 ```
 
 ### Subhead
 
 ```
 Made in America. No artificial dyes.
-The candy your grandparents would have recognized.
+Real fruit, real color, real flavor.
 ```
 
 ### CTA
 
 ```
 [Email field placeholder: "your@email.com"]
-[ Button: "GIVE ME 10% OFF" ]
+[ Button: "JOIN THE LIST" ]
 ```
 
 ### Footer microcopy
@@ -205,95 +198,75 @@ We email weekly, never sell your data, unsubscribe anytime.
 
 - USA flag colors (cream, brick red, navy)
 - Comic-style USA Gummies bag illustration on left
-- "10% OFF" in big bold red
+- Five real-fruit gummy bears across the bottom (Cherry, Lemon, Green Apple, Orange, Watermelon)
 - Mobile: full-screen, single-column, thumb-zone CTA at bottom
 
 ---
 
-## 🎟️ DISCOUNT CODES STATUS (pre-created 2026-04-28)
+## 🎟️ DISCOUNT CODE CLEANUP (Ben — 5 min in admin)
 
-| Code         | Status                           | Value     | Min spend | Once per customer | Manual fix needed                   |
-| ------------ | -------------------------------- | --------- | --------- | ----------------- | ----------------------------------- |
-| `WELCOME10`  | ✅ Already existed in store       | (verify)  | (verify)  | (verify)          | Confirm value = 10% in admin        |
-| `CART15`     | ✅ Created via MCP (id 1756621668723) | 15% off | none      | yes               | Add 48-hour expiry from issue       |
-| `REFER5`     | ✅ Created via MCP (id 1756621701491) | $5 off  | **none**  | yes               | **ADD $20 MIN SPEND** before launch |
-
-**Why min-spend matters on REFER5:** without it, a buyer could buy a $4 item and
-get -$1 ("we owe you"). MCP doesn't support min-spend on creation, so this
-must be tightened in Shopify Admin → Discounts → REFER5 → Minimum purchase
-requirements → Minimum amount = $20.
-
-> Test/redundant codes also exist: `TESTNIGHT428` (5% off, no min) and
-> `WELCOMEUSA10` (10% off, no min). Both can be deleted in admin.
-
-### Original code spec (for reference)
+Per the 2026-04-28 strategy revision (no discount codes), the codes Claude
+pre-created earlier today need to be deleted in Shopify admin:
 
 ```
-WELCOME10
-  Type:        % off
-  Value:       10%
-  Min spend:   none
-  Usage:       1 per customer
-  Expires:     7 days from issue (per email)
-  Note:        Issued by welcome series + popup
-
-REFER5
-  Type:        $ off
-  Value:       $5
-  Min spend:   $20            ← MUST be added manually post-creation
-  Usage:       1 per customer (auto-issued post-purchase)
-  Expires:     90 days
-  Note:        Drive referral loops
-
-CART15
-  Type:        % off
-  Value:       15%
-  Min spend:   none
-  Usage:       1 per customer
-  Expires:     48 hours        ← Set in admin per issue
-  Note:        Optional escalation in abandoned-cart email 2 if WELCOME10 is unused
+https://admin.shopify.com/store/usa-gummies/discounts
 ```
+
+Codes to **DELETE**:
+
+| Code            | Origin              | Notes                              |
+| --------------- | ------------------- | ---------------------------------- |
+| `CART15`        | Claude MCP, today   | 15% off — over the 10% guard rail  |
+| `REFER5`        | Claude MCP, today   | $5 fixed off, no min spend         |
+| `WELCOMEUSA10`  | Claude MCP, today   | Redundant test code (10% off)      |
+| `TESTNIGHT428`  | Claude MCP, today   | Test code created during MCP probe |
+
+Codes to **REVIEW**:
+
+| Code        | Notes                                                                |
+| ----------- | -------------------------------------------------------------------- |
+| `WELCOME10` | Already existed in store before today. Delete or leave disabled — no flow references it. |
 
 ---
 
 ## 📋 BEN'S TOMORROW WORKFLOW
 
 ```
-1. Open: https://admin.shopify.com/store/usa-gummies/email
+1. https://admin.shopify.com/store/usa-gummies/discounts
+   → Delete the 5 codes listed in § DISCOUNT CODE CLEANUP
+
+2. https://admin.shopify.com/store/usa-gummies/email
    → Verify Shopify Email is enabled (free up to 10K/mo)
 
-2. Open: https://admin.shopify.com/store/usa-gummies/discounts
-   → Create the 3 discount codes from § "DISCOUNT CODES" above
-   (Or I can create them via API tomorrow)
-
-3. Open: https://admin.shopify.com/store/usa-gummies/email/automations
+3. https://admin.shopify.com/store/usa-gummies/email/automations
    → Create 3 flows:
        a. Welcome Series      — trigger: customer subscribes
        b. Abandoned Checkout  — trigger: checkout abandoned
        c. First Order         — trigger: first paid order
    → Paste the email content from this doc into each
+   → IMPORTANT: do NOT add any discount-code merge tags
 
-4. Open: https://admin.shopify.com/store/usa-gummies/online_store/themes
+4. https://admin.shopify.com/store/usa-gummies/online_store/themes
    → Edit current theme → add Sign-up form OR install Privy app (free tier)
    → Configure exit intent + 30s timer triggers
-   → Use the popup copy from § "POPUP CAPTURE FORM"
+   → Use the popup copy from § POPUP CAPTURE FORM
 
 5. Test:
    → Open /shop incognito → wait 30s OR move mouse to top → popup appears
    → Submit a test email
-   → Check email arrives within 5 min with WELCOME10 code
+   → Check email arrives within 5 min — should be brand-story content,
+     NO discount code anywhere in the body
    → Add a product to cart → close browser → wait 1h
-   → Check abandoned cart email arrives
+   → Check abandoned cart email arrives — same, no discount
 
 6. Push live → done.
 ```
 
 ---
 
-## 🔔 What I'll do tomorrow morning to support this
+## 🔔 What Claude will do tomorrow morning to support this
 
-- Create the 3 discount codes via Shopify Admin API at 09:00 MT (saves you a step)
-- Verify Shopify Email is provisioned on the account (might need confirmation)
-- Walk you through the Shopify Email flow builder if it's new
-- Test the popup → email → discount chain end-to-end
+- Verify Shopify Email is provisioned on the account
+- Walk through the Shopify Email flow builder if it's new to you
+- Test the popup → email chain end-to-end
 - Wire the audit script to track email-captured signups as a new metric
