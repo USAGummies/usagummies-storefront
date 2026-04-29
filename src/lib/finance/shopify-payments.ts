@@ -194,3 +194,133 @@ export async function fetchShopifyPaymentsBalance(): Promise<ShopifyPaymentsBala
 
   return result;
 }
+
+// ---------------------------------------------------------------------------
+// Recent payouts (for reconciliation specialist)
+// ---------------------------------------------------------------------------
+
+/**
+ * Compact shape used by the reconciliation agent. Returns ONE entry per
+ * Shopify Payments payout in the requested window so Rene can tag each
+ * with CoA codes. Distinct from `fetchShopifyPaymentsBalance()` which
+ * returns aggregate balance + the single latest payout.
+ */
+export interface ShopifyPayoutLine {
+  /** Stable Shopify GraphQL gid. */
+  id: string;
+  /** ISO 8601 issued timestamp. */
+  issuedAt: string;
+  /** Net amount in the payout currency (Shopify's `net.amount`, parsed). */
+  amount: number;
+  /** Currency from Shopify (typically `USD`). */
+  currency: string;
+  /** Shopify status: PAID | COMPLETED | SCHEDULED | IN_TRANSIT | FAILED | CANCELED. */
+  status: string;
+}
+
+const PAYOUTS_WINDOW_QUERY = `
+  query Payouts($first: Int!) {
+    shopifyPaymentsAccount {
+      payouts(first: $first, reverse: true) {
+        edges {
+          node {
+            id
+            net { amount currencyCode }
+            status
+            issuedAt
+          }
+        }
+      }
+    }
+  }
+`;
+
+type PayoutsWindowResult = {
+  shopifyPaymentsAccount: {
+    payouts: {
+      edges: {
+        node: {
+          id: string;
+          net: { amount: string; currencyCode: string };
+          status: string;
+          issuedAt: string;
+        };
+      }[];
+    } | null;
+  } | null;
+};
+
+async function shopifyAdminGqlVars<T>(
+  query: string,
+  variables: Record<string, unknown>,
+): Promise<T | null> {
+  const token = SHOPIFY_ADMIN_TOKEN();
+  const domain = SHOPIFY_STORE_DOMAIN();
+  if (!token || !domain) return null;
+  try {
+    const res = await fetch(`https://${domain}/admin/api/2024-10/graphql.json`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Shopify-Access-Token": token,
+      },
+      body: JSON.stringify({ query, variables }),
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    if (json.errors) {
+      console.error(
+        "[shopify-payments] GraphQL errors (payouts window):",
+        JSON.stringify(json.errors).slice(0, 300),
+      );
+    }
+    return json.data as T;
+  } catch (err) {
+    console.error("[shopify-payments] Exception (payouts window):", err);
+    return null;
+  }
+}
+
+/**
+ * Fetch all Shopify Payments payouts within the last `daysWindow` days.
+ *
+ * Returns `null` ONLY when the integration is unreachable / unconfigured —
+ * the caller renders that as a degraded-mode line ("Shopify Payments scope
+ * missing" or "API unreachable"). An empty array means the API responded
+ * with zero payouts in the window — that's the canonical "no payouts to
+ * reconcile" state, not a failure.
+ *
+ * NEVER posts to QBO; this is a read-only feeder for the reconciliation
+ * specialist's prep digest. Class A surface only.
+ */
+export async function fetchRecentShopifyPayouts(
+  daysWindow: number,
+): Promise<ShopifyPayoutLine[] | null> {
+  if (!isShopifyPaymentsConfigured()) return null;
+  // Shopify GraphQL pagination requires `first: <int>`; we cap at 50 to
+  // bound cost. A 14-day window with a daily Shopify Payments cadence
+  // produces ≤ 14 payouts, so 50 is comfortable headroom.
+  const data = await shopifyAdminGqlVars<PayoutsWindowResult>(
+    PAYOUTS_WINDOW_QUERY,
+    { first: 50 },
+  );
+  if (!data?.shopifyPaymentsAccount) return null;
+
+  const cutoff = Date.now() - daysWindow * 86_400_000;
+  const out: ShopifyPayoutLine[] = [];
+  for (const edge of data.shopifyPaymentsAccount.payouts?.edges ?? []) {
+    const issuedMs = new Date(edge.node.issuedAt).getTime();
+    if (!Number.isFinite(issuedMs) || issuedMs < cutoff) continue;
+    const amount = Number.parseFloat(edge.node.net.amount);
+    if (!Number.isFinite(amount)) continue;
+    out.push({
+      id: edge.node.id,
+      issuedAt: edge.node.issuedAt,
+      amount,
+      currency: edge.node.net.currencyCode,
+      status: edge.node.status,
+    });
+  }
+  return out;
+}

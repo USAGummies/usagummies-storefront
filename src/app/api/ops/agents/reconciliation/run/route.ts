@@ -36,6 +36,10 @@ import { newRunContext } from "@/lib/ops/control-plane/run-id";
 import { auditStore } from "@/lib/ops/control-plane/stores";
 import { buildAuditEntry } from "@/lib/ops/control-plane/audit";
 import { getRecentFairePayouts, isFaireConfigured } from "@/lib/ops/faire-client";
+import {
+  fetchRecentShopifyPayouts,
+  isShopifyPaymentsConfigured,
+} from "@/lib/finance/shopify-payments";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -173,11 +177,34 @@ async function gatherDigestData(): Promise<DigestData> {
     degraded.push("faire-payouts: FAIRE_ACCESS_TOKEN not configured");
   }
 
-  // Shopify payouts — admin API gives a direct payouts feed. Deferred
-  // to a follow-up commit (needs adminRequest helper extended).
-  degraded.push(
-    "shopify-payouts: admin API payouts feed not wired (next commit); check Shopify Admin > Payouts manually",
-  );
+  // Shopify payouts — admin API direct feed via `fetchRecentShopifyPayouts`.
+  // Returns null when SHOPIFY_ADMIN_TOKEN is missing the `read_shopify_payments_payouts`
+  // scope OR the store doesn't use Shopify Payments — degrade gracefully.
+  if (isShopifyPaymentsConfigured()) {
+    const shopifyPayouts = await fetchRecentShopifyPayouts(14);
+    if (shopifyPayouts === null) {
+      degraded.push(
+        "shopify-payouts: API returned no shopifyPaymentsAccount — verify SHOPIFY_ADMIN_TOKEN has `read_shopify_payments_payouts` scope, or check Shopify Admin > Payouts manually",
+      );
+    } else {
+      for (const p of shopifyPayouts) {
+        // Skip canceled / failed payouts — not reconcilable revenue.
+        if (p.status === "FAILED" || p.status === "CANCELED") continue;
+        lines.push({
+          source: "shopify",
+          idOrRef: p.id,
+          paidAt: p.issuedAt,
+          amount: p.amount,
+          currency: p.currency,
+          suggestedAccount: COA_SUGGESTIONS.shopify,
+          provenance: `shopify:admin:payouts:${p.id}`,
+        });
+      }
+    }
+  } else {
+    degraded.push("shopify-payouts: SHOPIFY_ADMIN_TOKEN / SHOPIFY_STORE_DOMAIN not configured");
+  }
+
   degraded.push(
     "amazon-settlements: SP-API recon not wired (separate route P-FIN-07); check Amazon Seller Central > Payments manually",
   );
