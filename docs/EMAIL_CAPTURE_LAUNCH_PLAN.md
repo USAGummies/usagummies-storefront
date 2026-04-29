@@ -1,9 +1,16 @@
 # USA Gummies — Email Capture & Recovery Launch Plan
 
-**Status:** Content drafted, ready for paste-and-launch
+**Status:** Content drafted + 3 discount codes pre-created. Ready for paste-and-launch.
 **Tool:** Shopify Email (native, free up to 10K emails/mo)
 **Owner:** Ben (Shopify Admin UI work)
-**Estimated launch time:** 60-90 min tomorrow morning
+**Estimated launch time:** 30-45 min tomorrow morning (codes already done)
+
+> **Update 2026-04-28 18:35 PT (Claude prep):** All 3 discount codes are
+> pre-created in Shopify. Two manual tweaks needed in admin UI: (1) confirm
+> `WELCOME10` value = 10% (already existed in store from prior setup), and
+> (2) add `$20 minimum spend` to `REFER5` (MCP can't set min-spend; the code
+> is created at $5 off with no min so it must be tightened before launch).
+> See § DISCOUNT CODES STATUS below.
 
 ---
 
@@ -203,7 +210,23 @@ We email weekly, never sell your data, unsubscribe anytime.
 
 ---
 
-## 🎟️ DISCOUNT CODES TO CREATE
+## 🎟️ DISCOUNT CODES STATUS (pre-created 2026-04-28)
+
+| Code         | Status                           | Value     | Min spend | Once per customer | Manual fix needed                   |
+| ------------ | -------------------------------- | --------- | --------- | ----------------- | ----------------------------------- |
+| `WELCOME10`  | ✅ Already existed in store       | (verify)  | (verify)  | (verify)          | Confirm value = 10% in admin        |
+| `CART15`     | ✅ Created via MCP (id 1756621668723) | 15% off | none      | yes               | Add 48-hour expiry from issue       |
+| `REFER5`     | ✅ Created via MCP (id 1756621701491) | $5 off  | **none**  | yes               | **ADD $20 MIN SPEND** before launch |
+
+**Why min-spend matters on REFER5:** without it, a buyer could buy a $4 item and
+get -$1 ("we owe you"). MCP doesn't support min-spend on creation, so this
+must be tightened in Shopify Admin → Discounts → REFER5 → Minimum purchase
+requirements → Minimum amount = $20.
+
+> Test/redundant codes also exist: `TESTNIGHT428` (5% off, no min) and
+> `WELCOMEUSA10` (10% off, no min). Both can be deleted in admin.
+
+### Original code spec (for reference)
 
 ```
 WELCOME10
@@ -217,7 +240,7 @@ WELCOME10
 REFER5
   Type:        $ off
   Value:       $5
-  Min spend:   $20
+  Min spend:   $20            ← MUST be added manually post-creation
   Usage:       1 per customer (auto-issued post-purchase)
   Expires:     90 days
   Note:        Drive referral loops
@@ -227,7 +250,7 @@ CART15
   Value:       15%
   Min spend:   none
   Usage:       1 per customer
-  Expires:     48 hours
+  Expires:     48 hours        ← Set in admin per issue
   Note:        Optional escalation in abandoned-cart email 2 if WELCOME10 is unused
 ```
 
