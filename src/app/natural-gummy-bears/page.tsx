@@ -33,7 +33,7 @@ function resolveSiteUrl() {
 const SITE_URL = resolveSiteUrl();
 const PAGE_TITLE = "All Natural Gummy Bears | No Artificial Ingredients | USA Gummies";
 const PAGE_DESCRIPTION =
-  "All natural gummy bears made in the USA with fruit and vegetable colors, natural flavors, and no artificial dyes. Clean ingredients you can trust. Free shipping on 5+ bags.";
+  "All natural gummy bears made in the USA with fruit and vegetable colors, natural flavors, and no artificial dyes. Clean ingredients you can trust. Free shipping on every order.";
 const PAGE_URL = `${SITE_URL}/natural-gummy-bears`;
 const OG_IMAGE = "/opengraph-image";
 const ARTICLE_HEADLINE = "All Natural Gummy Bears";

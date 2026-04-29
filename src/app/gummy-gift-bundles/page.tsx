@@ -166,7 +166,7 @@ export default async function GummyGiftBundlesPage() {
             ))}
           </div>
           <p className="lp-sans mx-auto mt-8 max-w-[60ch] text-center text-[0.9rem] leading-[1.5] text-[var(--lp-ink)]/65">
-            Free shipping at 5+ bags. Savings grow as you add bags.
+            Free shipping on every order. Savings grow as you add bags.
           </p>
         </div>
       </section>

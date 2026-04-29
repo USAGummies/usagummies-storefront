@@ -47,7 +47,7 @@ export function EmptyCartView({
         <div className="text-center">
           <div className="text-lg font-black text-[var(--text)]">Your cart is empty</div>
           <div className="mt-1 text-xs text-[var(--muted)]">
-            Pick a bag count to get started. Free shipping at 5+ bags.
+            Pick a bag count to get started. Free shipping on every order.
           </div>
         </div>
         <div className="mt-4 grid grid-cols-3 gap-2">
@@ -108,7 +108,7 @@ export function EmptyCartView({
         <div className="text-center">
           <div className="text-lg font-black text-[var(--text)]">Your cart is empty</div>
           <div className="mt-1 text-sm text-[var(--muted)]">
-            Pick a bag count to get started. Free shipping at 5+ bags.
+            Pick a bag count to get started. Free shipping on every order.
           </div>
         </div>
         <div className="mt-5 grid grid-cols-3 gap-3">
@@ -163,7 +163,7 @@ export function EmptyCartView({
         <div className="mt-3 flex flex-wrap items-center justify-center gap-3 text-[11px] text-[var(--muted)]">
           <span>{"\uD83C\uDDFA\uD83C\uDDF8"} Made in USA</span>
           <span>&bull;</span>
-          <span>{"\uD83D\uDE9A"} Free shipping 5+</span>
+          <span>{"\uD83D\uDE9A"} Free shipping</span>
           <span>&bull;</span>
           <span>{"\u2B50"} {AMAZON_REVIEWS.aggregate.rating.toFixed(1)} stars</span>
         </div>

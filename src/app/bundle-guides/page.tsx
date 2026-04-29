@@ -177,7 +177,7 @@ export default async function BundleGuidesPage() {
             ))}
           </div>
           <p className="lp-sans mx-auto mt-10 max-w-[60ch] text-center text-[0.9rem] leading-[1.5] text-[var(--lp-ink)]/65">
-            Made in the USA. No artificial dyes. Free shipping on 5+ bags.
+            Made in the USA. No artificial dyes. Free shipping on every order.
           </p>
         </div>
       </section>

@@ -33,7 +33,7 @@ function resolveSiteUrl() {
 const SITE_URL = resolveSiteUrl();
 const PAGE_TITLE = "Dye-Free Gummy Bears Safe for Kids | USA Gummies";
 const PAGE_DESCRIPTION =
-  "Dye-free gummy bears parents can trust. USA Gummies are made in the USA with no artificial dyes, no Red 40, and all natural flavors. A cleaner candy choice for kids. Free shipping on 5+ bags.";
+  "Dye-free gummy bears parents can trust. USA Gummies are made in the USA with no artificial dyes, no Red 40, and all natural flavors. A cleaner candy choice for kids. Free shipping on every order.";
 const PAGE_URL = `${SITE_URL}/kids-safe-gummy-bears`;
 const OG_IMAGE = "/opengraph-image";
 const ARTICLE_HEADLINE = "Dye-Free Gummy Bears Safe for Kids";
@@ -133,7 +133,7 @@ const FAQS = [
   {
     question: "Where can I buy dye-free gummy bears for kids?",
     answer:
-      "You can order USA Gummies directly from our website with free shipping on orders of 5 or more bags. We also sell on Amazon. Visit our shop page for current pricing and bundle deals.",
+      "You can order USA Gummies directly from our website with free shipping on every order. We also sell on Amazon. Visit our shop page for current pricing and bundle deals.",
   },
 ];
 

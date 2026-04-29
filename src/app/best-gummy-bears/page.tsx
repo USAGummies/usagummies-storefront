@@ -33,7 +33,7 @@ function resolveSiteUrl() {
 const SITE_URL = resolveSiteUrl();
 const PAGE_TITLE = "Best Gummy Bears of 2026 | USA Gummies";
 const PAGE_DESCRIPTION =
-  "Discover the best gummy bears of 2026. USA Gummies are made in the USA with no artificial dyes, all natural flavors, and a classic soft chew. Free shipping on 5+ bags.";
+  "Discover the best gummy bears of 2026. USA Gummies are made in the USA with no artificial dyes, all natural flavors, and a classic soft chew. Free shipping on every order.";
 const PAGE_URL = `${SITE_URL}/best-gummy-bears`;
 const OG_IMAGE = "/opengraph-image";
 const ARTICLE_HEADLINE = "Best Gummy Bears of 2026";
@@ -121,7 +121,7 @@ const FAQS = [
   {
     question: "Do you offer free shipping?",
     answer:
-      "Yes. Orders of 5 or more bags ship free within the United States.",
+      "Yes. We ship free on every order within the United States. No minimum.",
   },
   {
     question: "Where are USA Gummies made?",

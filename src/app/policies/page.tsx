@@ -46,7 +46,7 @@ const POLICIES = [
   {
     href: "/policies/shipping",
     title: "Shipping Policy",
-    desc: "Processing times, delivery expectations, and tracking. Free shipping on 5+ bags.",
+    desc: "Processing times, delivery expectations, and tracking. Free shipping on every order.",
   },
   {
     href: "/policies/returns",

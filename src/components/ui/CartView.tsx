@@ -112,7 +112,7 @@ function bundleLabel(qty: number) {
 }
 
 function dealToastMessage(milestone: { qty: number; label: string }) {
-  if (milestone.qty === 5) return "Price update: free shipping unlocked.";
+  if (milestone.qty === 5) return "Price update: bundle pricing unlocked — $5.00/bag.";
   if (milestone.qty === 8) return "Price update: most picked price unlocked.";
   if (milestone.qty === 12) return "Price update: best per-bag price unlocked.";
   return `Price update: ${milestone.label.toLowerCase()}.`;
@@ -225,24 +225,24 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
     };
   });
 
+  // Free shipping is universal (FREE_SHIP_QTY=1, SHIPPING_COST=0). Keep
+  // these helpers around so the unlock-toast doesn't crash if a future
+  // change reintroduces a shipping threshold, but the live copy now reads
+  // as the universal-free-ship message.
   const unlocked = totalBags >= FREE_SHIP_QTY;
   const freeShipGap = Math.max(0, FREE_SHIP_QTY - totalBags);
-  const freeShipLine = unlocked
-    ? "Free shipping unlocked."
-    : `Add ${freeShipGap} more bag${freeShipGap === 1 ? "" : "s"} for free shipping.`;
+  const freeShipLine = "Free shipping included on every order.";
   const shippingCost = shippingForQty(totalBags);
-  const shippingSummary = unlocked ? "Free" : `$${SHIPPING_COST.toFixed(2)}`;
-  const shippingHint = unlocked
-    ? "Free shipping unlocked"
-    : `Add ${freeShipGap} bag${freeShipGap === 1 ? "" : "s"} to save $${SHIPPING_COST.toFixed(2)} on shipping`;
+  const shippingSummary = "Free";
+  const shippingHint = "Free shipping on every order — no minimum.";
   const subtotalNum = Number(subtotal?.replace?.(/[^0-9.]/g, "") || 0);
   const estimatedTotal = formatNumber(subtotalNum + shippingCost, summaryCurrency);
 
   let cartHeadline = "";
   if (totalBags < 5) {
-    cartHeadline = "Bundle pricing starts at 5 bags.";
+    cartHeadline = "Add 5 bags to drop to $5.00/bag.";
   } else if (totalBags < 8) {
-    cartHeadline = "Free shipping unlocked.";
+    cartHeadline = "Bundle pricing active — $5.00/bag.";
   } else if (totalBags === 8) {
     cartHeadline = "Most picked size active.";
   } else if (totalBags > 8 && totalBags < 12) {
@@ -405,9 +405,9 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
   const regularPerBagText = hasSavings ? formatNumber(BASE_PRICE, summaryCurrency) : "";
   const regularTotalText = hasSavings ? formatNumber(BASE_PRICE * totalBags, summaryCurrency) : "";
   const drawerSavingsLine = hasSavings
-    ? "You unlocked free shipping + bundle pricing."
+    ? "Bundle pricing active — free shipping included."
     : totalBags > 0
-      ? "Bundle pricing applies at 5+ bags."
+      ? "Add 5 bags to drop to $5.00/bag — free shipping on every order."
       : "";
   const bundleSavingsText = bundleSavings > 0
     ? `You're saving ${formatNumber(bundleSavings, summaryCurrency)} with your bundle`

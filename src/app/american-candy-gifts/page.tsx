@@ -33,7 +33,7 @@ function resolveSiteUrl() {
 const SITE_URL = resolveSiteUrl();
 const PAGE_TITLE = "American-Made Candy Gifts | USA Gummies Gift Ideas";
 const PAGE_DESCRIPTION =
-  "Looking for American-made candy gifts? USA Gummies are made in the USA with no artificial dyes. Perfect for birthdays, holidays, care packages, and corporate gifts. Free shipping on 5+ bags.";
+  "Looking for American-made candy gifts? USA Gummies are made in the USA with no artificial dyes. Perfect for birthdays, holidays, care packages, and corporate gifts. Free shipping on every order.";
 const PAGE_URL = `${SITE_URL}/american-candy-gifts`;
 const OG_IMAGE = "/opengraph-image";
 const ARTICLE_HEADLINE = "American-Made Candy Gifts";
@@ -117,7 +117,7 @@ const FAQS = [
   {
     question: "How long does shipping take?",
     answer:
-      "Most orders ship within 1-2 business days and arrive in 3-5 business days via USPS. Free shipping kicks in at 5+ bags.",
+      "Most orders ship within 1-2 business days and arrive in 3-5 business days via USPS. Free shipping is included on every order.",
   },
   {
     question: "Are USA Gummies a good gift for kids?",

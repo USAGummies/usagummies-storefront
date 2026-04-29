@@ -7,7 +7,7 @@ Brand facts:
 - USA Gummies are made in the USA.
 - All natural flavors; no artificial dyes.
 - Ships within 24 hours.
-- Free shipping on 5+ bags.
+- Free shipping on every order.
 - Satisfaction guarantee for customers.
 
 Guidelines:

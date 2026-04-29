@@ -51,7 +51,7 @@ const SECTIONS = [
   {
     title: "Pricing",
     body:
-      "Prices are shown in your cart at checkout. Savings pricing and shipping eligibility (including Free shipping on 5+ bags) are displayed clearly before you purchase.",
+      "Prices are shown in your cart at checkout. Savings pricing and shipping eligibility (including Free shipping on every order) are displayed clearly before you purchase.",
   },
   {
     title: "Checkout & payments",
