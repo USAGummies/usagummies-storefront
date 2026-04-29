@@ -23,12 +23,12 @@ type MoneyV2 = { amount: string; currencyCode: string };
 
 const FEATURED_BUNDLE_QTYS = [5, 8, 12];
 const SAVINGS_LADDER = [
-  { qty: 5, label: "Save + free ship", caption: "5+ bags" },
+  { qty: 5, label: "$5.00/bag", caption: "5 bags" },
   { qty: 8, label: "Most picked", caption: "8 bags" },
   { qty: 12, label: "Best price", caption: "12 bags" },
 ];
 const PROGRESS_MILESTONES = [
-  { qty: 5, label: "Save + free ship" },
+  { qty: 5, label: "$5.00/bag" },
   { qty: 8, label: "Most picked" },
   { qty: 12, label: "Best price" },
 ];
@@ -65,8 +65,7 @@ function clampPct(pct: number) {
 
 function bundleSummaryText(lineBags: number) {
   if (!lineBags) return "Bundle: —";
-  const shipping = lineBags >= FREE_SHIP_QTY ? "Free Shipping" : "Ships via Amazon";
-  return `Bundle: ${lineBags} Bag${lineBags === 1 ? "" : "s"} (${shipping})`;
+  return `Bundle: ${lineBags} Bag${lineBags === 1 ? "" : "s"} (Free Shipping)`;
 }
 
 function useCountUp(value: number, duration = 520) {
@@ -251,7 +250,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
   } else {
     cartHeadline = "Best per-bag price active.";
   }
-  const cartSubline = "Free shipping at 5+ bags.";
+  const cartSubline = "Free shipping on every order.";
 
   const dealStatusLabel = bestPriceReached
     ? "Best price active"
@@ -970,7 +969,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
                 </summary>
                 <ul className="mt-2 space-y-1">
                   <li>Savings start at 5 bags</li>
-                  <li>Free shipping at 5+ bags</li>
+                  <li>Free shipping on every order</li>
                   <li>8 bags is the most picked option</li>
                   <li>Per-bag price caps at {formatNumber(MIN_PER_BAG, summaryCurrency)} after 12+ bags</li>
                 </ul>

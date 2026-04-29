@@ -49,7 +49,7 @@ LEVER:    Brand story (USA, dye-free, real fruit) — NOT discounting
 >
 > [SHOP NOW →]({{shop_url}})
 >
-> — Ben Stutman, Founder
+> — The USA Gummies Team 🇺🇸
 
 ### Email 2 (+24h)
 
@@ -112,7 +112,7 @@ LEVER:    Brand story (USA, dye-free, real fruit) — NOT discounting
 >
 > [COMPLETE YOUR ORDER →]({{checkout_url}})
 >
-> P.S. — free shipping on 5+ bags.
+> P.S. — free shipping on every order.
 
 ### Email 2 (+24h after abandonment)
 
@@ -154,7 +154,7 @@ LEVER:    Brand story (USA, dye-free, real fruit) — NOT discounting
 > - You'll get a tracking number by email
 > - Most orders arrive in 2-5 business days
 >
-> Reply to this email if anything goes wrong — Ben (the founder, not a robot) reads every reply.
+> Reply to this email if anything goes wrong — a real human reads every reply.
 >
 > Thanks for backing American candy.
 >

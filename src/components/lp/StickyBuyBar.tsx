@@ -47,7 +47,7 @@ export function StickyBuyBar() {
       <div className="flex flex-col leading-tight">
         <span className="lp-sticky-text">All-American Gummy Bears</span>
         <span className="lp-label text-[0.62rem] text-[var(--lp-cream)]/80">
-          7.5 oz · Dye-Free · $5.99
+          $5.99 · Free shipping · Dye-Free
         </span>
       </div>
       <Link

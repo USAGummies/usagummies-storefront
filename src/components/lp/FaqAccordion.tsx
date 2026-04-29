@@ -24,7 +24,7 @@ const FAQ = [
   {
     q: "How fast do orders ship?",
     // From BagSlider copy already live on the site: "Ships within 24 hours"
-    a: "Within 24 hours. Standard ground is 3–5 days, free on orders of 5 bags or more.",
+    a: "Within 24 hours. Standard ground is 3–5 days, free on every order.",
   },
   {
     q: "What's your return policy?",

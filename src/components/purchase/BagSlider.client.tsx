@@ -33,7 +33,7 @@ const MIN_QTY = 1;
 const MAX_QTY = 12;
 
 const MILESTONES = [
-  { qty: 5, label: "Free shipping", color: "#2D7A3A" },
+  { qty: 5, label: "$5.00/bag", color: "#2D7A3A" },
   { qty: 8, label: "Most popular", color: "#1B2A4A" },
   { qty: 12, label: "Best price", color: "#c7362c" },
 ] as const;
@@ -316,7 +316,7 @@ export default function BagSlider({
             <span className="text-[var(--candy-yellow,#f5c842)]">&#9733;</span>
             <span>4.8 stars</span>
             <span className="text-[var(--border)]">&middot;</span>
-            <span>Free shipping on 5+</span>
+            <span>Free shipping</span>
             <span className="text-[var(--border)]">&middot;</span>
             <span>Made in USA</span>
           </div>

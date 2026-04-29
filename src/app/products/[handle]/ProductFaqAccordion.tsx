@@ -22,7 +22,7 @@ const PRODUCT_FAQS = [
   {
     question: "What is the 5-pack deal?",
     answer:
-      "The 5-pack is $25.00 ($5.00 per bag) with FREE shipping included. That's over 15% off the single-bag retail price.",
+      "The 5-pack is $25.00 ($5.00 per bag) — that's over 15% off the single-bag retail price. Free shipping is included on every order.",
   },
   {
     question: "How should I store gummy bears?",
@@ -32,7 +32,7 @@ const PRODUCT_FAQS = [
   {
     question: "Do you ship to all 50 states?",
     answer:
-      "Yes! We ship to all 50 states. Orders of $22.50+ get free shipping. Alaska, Hawaii, and Puerto Rico have a flat $13.99 shipping rate.",
+      "Yes! We ship to all 50 states with free shipping on every order — no minimum.",
   },
 ];
 

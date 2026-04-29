@@ -13,14 +13,14 @@ const CHECKOUT_URL_1 = "/go/checkout?qty=1";
 const TOP_REVIEWS = AMAZON_REVIEWS.reviews.slice(0, 3);
 
 export const metadata: Metadata = {
-  title: "USA Gummies 5-Pack Bundle | Free Shipping | Made in USA",
+  title: "USA Gummies | Free Shipping on Every Order | Made in USA",
   description:
-    "Classic American gummy bears — no artificial dyes, all natural flavors. Get the 5-pack bundle with free shipping. Made in the USA.",
+    "America's Candy — classic gummy bears, no artificial dyes, all natural flavors. Free shipping on every order, no minimum. Made in the USA.",
   robots: { index: false, follow: false },
   openGraph: {
-    title: "USA Gummies 5-Pack Bundle | Free Shipping",
+    title: "USA Gummies | Free Shipping on Every Order",
     description:
-      "Classic American gummy bears — no artificial dyes, all natural flavors. Get the 5-pack bundle with free shipping.",
+      "America's Candy — no artificial dyes, all natural flavors. Free shipping on every order. Made in the USA.",
     images: [{ url: "/Hero-pack.jpeg" }],
   },
 };
@@ -325,7 +325,7 @@ export default function GoLandingPage() {
 
             <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 6, marginTop: 10, fontSize: 11, color: "#5f5b56", fontWeight: 500 }}>
               <span>🔒</span>
-              <span>Family-owned American business · Warehouses in Washington & Pennsylvania</span>
+              <span>America&rsquo;s Candy &middot; 100% American supply chain &middot; 30-day satisfaction guarantee</span>
             </div>
           </div>
 
@@ -436,10 +436,10 @@ export default function GoLandingPage() {
           </div>
 
           <a
-            href="https://www.usagummies.com/review"
+            href="/shop"
             style={{ display: "inline-block", marginTop: 16, fontSize: 13, fontWeight: 600, color: "#1B2A4A", textDecoration: "underline", textUnderlineOffset: 3 }}
           >
-            Read all reviews →
+            See all options →
           </a>
         </div>
       </section>
@@ -472,7 +472,7 @@ export default function GoLandingPage() {
             READY TO TRY THEM?
           </span>
           <p style={{ color: "#5f5b56", fontSize: 14, lineHeight: 1.6, maxWidth: 440, margin: "8px auto 0" }}>
-            Free shipping on the 5-pack. Or grab a single bag to try us out — ships in 1–2 days.
+            Free shipping on every order. Try 1 bag or stack up for the best per-bag price — ships in 1–2 days.
           </p>
         </div>
         <a href={CHECKOUT_URL} className="lp-cta">
@@ -501,7 +501,7 @@ export default function GoLandingPage() {
         </a>
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 6, marginTop: 10, fontSize: 11, color: "#5f5b56", fontWeight: 500 }}>
           <span>🔒</span>
-          <span>Family-owned American business · Love them or your money back</span>
+          <span>America&rsquo;s Candy &middot; Love them or your money back</span>
         </div>
         <div style={{ marginTop: 12, textAlign: "center" }}>
           <a
