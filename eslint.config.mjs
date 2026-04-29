@@ -41,6 +41,7 @@ export default [
       "@next/next/no-html-link-for-pages": "error",
       "@next/next/no-img-element": "warn",
       "react/no-danger": "off",
+      "react/no-unescaped-entities": "warn",
       "react-hooks/exhaustive-deps": "off",
     },
   },
