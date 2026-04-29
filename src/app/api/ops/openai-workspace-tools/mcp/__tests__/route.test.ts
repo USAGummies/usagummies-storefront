@@ -11,16 +11,18 @@ import * as authModule from "@/lib/ops/abra-auth";
 
 const mockedAuth = authModule.isAuthorized as unknown as ReturnType<typeof vi.fn>;
 
-function req(body?: unknown): Request {
+function req(body?: unknown, headers?: HeadersInit): Request {
   return new Request("http://localhost/api/ops/openai-workspace-tools/mcp", {
     method: body === undefined ? "GET" : "POST",
     body: body === undefined ? undefined : JSON.stringify(body),
+    headers,
   });
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   mockedAuth.mockResolvedValue(true);
+  delete process.env.OPENAI_WORKSPACE_CONNECTOR_SECRET;
 });
 
 describe("OpenAI workspace MCP route", () => {
@@ -43,6 +45,16 @@ describe("OpenAI workspace MCP route", () => {
     expect(body.tools.map((tool) => tool.name).sort()).toEqual(["fetch", "search"]);
   });
 
+  it("GET allows the dedicated OpenAI workspace connector bearer", async () => {
+    mockedAuth.mockResolvedValueOnce(false);
+    process.env.OPENAI_WORKSPACE_CONNECTOR_SECRET = "workspace-connector-secret";
+    const { GET } = await import("../route");
+    const res = await GET(
+      req(undefined, { authorization: "Bearer workspace-connector-secret" }),
+    );
+    expect(res.status).toBe(200);
+  });
+
   it("401s unauthenticated POST", async () => {
     mockedAuth.mockResolvedValueOnce(false);
     const { POST } = await import("../route");
@@ -63,6 +75,19 @@ describe("OpenAI workspace MCP route", () => {
       "fetch",
       "search",
     ]);
+  });
+
+  it("POST allows the dedicated OpenAI workspace connector bearer", async () => {
+    mockedAuth.mockResolvedValueOnce(false);
+    process.env.OPENAI_WORKSPACE_CONNECTOR_SECRET = "workspace-connector-secret";
+    const { POST } = await import("../route");
+    const res = await POST(
+      req(
+        { jsonrpc: "2.0", id: 1, method: "tools/list" },
+        { authorization: "Bearer workspace-connector-secret" },
+      ),
+    );
+    expect(res.status).toBe(200);
   });
 
   it("POST search returns MCP text content with connector results", async () => {

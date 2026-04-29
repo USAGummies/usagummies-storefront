@@ -31,6 +31,7 @@ function fingerprint(overrides: Partial<EnvFingerprint> = {}): EnvFingerprint {
     GOOGLE_DRIVE_SHIPPING_ARTIFACTS_PARENT_ID: false,
     GOOGLE_DRIVE_VENDOR_ONBOARDING_PARENT_ID: false,
     WHOLESALE_INQUIRY_SECRET: false,
+    OPENAI_WORKSPACE_CONNECTOR_SECRET: false,
     SLACK_BOT_TOKEN: false,
     SLACK_SIGNING_SECRET: false,
     CRON_SECRET: false,
@@ -50,6 +51,7 @@ describe("deriveEnvStatus — all-ready", () => {
       GOOGLE_DRIVE_SHIPPING_ARTIFACTS_PARENT_ID: true,
       GOOGLE_DRIVE_VENDOR_ONBOARDING_PARENT_ID: true,
       WHOLESALE_INQUIRY_SECRET: true,
+      OPENAI_WORKSPACE_CONNECTOR_SECRET: true,
       SLACK_BOT_TOKEN: true,
       SLACK_SIGNING_SECRET: true,
       CRON_SECRET: true,
@@ -78,6 +80,16 @@ describe("deriveEnvStatus — missing upload parent", () => {
     expect(row).toBeDefined();
     expect(row!.status).toBe("missing");
     expect(row!.impactWhenMissing).toMatch(/upload/i);
+  });
+
+  it("missing OPENAI_WORKSPACE_CONNECTOR_SECRET reports ChatGPT connector impact", () => {
+    const status = deriveEnvStatus(fingerprint());
+    const row = status.rows.find(
+      (r) => r.key === "OPENAI_WORKSPACE_CONNECTOR_SECRET",
+    );
+    expect(row).toBeDefined();
+    expect(row!.status).toBe("missing");
+    expect(row!.impactWhenMissing).toMatch(/ChatGPT custom connector/i);
   });
 });
 

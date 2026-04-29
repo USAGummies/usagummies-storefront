@@ -36,6 +36,8 @@ export interface EnvFingerprint {
   GOOGLE_DRIVE_VENDOR_ONBOARDING_PARENT_ID: boolean;
   // Wholesale inquiry portal — token mint secret.
   WHOLESALE_INQUIRY_SECRET: boolean;
+  // OpenAI / ChatGPT workspace connector — dedicated bearer secret.
+  OPENAI_WORKSPACE_CONNECTOR_SECRET: boolean;
   // Slack — bot token + signing secret.
   SLACK_BOT_TOKEN: boolean;
   SLACK_SIGNING_SECRET: boolean;
@@ -113,6 +115,12 @@ const PURPOSES: Record<string, { purpose: string; impactWhenMissing: string }> =
       impactWhenMissing:
         "/api/leads omits inquiryUrl on wholesale submissions; the form's existing success state still works, but no bookmarkable receipt page.",
     },
+    OPENAI_WORKSPACE_CONNECTOR_SECRET: {
+      purpose:
+        "Bearer secret for the ChatGPT workspace MCP connector. Existing ops session/CRON auth still works internally.",
+      impactWhenMissing:
+        "ChatGPT custom connector cannot authenticate with a stable bearer token; internal ops users can still access the route through normal ops auth.",
+    },
     SLACK_BOT_TOKEN: {
       purpose: "Bot token used for Slack file uploads + thread posts.",
       impactWhenMissing:
@@ -154,6 +162,7 @@ const ENV_DISPLAY_ORDER: Array<keyof EnvFingerprint> = [
   "GOOGLE_DRIVE_SHIPPING_ARTIFACTS_PARENT_ID",
   "GOOGLE_DRIVE_VENDOR_ONBOARDING_PARENT_ID",
   "WHOLESALE_INQUIRY_SECRET",
+  "OPENAI_WORKSPACE_CONNECTOR_SECRET",
 ];
 
 export function deriveEnvStatus(fingerprint: EnvFingerprint): EnvStatus {

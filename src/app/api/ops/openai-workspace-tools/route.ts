@@ -8,7 +8,7 @@
  */
 import { NextResponse } from "next/server";
 
-import { isAuthorized } from "@/lib/ops/abra-auth";
+import { isOpenAIWorkspaceAuthorized } from "@/lib/ops/openai-workspace-tools/auth";
 import {
   connectorSearchDocuments,
   listOpenAIWorkspaceTools,
@@ -19,7 +19,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request): Promise<Response> {
-  if (!(await isAuthorized(req))) {
+  if (!(await isOpenAIWorkspaceAuthorized(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

@@ -30,6 +30,7 @@ const ENV_KEYS = [
   "GOOGLE_DRIVE_SHIPPING_ARTIFACTS_PARENT_ID",
   "GOOGLE_DRIVE_VENDOR_ONBOARDING_PARENT_ID",
   "WHOLESALE_INQUIRY_SECRET",
+  "OPENAI_WORKSPACE_CONNECTOR_SECRET",
   "SLACK_BOT_TOKEN",
   "SLACK_SIGNING_SECRET",
   "CRON_SECRET",
@@ -97,18 +98,25 @@ describe("env values never leak", () => {
     process.env.GMAIL_OAUTH_REFRESH_TOKEN =
       "1//06ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij_real_token_shape";
     process.env.WHOLESALE_INQUIRY_SECRET = "another-secret-that-should-stay-hidden-foo-bar-baz";
+    process.env.OPENAI_WORKSPACE_CONNECTOR_SECRET =
+      "openai-workspace-secret-that-should-stay-hidden";
     const { GET } = await import("../route");
     const res = await GET(buildReq());
     const text = await res.text();
     expect(text).not.toContain(SECRET);
     expect(text).not.toContain("1//06ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij");
     expect(text).not.toContain("another-secret-that-should-stay-hidden");
+    expect(text).not.toContain("openai-workspace-secret-that-should-stay-hidden");
     // Status is correctly reported as "ready" though.
     const body = JSON.parse(text) as {
       env: { rows: Array<{ key: string; status: string }> };
     };
     const cronRow = body.env.rows.find((r) => r.key === "CRON_SECRET");
     expect(cronRow?.status).toBe("ready");
+    const connectorRow = body.env.rows.find(
+      (r) => r.key === "OPENAI_WORKSPACE_CONNECTOR_SECRET",
+    );
+    expect(connectorRow?.status).toBe("ready");
   });
 });
 

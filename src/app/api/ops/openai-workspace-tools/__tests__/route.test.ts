@@ -8,15 +8,17 @@ import * as authModule from "@/lib/ops/abra-auth";
 
 const mockedAuth = authModule.isAuthorized as unknown as ReturnType<typeof vi.fn>;
 
-function req(): Request {
+function req(headers?: HeadersInit): Request {
   return new Request("http://localhost/api/ops/openai-workspace-tools", {
     method: "GET",
+    headers,
   });
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   mockedAuth.mockResolvedValue(true);
+  delete process.env.OPENAI_WORKSPACE_CONNECTOR_SECRET;
 });
 
 describe("GET /api/ops/openai-workspace-tools", () => {
@@ -48,6 +50,16 @@ describe("GET /api/ops/openai-workspace-tools", () => {
     expect(body.tools.find((tool) => tool.id === "ops.sales.snapshot")?.readOnly).toBe(
       true,
     );
+  });
+
+  it("allows the dedicated OpenAI workspace connector bearer", async () => {
+    mockedAuth.mockResolvedValueOnce(false);
+    process.env.OPENAI_WORKSPACE_CONNECTOR_SECRET = "workspace-connector-secret";
+    const { GET } = await import("../route");
+    const res = await GET(
+      req({ authorization: "Bearer workspace-connector-secret" }),
+    );
+    expect(res.status).toBe(200);
   });
 
   it("does not expose secret-shaped strings", async () => {

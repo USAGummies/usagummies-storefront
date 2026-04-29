@@ -52,11 +52,13 @@ The route is diagnostic and auth-gated. It exposes tool metadata only. It does n
 
 Phase 1 adds the read-only MCP-compatible endpoint:
 
+- `src/lib/ops/openai-workspace-tools/auth.ts`
 - `src/lib/ops/openai-workspace-tools/mcp.ts`
 - `GET /api/ops/openai-workspace-tools/mcp`
 - `POST /api/ops/openai-workspace-tools/mcp`
 
 The MCP endpoint supports `initialize`, `tools/list`, and `tools/call` for `search` / `fetch` only. It has no write tools.
+External ChatGPT connector auth uses `OPENAI_WORKSPACE_CONNECTOR_SECRET` as a dedicated bearer token. Existing internal ops auth remains supported.
 
 ## 4. Tool Classes
 
@@ -133,7 +135,7 @@ Shipped in this change:
 - `search(query)` over registry connector documents.
 - `fetch(id)` for one connector document with metadata.
 - JSON-RPC-style `initialize`, `tools/list`, and `tools/call` handling.
-- Auth gate via `isAuthorized()`.
+- Auth gate via existing ops auth OR `Authorization: Bearer <OPENAI_WORKSPACE_CONNECTOR_SECRET>`.
 - No write imports, no env value reads, no approval opening.
 
 The endpoint exposes:
@@ -148,6 +150,7 @@ Current scope:
 - No write tools.
 - No raw env values.
 - Session or bearer auth through the existing ops `isAuthorized()` path.
+- Dedicated connector bearer auth through `OPENAI_WORKSPACE_CONNECTOR_SECRET`.
 
 Acceptance:
 
