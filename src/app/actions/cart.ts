@@ -9,7 +9,7 @@ import {
   updateLineQuantity,
   replaceCartWithVariant,
   getCart as getCartInternal,
-} from "@/lib/cart";
+} from "@/lib/cart.actions";
 import { normalizeSingleBagVariant } from "@/lib/bundles/atomic";
 import { getSafeCheckoutUrl } from "@/lib/checkout";
 
@@ -17,7 +17,8 @@ import { getSafeCheckoutUrl } from "@/lib/checkout";
  * Server actions wrapper layer.
  *
  * Design goal: make cart UX components resilient.
- * - All Shopify cart mutations live in src/lib/cart.ts.
+ * - All Shopify cart mutations live in src/lib/cart.actions.ts.
+ * - Pure helpers (GraphQL, types) live in src/lib/cart.ts.
  * - UI components call these actions (FormData) or the REST fallback (/api/cart).
  */
 

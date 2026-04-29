@@ -2,7 +2,7 @@
 // LIVE COMMERCE — preserves CartView, ReviewsSummary client logic. Wraps the
 // existing markup in a PageHero + cream section. Do not change cart behavior.
 import type { Metadata } from "next";
-import { getCart } from "@/lib/cart";
+import { getCart } from "@/lib/cart.actions";
 import { CartView } from "@/components/ui/CartView";
 import { ReviewsSummary } from "@/components/reviews/ReviewsSummary";
 import { PageHero } from "@/components/lp/PageHero";

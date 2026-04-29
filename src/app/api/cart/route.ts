@@ -6,9 +6,8 @@ import {
   updateLineQuantity,
   replaceCartWithVariant,
   getCart,
-  getCartById,
-  getCartConfigStatus,
-} from "@/lib/cart";
+} from "@/lib/cart.actions";
+import { getCartById, getCartConfigStatus } from "@/lib/cart";
 import { normalizeSingleBagVariant } from "@/lib/bundles/atomic";
 
 /* ── In-memory rate limiter (resets on cold start — acceptable on Vercel) ── */
