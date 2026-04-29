@@ -63,6 +63,8 @@ const SELF_AUTHENTICATED_PREFIXES = [
   "/api/ops/smoke", // SMOKE — cross-integration health check (isAuthorized)
   "/api/ops/shopify/", // SHOPIFY DTC — unfulfilled queue + dispatch bridge (isAuthorized)
   "/api/ops/upload", // UPLOAD — public-facing NCS-001 / vendor-doc capture (used by /upload/ncs and the wholesale inquiry receipt page). Route enforces its own perimeter: rate limit (5/min/IP), MIME allowlist, 10 MB cap, Drive-only writes (fail-closed if env missing).
+  "/api/ops/operating-memory/", // OPERATING MEMORY — P0-1 drift detector + P0-3 transcript saver (recent fetch). isCronAuthorized() bearer CRON_SECRET. Added 2026-04-29 — was inadvertently 401-blocked at the middleware layer despite correct in-route auth.
+  "/api/ops/transcript/", // TRANSCRIPT CAPTURE — P0-3 operating-memory transcript saver. POST /capture is the canonical write surface. isCronAuthorized() bearer CRON_SECRET. Added 2026-04-29 — same allowlist gap as operating-memory above.
 ];
 
 function isSelfAuthenticated(pathname: string): boolean {
