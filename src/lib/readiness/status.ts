@@ -372,6 +372,13 @@ export const SMOKE_CHECKLIST: readonly SmokeCheckItem[] = [
       "Internal ingest review queue. Status dropdowns + review notes work; nothing publishes to /where-to-buy.",
     surface: "operator",
   },
+  {
+    href: "/api/ops/openai-workspace-tools/mcp",
+    label: "OpenAI workspace MCP",
+    description:
+      "Read-only ChatGPT connector endpoint. GET should show search/fetch tools; POST search/fetch stays read-only.",
+    surface: "operator",
+  },
 ];
 
 // ----- helpers -------------------------------------------------------

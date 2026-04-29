@@ -94,6 +94,10 @@ export async function GET(req: Request): Promise<Response> {
       },
       { url: "/api/ops/ap-packets", label: "AP packets list" },
       { url: "/api/ops/locations/ingest", label: "Location ingest queue" },
+      {
+        url: "/api/ops/openai-workspace-tools/mcp",
+        label: "OpenAI workspace MCP connector",
+      },
     ],
   });
 }

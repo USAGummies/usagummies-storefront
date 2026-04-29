@@ -248,5 +248,6 @@ describe("smoke checklist — stable shape", () => {
     expect(hrefs).toContain("/ops/finance/review");
     expect(hrefs).toContain("/ops/ap-packets");
     expect(hrefs).toContain("/ops/locations");
+    expect(hrefs).toContain("/api/ops/openai-workspace-tools/mcp");
   });
 });

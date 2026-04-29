@@ -88,6 +88,7 @@ describe("happy path", () => {
     expect(urls).toContain("/api/ops/control-plane/health");
     expect(urls).toContain("/api/ops/ap-packets");
     expect(urls).toContain("/api/ops/locations/ingest");
+    expect(urls).toContain("/api/ops/openai-workspace-tools/mcp");
   });
 });
 
