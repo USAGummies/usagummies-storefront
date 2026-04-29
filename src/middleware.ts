@@ -72,6 +72,8 @@ const SELF_AUTHENTICATED_PREFIXES = [
   "/api/ops/wholesale/completed", // WHOLESALE COMPLETED — monthly-close audit envelope query surface, Phase 35.f.6.b (isAuthorized session + CRON_SECRET).
   "/api/ops/wholesale/chase-email", // WHOLESALE CHASE EMAIL — draft chase email for a stalled flow, Phase 35.f.7 (isAuthorized session + CRON_SECRET, read-only never sends).
   "/api/ops/wholesale/send-ap-packet", // WHOLESALE AP PACKET SEND — explicit-context send route, Phase 35.f.3.c (isAuthorized session + CRON_SECRET). Sends NCS-001 + CIF-001 + invoice draft via Gmail with BCC rene@. Used for first-customer Mike + future one-offs.
+  "/api/ops/operating-memory/", // OPERATING MEMORY — P0-1 drift detector + P0-3 transcript saver (recent fetch). isCronAuthorized() bearer CRON_SECRET. Added 2026-04-29 — was inadvertently 401-blocked at the middleware layer despite correct in-route auth.
+  "/api/ops/transcript/", // TRANSCRIPT CAPTURE — P0-3 operating-memory transcript saver. POST /capture is the canonical write surface. isCronAuthorized() bearer CRON_SECRET. Added 2026-04-29 — same allowlist gap as operating-memory above.
 ];
 
 function isSelfAuthenticated(pathname: string): boolean {
