@@ -1,6 +1,6 @@
 # OpenAI ChatGPT Workspace Agents Integration
 
-**Status:** Phase 0 shipped — doctrine + internal tool registry  
+**Status:** Phase 1 shipped — read-only MCP search/fetch connector
 **Owner:** Ben  
 **Last updated:** 2026-04-29
 
@@ -43,12 +43,20 @@ flowchart LR
   Closers --> Audit["#ops-audit + KV/audit stores"]
 ```
 
-Phase 0 creates the typed allowlist:
+Phase 0 created the typed allowlist:
 
 - `src/lib/ops/openai-workspace-tools/registry.ts`
 - `GET /api/ops/openai-workspace-tools`
 
 The route is diagnostic and auth-gated. It exposes tool metadata only. It does not execute any tool.
+
+Phase 1 adds the read-only MCP-compatible endpoint:
+
+- `src/lib/ops/openai-workspace-tools/mcp.ts`
+- `GET /api/ops/openai-workspace-tools/mcp`
+- `POST /api/ops/openai-workspace-tools/mcp`
+
+The MCP endpoint supports `initialize`, `tools/list`, and `tools/call` for `search` / `fetch` only. It has no write tools.
 
 ## 4. Tool Classes
 
@@ -120,19 +128,32 @@ Shipped in this change:
 
 ### Phase 1 — Read-Only MCP Connector
 
-Build a remote MCP endpoint with:
+Shipped in this change:
 
-- `search(query)` over registry documents and selected ops read-model summaries.
-- `fetch(id)` for full source details.
+- `search(query)` over registry connector documents.
+- `fetch(id)` for one connector document with metadata.
+- JSON-RPC-style `initialize`, `tools/list`, and `tools/call` handling.
+- Auth gate via `isAuthorized()`.
+- No write imports, no env value reads, no approval opening.
+
+The endpoint exposes:
+
+- `GET /api/ops/openai-workspace-tools/mcp` for read-only discovery.
+- `POST /api/ops/openai-workspace-tools/mcp` for MCP tool calls.
+
+Current scope:
+
+- `search(query)` over registry documents.
+- `fetch(id)` for full registry-document details.
 - No write tools.
 - No raw env values.
-- Session or bearer auth compatible with ChatGPT custom connectors.
+- Session or bearer auth through the existing ops `isAuthorized()` path.
 
 Acceptance:
 
-- ChatGPT can answer "what needs Ben's attention today?" from `/ops/sales`.
-- ChatGPT can answer "what is broken after deploy?" from `/ops/readiness`.
-- ChatGPT can summarize receipt review packets without changing status.
+- ChatGPT can search approved tool inventory.
+- ChatGPT can fetch the backing route/surface and safety notes for an approved tool.
+- ChatGPT cannot call approval-request or execution tools through MCP.
 
 ### Phase 2 — Approval Request Tools
 
