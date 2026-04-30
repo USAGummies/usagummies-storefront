@@ -19,7 +19,7 @@
  *
  * Output: creative-drafts/<YYYYMMDD-HHMMSS>-<slug>-<n>.png
  */
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -42,10 +42,24 @@ if (existsSync(ENV_FILE)) {
 }
 
 // ── Brand reference defaults ───────────────────────────────────────────
-const DEFAULT_REFS = [
-  "public/brand/photos/bag-1776.jpg",      // hero bag photo (real product)
-  "public/brand/logo-horizontal.png",      // logo lockup
-];
+// Pulls from creative-drafts/.drive-cache/ first (Drive-sourced, higher
+// quality), falling back to repo files. To refresh the cache, ask Claude
+// in chat to pull specific Drive file IDs via the Drive MCP tools.
+function discoverDefaultRefs(repo) {
+  const cacheDir = path.join(repo, "creative-drafts", ".drive-cache");
+  const refs = [];
+  if (existsSync(cacheDir)) {
+    for (const f of readdirSync(cacheDir)) {
+      if (/\.(png|jpe?g|webp)$/i.test(f)) refs.push(path.join("creative-drafts", ".drive-cache", f));
+    }
+  }
+  if (refs.length === 0) {
+    // Fallback to repo-bundled refs
+    refs.push("public/brand/photos/bag-1776.jpg");
+    refs.push("public/brand/logo-horizontal.png");
+  }
+  return refs;
+}
 
 // ── Brand grammar shared across all prompts ────────────────────────────
 const BRAND_RULES = `
@@ -280,7 +294,8 @@ Examples:
   const n = args.n || 1;
 
   // Build reference list (defaults + any --ref additions)
-  const refPaths = args.noDefaults ? [] : [...DEFAULT_REFS];
+  const defaults = args.noDefaults ? [] : discoverDefaultRefs(REPO);
+  const refPaths = [...defaults];
   for (const r of args.refs) refPaths.push(r);
   const refs = refPaths.map(loadRefImage);
 

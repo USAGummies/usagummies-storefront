@@ -83,3 +83,6 @@ firebase-debug.log
 
 # binary files (track in Google Drive, not git)
 *.xlsx
+
+# Creative drafter outputs + Drive ref cache (re-pull via MCP)
+creative-drafts/

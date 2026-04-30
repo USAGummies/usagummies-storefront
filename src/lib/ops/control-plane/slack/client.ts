@@ -157,13 +157,127 @@ export async function conversationsHistory(params: {
   }
 }
 
+/**
+ * Resolve a `#channel-name` (or already-`Cxxxx` id) to a channel id and
+ * call `conversations.join` on it. Used to auto-recover from
+ * `not_in_channel` errors — bots can join any public channel without an
+ * invite. Private channels still require manual `/invite`.
+ *
+ * Returns `{ ok: true }` when the bot is now a member (whether it just
+ * joined or was already in the channel). Returns `{ ok: false }` for
+ * unrecoverable cases (bot lacks `channels:join` scope, channel is
+ * private and bot was never invited, channel doesn't exist).
+ */
+export async function joinChannel(channel: string): Promise<SlackResult> {
+  const bot = token();
+  if (!bot) {
+    return { ok: false, degraded: true, error: "SLACK_BOT_TOKEN not configured (degraded mode)" };
+  }
+  // `conversations.join` accepts a channel id, not a #name string.
+  // If the caller passed a name (or a `#name` string), resolve it first
+  // via conversations.list. Slack's API rejects `#name` directly here.
+  let channelId = channel.startsWith("#")
+    ? channel.slice(1)
+    : channel;
+  if (!channelId.match(/^C[A-Z0-9]+$/)) {
+    const resolved = await resolveChannelIdByName(channelId);
+    if (!resolved.ok || !resolved.id) {
+      return {
+        ok: false,
+        error: `joinChannel: could not resolve channel name "${channel}"${resolved.error ? ` (${resolved.error})` : ""}`,
+      };
+    }
+    channelId = resolved.id;
+  }
+  try {
+    const res = await fetch("https://slack.com/api/conversations.join", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${bot}`,
+        "Content-Type": "application/json; charset=utf-8",
+      },
+      body: JSON.stringify({ channel: channelId }),
+    });
+    const json = (await res.json()) as SlackResult;
+    if (!json.ok) {
+      return { ok: false, error: json.error ?? `HTTP ${res.status}` };
+    }
+    return { ok: true, channel: channelId };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "unknown slack error",
+    };
+  }
+}
+
+async function resolveChannelIdByName(name: string): Promise<{ ok: boolean; id?: string; error?: string }> {
+  const bot = token();
+  if (!bot) return { ok: false, error: "no token" };
+  // Page through public + private channels. We expect <500 channels, so
+  // a single page (limit=200) plus 1-2 follow-ups handles the workspace.
+  let cursor = "";
+  for (let page = 0; page < 5; page++) {
+    const qs = new URLSearchParams({
+      types: "public_channel,private_channel",
+      limit: "200",
+      exclude_archived: "true",
+    });
+    if (cursor) qs.set("cursor", cursor);
+    try {
+      const res = await fetch(
+        `https://slack.com/api/conversations.list?${qs.toString()}`,
+        { headers: { Authorization: `Bearer ${bot}` } },
+      );
+      const json = (await res.json()) as {
+        ok: boolean;
+        channels?: Array<{ id: string; name: string }>;
+        response_metadata?: { next_cursor?: string };
+        error?: string;
+      };
+      if (!json.ok) return { ok: false, error: json.error ?? "conversations.list failed" };
+      const match = (json.channels ?? []).find((c) => c.name === name);
+      if (match) return { ok: true, id: match.id };
+      cursor = json.response_metadata?.next_cursor ?? "";
+      if (!cursor) break;
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : "list error" };
+    }
+  }
+  return { ok: false, error: "channel not found" };
+}
+
 export async function postMessage(params: PostMessageParams): Promise<SlackResult> {
-  return call("chat.postMessage", {
+  const result = await call("chat.postMessage", {
     channel: params.channel,
     text: params.text,
     blocks: params.blocks,
     thread_ts: params.threadTs,
   });
+  // Auto-recover on `not_in_channel`: join the channel and retry once.
+  // Killed the second class of #ops-alerts file-upload-failure noise
+  // (the first class — `missing_scope` — is deduped to 1×/day in
+  // /api/ops/shipping/auto-ship/route.ts per Cut D).
+  if (
+    !result.ok &&
+    !result.degraded &&
+    result.error === "not_in_channel"
+  ) {
+    const join = await joinChannel(params.channel);
+    if (join.ok) {
+      return call("chat.postMessage", {
+        channel: params.channel,
+        text: params.text,
+        blocks: params.blocks,
+        thread_ts: params.threadTs,
+      });
+    }
+    return {
+      ok: false,
+      error: `not_in_channel + auto-join failed: ${join.error ?? "unknown"}`,
+    };
+  }
+  return result;
 }
 
 export async function updateMessage(params: UpdateMessageParams): Promise<SlackResult> {
