@@ -53,7 +53,7 @@ import {
   readSalesPipeline,
   readWholesaleInquiries,
 } from "@/lib/ops/sales-command-readers";
-import { HUBSPOT, listRecentDeals } from "@/lib/ops/hubspot-client";
+import { HUBSPOT, listRecentContacts, listRecentDeals } from "@/lib/ops/hubspot-client";
 import {
   summarizeStaleBuyers,
   type HubSpotDealForStaleness,
@@ -64,12 +64,18 @@ import {
   type SampleQueueHealth,
 } from "@/lib/sales/sample-queue";
 import {
+  summarizeEnrichmentOpportunities,
+  type EnrichmentOpportunitiesSummary,
+} from "@/lib/sales/enrichment-opportunities";
+import {
   classifyAmazonReorderCandidates,
+  classifyShopifyReorderCandidates,
   classifyWholesaleReorderCandidates,
   summarizeReorderFollowUps,
   type ReorderFollowUpSummary,
 } from "@/lib/sales/reorder-followup";
 import { listAmazonCustomers } from "@/lib/ops/amazon-customers";
+import { listShopifyCustomersWithLastOrder } from "@/lib/shopify/customers-with-last-order";
 import {
   summarizeOnboardingBlockers,
   type OnboardingBlockersSummary,
@@ -346,6 +352,7 @@ async function composeAndPost(req: Request): Promise<Response> {
   let sampleQueue: SampleQueueHealth | undefined;
   let reorderFollowUps: ReorderFollowUpSummary | undefined;
   let onboardingBlockers: OnboardingBlockersSummary | undefined;
+  let enrichmentOpportunities: EnrichmentOpportunitiesSummary | undefined;
   if (kind === "morning") {
     try {
       const deals = await listRecentDeals({ limit: 200 });
@@ -367,7 +374,7 @@ async function composeAndPost(req: Request): Promise<Response> {
       sampleQueue = computeSampleQueueHealth(adapted, now, retrievedAt);
 
       // Phase D4 — reorder follow-ups. Reuses the same `adapted`
-      // wholesale deals; pulls Amazon customers separately.
+      // wholesale deals; pulls Amazon + Shopify customers separately.
       try {
         const amazonCustomers = await listAmazonCustomers({ limit: 500 });
         const amazonRetrievedAt = new Date().toISOString();
@@ -386,14 +393,47 @@ async function composeAndPost(req: Request): Promise<Response> {
           adapted,
           now,
         );
+
+        // Phase D4 v0.2 — Shopify DTC 90d reorder slot. Fail-soft on
+        // its own (separate try/catch) so a Shopify admin outage
+        // doesn't tank the Amazon + wholesale signal.
+        let shopifyCandidates: ReturnType<typeof classifyShopifyReorderCandidates> = [];
+        let shopifyRetrievedAt: string | null = null;
+        try {
+          const shopifyCustomers = await listShopifyCustomersWithLastOrder({ limit: 300 });
+          shopifyRetrievedAt = new Date().toISOString();
+          shopifyCandidates = classifyShopifyReorderCandidates(
+            shopifyCustomers.map((c) => ({
+              numericId: c.numericId,
+              email: c.email,
+              firstName: c.firstName,
+              lastName: c.lastName,
+              lastOrderAt: c.lastOrderAt,
+              ordersCount: c.ordersCount,
+              totalSpentUsd: c.totalSpentUsd,
+            })),
+            now,
+          );
+        } catch (err) {
+          degradations.push(
+            `shopify-reorder: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+
+        const sources: Array<{ system: "amazon-fbm-registry" | "hubspot" | "shopify-admin"; retrievedAt: string }> = [
+          { system: "amazon-fbm-registry", retrievedAt: amazonRetrievedAt },
+          { system: "hubspot", retrievedAt },
+        ];
+        if (shopifyRetrievedAt) {
+          sources.push({ system: "shopify-admin", retrievedAt: shopifyRetrievedAt });
+        }
+
         reorderFollowUps = summarizeReorderFollowUps({
           amazonCandidates,
           wholesaleCandidates,
+          shopifyCandidates,
           now,
-          sources: [
-            { system: "amazon-fbm-registry", retrievedAt: amazonRetrievedAt },
-            { system: "hubspot", retrievedAt },
-          ],
+          sources,
         });
       } catch (err) {
         degradations.push(
@@ -403,6 +443,22 @@ async function composeAndPost(req: Request): Promise<Response> {
     } catch (err) {
       degradations.push(
         `stale-buyers/sample-queue: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+
+    // Phase D5 v0.3 — enrichment opportunities. Lightweight count-only
+    // sweep; no Apollo lookups happen here. Independent fail-soft.
+    try {
+      const contacts = await listRecentContacts({ limit: 100 });
+      const enrichRetrievedAt = new Date().toISOString();
+      enrichmentOpportunities = summarizeEnrichmentOpportunities(
+        contacts,
+        now,
+        enrichRetrievedAt,
+      );
+    } catch (err) {
+      degradations.push(
+        `enrichment-opportunities: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
 
@@ -588,6 +644,7 @@ async function composeAndPost(req: Request): Promise<Response> {
     sampleQueue,
     reorderFollowUps,
     onboardingBlockers,
+    enrichmentOpportunities,
     dispatch,
     signals,
     degradations,

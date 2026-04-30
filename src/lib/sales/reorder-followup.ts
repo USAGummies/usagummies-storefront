@@ -86,6 +86,23 @@ export interface AmazonReorderInput {
 }
 
 /**
+ * Pure helper input — Shopify DTC customer record (subset of the
+ * `ShopifyCustomerWithLastOrder` schema in `src/lib/shopify/customers-with-last-order.ts`).
+ * Phase D4 v0.2.
+ */
+export interface ShopifyReorderInput {
+  /** Shopify customer numeric id (id minus the gid prefix). */
+  numericId: string;
+  email: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  /** ISO-8601 timestamp of the most-recent order. */
+  lastOrderAt: string | null;
+  ordersCount: number;
+  totalSpentUsd: number | null;
+}
+
+/**
  * Identify Amazon FBM reorder candidates. A candidate = repeat buyer
  * (orderCount ≥ 1) whose lastSeenAt is older than the 60-day window.
  *
@@ -157,6 +174,51 @@ export function classifyWholesaleReorderCandidates(
         priorOrders: 1,
         lastOrderAt: d.lastActivityAt ?? undefined,
         extra: "Shipped → reorder window",
+      },
+    });
+  }
+  return out;
+}
+
+/**
+ * Identify Shopify DTC reorder candidates (Phase D4 v0.2). A
+ * candidate = customer with `ordersCount >= 1` whose `lastOrderAt`
+ * is older than the 90-day window. Requires email (the only stable
+ * way to text a buyer-followup in absence of a Shopify customer URL).
+ *
+ * Like the Amazon version: even one-time buyers are reorder candidates
+ * at 90 days. The DTC funnel exists to convert one-and-dones.
+ */
+export function classifyShopifyReorderCandidates(
+  shopifyCustomers: ShopifyReorderInput[],
+  now: Date,
+): ReorderCandidate[] {
+  const window = REORDER_WINDOW_DAYS["shopify-dtc"];
+  const out: ReorderCandidate[] = [];
+  for (const c of shopifyCustomers) {
+    if (!c.email) continue; // need email to follow up
+    if (c.ordersCount <= 0) continue;
+    const days = daysBetween(now, c.lastOrderAt);
+    if (!Number.isFinite(days)) continue;
+    if (days < window) continue;
+    const displayName = [c.firstName, c.lastName].filter(Boolean).join(" ").trim() || c.email;
+    const spend = c.totalSpentUsd
+      ? `$${c.totalSpentUsd.toFixed(0)} lifetime`
+      : "unknown lifetime spend";
+    out.push({
+      channel: "shopify-dtc",
+      id: `shopify:${c.numericId}`,
+      displayName,
+      daysSinceLastOrder: Math.floor(days),
+      windowDays: window,
+      nextAction:
+        c.ordersCount > 1
+          ? `Send Shopify DTC repeat-buyer reorder email (orderCount=${c.ordersCount}, ${spend})`
+          : `Send Shopify DTC first-time-buyer reorder offer (${spend})`,
+      meta: {
+        priorOrders: c.ordersCount,
+        lastOrderAt: c.lastOrderAt ?? undefined,
+        extra: spend,
       },
     });
   }

@@ -496,3 +496,86 @@ describe("composeDailyBrief — onboardingBlockers slice rendering", () => {
     expect(json).not.toContain("Wholesale onboarding stalled");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase D5 v0.3 — enrichment opportunities (morning-brief slot)
+// ---------------------------------------------------------------------------
+
+import type { EnrichmentOpportunitiesSummary } from "@/lib/sales/enrichment-opportunities";
+import { renderEnrichmentOpportunitiesMarkdown } from "@/lib/ops/control-plane/daily-brief";
+
+function enrichSummary(overrides: Partial<EnrichmentOpportunitiesSummary> = {}): EnrichmentOpportunitiesSummary {
+  return {
+    asOf: NOW.toISOString(),
+    scanned: 50,
+    missingAny: 18,
+    perField: [
+      { field: "jobtitle", count: 12 },
+      { field: "phone", count: 8 },
+      { field: "company", count: 5 },
+      { field: "city", count: 3 },
+      { field: "state", count: 3 },
+      { field: "firstname", count: 1 },
+    ],
+    source: { system: "hubspot", retrievedAt: NOW.toISOString() },
+    ...overrides,
+  };
+}
+
+describe("renderEnrichmentOpportunitiesMarkdown — D5 v0.3 formatting", () => {
+  it("returns empty string when missingAny=0 (quiet-collapse)", () => {
+    const text = renderEnrichmentOpportunitiesMarkdown(
+      enrichSummary({ missingAny: 0, perField: [] }),
+    );
+    expect(text).toBe("");
+  });
+
+  it("renders header + top-5 fields + sweep hint", () => {
+    const text = renderEnrichmentOpportunitiesMarkdown(enrichSummary());
+    expect(text).toContain("Enrichment opportunities — 18 contact(s) missing fields");
+    expect(text).toContain("scanned 50");
+    expect(text).toContain("jobtitle 12");
+    expect(text).toContain("phone 8");
+    expect(text).toContain("company 5");
+    expect(text).toContain("Sweep: `POST /api/ops/sales/apollo-enrich/sweep`");
+  });
+
+  it("caps top-fields display at 5", () => {
+    const text = renderEnrichmentOpportunitiesMarkdown(enrichSummary());
+    // perField has 6 entries; render should only show first 5.
+    expect(text).not.toContain("firstname 1");
+  });
+});
+
+describe("composeDailyBrief — enrichmentOpportunities slice rendering", () => {
+  it("renders the section in morning brief when missingAny > 0", () => {
+    const out = composeDailyBrief({ ...baseInput(), enrichmentOpportunities: enrichSummary() });
+    const json = JSON.stringify(out.blocks);
+    expect(json).toContain("Enrichment opportunities");
+  });
+
+  it("OMITS the section when slice is undefined", () => {
+    const out = composeDailyBrief(baseInput());
+    const json = JSON.stringify(out.blocks);
+    expect(json).not.toContain("Enrichment opportunities");
+  });
+
+  it("OMITS the section when missingAny = 0 (quiet-collapse)", () => {
+    const out = composeDailyBrief({
+      ...baseInput(),
+      enrichmentOpportunities: enrichSummary({ missingAny: 0, perField: [] }),
+    });
+    const json = JSON.stringify(out.blocks);
+    expect(json).not.toContain("Enrichment opportunities");
+  });
+
+  it("OMITS the section on EOD even when slice is provided", () => {
+    const out = composeDailyBrief({
+      ...baseInput(),
+      kind: "eod",
+      enrichmentOpportunities: enrichSummary(),
+    });
+    const json = JSON.stringify(out.blocks);
+    expect(json).not.toContain("Enrichment opportunities");
+  });
+});

@@ -4,9 +4,11 @@ import { HUBSPOT } from "@/lib/ops/hubspot-client";
 import {
   REORDER_WINDOW_DAYS,
   classifyAmazonReorderCandidates,
+  classifyShopifyReorderCandidates,
   classifyWholesaleReorderCandidates,
   summarizeReorderFollowUps,
   type AmazonReorderInput,
+  type ShopifyReorderInput,
 } from "@/lib/sales/reorder-followup";
 import type { HubSpotDealForStaleness } from "@/lib/sales/stale-buyer";
 
@@ -228,5 +230,124 @@ describe("summarizeReorderFollowUps", () => {
     });
     expect(r.sources).toHaveLength(2);
     expect(r.sources[0].system).toBe("amazon-fbm-registry");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase D4 v0.2 — Shopify DTC reorder slot
+// ---------------------------------------------------------------------------
+
+function shopify(overrides: Partial<ShopifyReorderInput> = {}): ShopifyReorderInput {
+  return {
+    numericId: "100",
+    email: "buyer@example.com",
+    firstName: "Sarah",
+    lastName: "McGowan",
+    lastOrderAt: "2026-01-15T15:00:00.000Z", // ~105d ago vs NOW (2026-04-30)
+    ordersCount: 1,
+    totalSpentUsd: 5.99,
+    ...overrides,
+  };
+}
+
+describe("classifyShopifyReorderCandidates", () => {
+  it("returns customers past the 90d window", () => {
+    const r = classifyShopifyReorderCandidates([shopify()], NOW);
+    expect(r).toHaveLength(1);
+    expect(r[0].channel).toBe("shopify-dtc");
+    expect(r[0].id).toBe("shopify:100");
+    expect(r[0].displayName).toBe("Sarah McGowan");
+    expect(r[0].daysSinceLastOrder).toBeGreaterThanOrEqual(90);
+    expect(r[0].windowDays).toBe(90);
+  });
+
+  it("excludes customers within the 90d window", () => {
+    const r = classifyShopifyReorderCandidates(
+      [shopify({ lastOrderAt: "2026-03-01T15:00:00.000Z" })], // ~60d
+      NOW,
+    );
+    expect(r).toHaveLength(0);
+  });
+
+  it("excludes customers without an email (no follow-up channel)", () => {
+    const r = classifyShopifyReorderCandidates([shopify({ email: null })], NOW);
+    expect(r).toHaveLength(0);
+  });
+
+  it("excludes customers with zero orders (browse-only accounts)", () => {
+    const r = classifyShopifyReorderCandidates(
+      [shopify({ ordersCount: 0, lastOrderAt: null })],
+      NOW,
+    );
+    expect(r).toHaveLength(0);
+  });
+
+  it("emits a different next-action for repeat vs first-time buyer", () => {
+    const repeat = classifyShopifyReorderCandidates(
+      [shopify({ ordersCount: 4, totalSpentUsd: 250 })],
+      NOW,
+    );
+    const oneTime = classifyShopifyReorderCandidates(
+      [shopify({ ordersCount: 1, totalSpentUsd: 5.99 })],
+      NOW,
+    );
+    expect(repeat[0].nextAction).toMatch(/repeat-buyer reorder/);
+    expect(repeat[0].nextAction).toMatch(/orderCount=4/);
+    expect(oneTime[0].nextAction).toMatch(/first-time-buyer reorder offer/);
+  });
+
+  it("falls back to email when first/last names are missing", () => {
+    const r = classifyShopifyReorderCandidates(
+      [shopify({ firstName: null, lastName: null })],
+      NOW,
+    );
+    expect(r[0].displayName).toBe("buyer@example.com");
+  });
+
+  it("formats lifetime spend in next-action / extra meta", () => {
+    const r = classifyShopifyReorderCandidates(
+      [shopify({ totalSpentUsd: 124.5 })],
+      NOW,
+    );
+    expect(r[0].meta.extra).toBe("$125 lifetime");
+    const noSpend = classifyShopifyReorderCandidates(
+      [shopify({ totalSpentUsd: null })],
+      NOW,
+    );
+    expect(noSpend[0].meta.extra).toBe("unknown lifetime spend");
+  });
+
+  it("skips records with invalid lastOrderAt (no fabrication)", () => {
+    const r = classifyShopifyReorderCandidates(
+      [shopify({ lastOrderAt: "not-a-date" })],
+      NOW,
+    );
+    expect(r).toHaveLength(0);
+  });
+});
+
+describe("summarizeReorderFollowUps — Shopify alongside Amazon + wholesale", () => {
+  it("includes Shopify candidates in topCandidates + byChannel", () => {
+    const r = summarizeReorderFollowUps({
+      amazonCandidates: classifyAmazonReorderCandidates([amazon()], NOW),
+      wholesaleCandidates: classifyWholesaleReorderCandidates([deal()], NOW),
+      shopifyCandidates: classifyShopifyReorderCandidates([shopify()], NOW),
+      now: NOW,
+      sources: [],
+    });
+    expect(r.total).toBe(3);
+    expect(r.byChannel.map((b) => b.channel).sort()).toEqual([
+      "amazon-fbm",
+      "shopify-dtc",
+      "wholesale",
+    ]);
+    // Channel priority: wholesale > amazon-fbm > shopify-dtc
+    expect(r.topCandidates[0].channel).toBe("wholesale");
+    expect(r.topCandidates[1].channel).toBe("amazon-fbm");
+    expect(r.topCandidates[2].channel).toBe("shopify-dtc");
+  });
+
+  it("REORDER_WINDOW_DAYS still locks Shopify DTC at 90d", () => {
+    expect(REORDER_WINDOW_DAYS["shopify-dtc"]).toBe(90);
   });
 });

@@ -23,6 +23,7 @@
 import type { ApprovalRequest, AuditLogEntry } from "./types";
 import type { PausedAgentRecord } from "./enforcement";
 import type { SalesCommandSlice } from "@/lib/ops/sales-command-center";
+import type { EnrichmentOpportunitiesSummary } from "@/lib/sales/enrichment-opportunities";
 import type { OnboardingBlockersSummary } from "@/lib/sales/onboarding-blockers";
 import type { ReorderFollowUpSummary } from "@/lib/sales/reorder-followup";
 import type { SampleQueueHealth } from "@/lib/sales/sample-queue";
@@ -177,6 +178,16 @@ export interface BriefInput {
    * is the morning glance for Ben.
    */
   onboardingBlockers?: OnboardingBlockersSummary;
+  /**
+   * Morning-only: Phase D5 v0.3 Apollo enrichment opportunities. A
+   * lightweight count of recent HubSpot contacts missing enrichable
+   * fields (firstname, lastname, jobtitle, phone, company, city,
+   * state). NO Apollo lookups happen in this surface — the actual
+   * enrichment sweep is a separate operator action via
+   * `POST /api/ops/sales/apollo-enrich/sweep`. Quiet-collapses
+   * when zero opportunities.
+   */
+  enrichmentOpportunities?: EnrichmentOpportunitiesSummary;
   /**
    * Morning-only: dispatch throughput in the previous 24h. Populated
    * by the daily-brief route from `buildDispatchBoardRows` +
@@ -537,6 +548,20 @@ export function composeDailyBrief(input: BriefInput): BriefOutput {
       blocks.push({
         type: "section",
         text: { type: "mrkdwn", text: blockerText },
+      });
+    }
+  }
+
+  // ---- Enrichment opportunities (Phase D5 v0.3, morning only) ----
+  // Lightweight count of recent HubSpot contacts missing enrichable
+  // fields. No Apollo calls happen here — the count is the surface;
+  // the actual sweep is a separate operator action.
+  if (input.kind === "morning" && input.enrichmentOpportunities) {
+    const enrichText = renderEnrichmentOpportunitiesMarkdown(input.enrichmentOpportunities);
+    if (enrichText) {
+      blocks.push({
+        type: "section",
+        text: { type: "mrkdwn", text: enrichText },
       });
     }
   }
@@ -1063,6 +1088,35 @@ export function renderOnboardingBlockersMarkdown(
       .join(", ");
     lines.push(
       `_Per-step: ${perStep}_  ·  _Open: <https://www.usagummies.com/ops/wholesale/onboarding|/ops/wholesale/onboarding>_`,
+    );
+  }
+  return lines.join("\n");
+}
+
+/**
+ * Phase D5 v0.3 — render the Apollo-enrichment-opportunities slice.
+ *
+ * Quiet-collapses (returns "") when missingAny=0 (everything filled).
+ *
+ * Layout:
+ *   *Enrichment opportunities — N contacts missing fields*  _(scanned M)_
+ *   _Top fields: jobtitle 12, phone 8, company 5_  ·  _Run: POST /api/ops/sales/apollo-enrich/sweep_
+ */
+export function renderEnrichmentOpportunitiesMarkdown(
+  slice: EnrichmentOpportunitiesSummary,
+): string {
+  if (slice.missingAny === 0) return "";
+  const lines: string[] = [];
+  lines.push(
+    `*Enrichment opportunities — ${slice.missingAny} contact(s) missing fields* _(scanned ${slice.scanned})_`,
+  );
+  if (slice.perField.length > 0) {
+    const top = slice.perField
+      .slice(0, 5)
+      .map((p) => `${p.field} ${p.count}`)
+      .join(", ");
+    lines.push(
+      `_Top fields: ${top}_  ·  _Sweep: \`POST /api/ops/sales/apollo-enrich/sweep\`_`,
     );
   }
   return lines.join("\n");
