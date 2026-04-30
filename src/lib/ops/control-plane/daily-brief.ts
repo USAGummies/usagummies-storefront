@@ -23,6 +23,7 @@
 import type { ApprovalRequest, AuditLogEntry } from "./types";
 import type { PausedAgentRecord } from "./enforcement";
 import type { SalesCommandSlice } from "@/lib/ops/sales-command-center";
+import type { StaleBuyerSummary } from "@/lib/sales/stale-buyer";
 
 export type BriefKind = "morning" | "eod";
 
@@ -135,6 +136,19 @@ export interface BriefInput {
    * #ops-daily picture.
    */
   salesCommand?: SalesCommandSlice;
+  /**
+   * Morning-only: Phase D1 stale-buyer detection. Populated by the
+   * daily-brief route from `summarizeStaleBuyers(deals, now,
+   * retrievedAt)` over `listRecentDeals()`. Composer renders the
+   * top-N stalest deals + per-stage counts ONLY when `kind ===
+   * "morning"` and at least one stale deal exists. Quiet-collapse
+   * when the staleness queue is empty.
+   *
+   * Doctrine: `/contracts/session-handoff.md` "B2B Revenue operating
+   * loop (Phase D)" — D1 + D6 ship together as the morning-brief
+   * surface for stale-buyer follow-up.
+   */
+  staleBuyers?: StaleBuyerSummary;
   /**
    * Morning-only: dispatch throughput in the previous 24h. Populated
    * by the daily-brief route from `buildDispatchBoardRows` +
@@ -440,6 +454,21 @@ export function composeDailyBrief(input: BriefInput): BriefOutput {
         text: renderSalesCommandMarkdown(input.salesCommand),
       },
     });
+  }
+
+  // ---- Stale buyers (Phase D1 + D6, morning only) ----
+  // Surfaces HubSpot deals whose lastActivityAt has aged past their
+  // stage's threshold. Quiet-collapse when zero stale deals: the
+  // section is omitted entirely. Skipped on EOD because the morning
+  // surface is the action window for follow-up.
+  if (input.kind === "morning" && input.staleBuyers) {
+    const staleText = renderStaleBuyersMarkdown(input.staleBuyers);
+    if (staleText) {
+      blocks.push({
+        type: "section",
+        text: { type: "mrkdwn", text: staleText },
+      });
+    }
   }
 
   // ---- Dispatch throughput (morning only) ----
@@ -820,6 +849,41 @@ export function renderSalesCommandMarkdown(slice: SalesCommandSlice): string {
  *  queue and a missing source. */
 function formatCount(value: number | null): string {
   return value === null ? "_not wired_" : `*${value}*`;
+}
+
+/**
+ * Phase D1 + D6 — render the stale-buyer slice into Markdown for the
+ * morning brief. Quiet-collapses to empty string when no deals are
+ * stale (the composer skips the section in that case).
+ *
+ * Layout:
+ *   *Stale buyers — N deal(s) need follow-up* _(scanned X active deals)_
+ *   • Lead — 12d — Indian Pueblo Stores — Send first-touch outreach
+ *   • Sample Shipped — 14d — Bryce Glamp — Sample-followup email
+ *   ...
+ *   _Per-stage: Lead 3, Sample Shipped 2, Quote/PO Sent 1_
+ */
+export function renderStaleBuyersMarkdown(slice: StaleBuyerSummary): string {
+  if (slice.stalest.length === 0) return "";
+  const totalStale = slice.staleByStage.reduce((s, x) => s + x.count, 0);
+  const header = `*Stale buyers — ${totalStale} deal(s) need follow-up* _(scanned ${slice.activeDealsScanned} active)_`;
+  const lines: string[] = [header];
+  for (const d of slice.stalest) {
+    const days = Number.isFinite(d.daysSinceActivity)
+      ? `${d.daysSinceActivity}d`
+      : "no activity";
+    const company = d.primaryCompanyName
+      ? d.primaryCompanyName
+      : d.dealName.slice(0, 60);
+    lines.push(`• \`${d.stageName}\` — ${days} — ${company} — _${d.nextAction}_`);
+  }
+  if (slice.staleByStage.length > 0) {
+    const perStage = slice.staleByStage
+      .map((s) => `${s.stageName} ${s.count}`)
+      .join(", ");
+    lines.push(`_Per-stage: ${perStage}_`);
+  }
+  return lines.join("\n");
 }
 
 /**

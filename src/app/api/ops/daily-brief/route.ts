@@ -53,6 +53,12 @@ import {
   readSalesPipeline,
   readWholesaleInquiries,
 } from "@/lib/ops/sales-command-readers";
+import { HUBSPOT, listRecentDeals } from "@/lib/ops/hubspot-client";
+import {
+  summarizeStaleBuyers,
+  type HubSpotDealForStaleness,
+  type StaleBuyerSummary,
+} from "@/lib/sales/stale-buyer";
 import { listDivisions } from "@/lib/ops/control-plane/divisions";
 import { getChannel } from "@/lib/ops/control-plane/channels";
 import {
@@ -317,6 +323,37 @@ async function composeAndPost(req: Request): Promise<Response> {
     }
   }
 
+  // Phase D1 + D6 — stale-buyer detection. Pulls every active B2B
+  // wholesale deal via listRecentDeals(), maps to the staleness
+  // schema, summarizes, and surfaces the top-N stalest in the
+  // morning brief. Failures degrade gracefully — the brief still
+  // ships without this slice.
+  let staleBuyers: StaleBuyerSummary | undefined;
+  if (kind === "morning") {
+    try {
+      const deals = await listRecentDeals({ limit: 200 });
+      const retrievedAt = new Date().toISOString();
+      const adapted: HubSpotDealForStaleness[] = deals.map((d) => ({
+        id: d.id,
+        dealname: d.dealname || null,
+        pipelineId: HUBSPOT.PIPELINE_B2B_WHOLESALE,
+        stageId: d.dealstage,
+        // listRecentDeals returns hs_lastmodifieddate which is the
+        // closest proxy we have for "last activity" without a
+        // separate engagements query. Future Phase D enhancement:
+        // also factor in lastEmailDate + dealStageChangedAt.
+        lastActivityAt: d.lastmodifieddate || null,
+        primaryContactId: null,
+        primaryCompanyName: null,
+      }));
+      staleBuyers = summarizeStaleBuyers(adapted, now, retrievedAt);
+    } catch (err) {
+      degradations.push(
+        `stale-buyers: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
   // Morning brief only: dispatch throughput in the previous 24h.
   // Reads the dispatch-board projection (ShipStation recent shipments
   // + shipping artifact stamps) and returns a one-line `:package:`
@@ -466,6 +503,7 @@ async function composeAndPost(req: Request): Promise<Response> {
     preflight,
     fulfillmentToday,
     salesCommand,
+    staleBuyers,
     dispatch,
     signals,
     degradations,
