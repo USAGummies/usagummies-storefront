@@ -492,44 +492,60 @@ export default function GoLandingPage() {
           {/* US map — highlights IN, WI, WA, WY, PA in red. Inlined SVG so we can override .state fill via CSS. */}
           <div className="supply-chain-map" dangerouslySetInnerHTML={{ __html: US_MAP_SVG }} aria-hidden="true" />
 
-          {/* Row 1 — Production */}
-          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "2px", color: "#c7362c", marginTop: 36, marginBottom: 12 }}>
-            PRODUCTION
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12, maxWidth: 820, margin: "0 auto 28px" }} className="sm:!grid-cols-3">
+          {/* Inline state-chip legend — collapses to a 2-col stack on mobile,
+              5-col flow on desktop. Replaces the prior 6-card / 2-row grid that
+              read as text-heavy on narrow viewports. */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+              gap: "10px 16px",
+              maxWidth: 720,
+              margin: "20px auto 0",
+              padding: "0 4px",
+            }}
+            className="sm:!grid-cols-5"
+          >
             {[
-              { state: "Indiana", role: "Gummies crafted" },
-              { state: "Wisconsin", role: "Packaging printed" },
-              { state: "Washington", role: "Repacked at a veteran-owned facility" },
-            ].map((step) => (
-              <div key={step.state} style={{ background: "#ffffff", border: "1px solid #e0dcd6", borderRadius: 12, padding: "20px 16px" }}>
-                <div className="lp-display" style={{ fontSize: 18, letterSpacing: "0.5px", color: "#1B2A4A" }}>
-                  {step.state}
-                </div>
-                <div style={{ fontSize: 12, color: "#5f5b56", marginTop: 6, lineHeight: 1.5 }}>
-                  {step.role}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Row 2 — Headquarters & Shipping */}
-          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "2px", color: "#1B2A4A", marginBottom: 12 }}>
-            HEADQUARTERS & SHIPPING
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12, maxWidth: 820, margin: "0 auto" }} className="sm:!grid-cols-3">
-            {[
-              { state: "Wyoming", role: "Corporate offices" },
-              { state: "Washington", role: "West Coast warehouse" },
-              { state: "Pennsylvania", role: "East Coast warehouse" },
-            ].map((step) => (
-              <div key={step.state} style={{ background: "#ffffff", border: "1px solid #e0dcd6", borderRadius: 12, padding: "20px 16px" }}>
-                <div className="lp-display" style={{ fontSize: 18, letterSpacing: "0.5px", color: "#1B2A4A" }}>
-                  {step.state}
-                </div>
-                <div style={{ fontSize: 12, color: "#5f5b56", marginTop: 6, lineHeight: 1.5 }}>
-                  {step.role}
-                </div>
+              { state: "IN", role: "Gummies crafted" },
+              { state: "WI", role: "Packaging" },
+              { state: "WA", role: "West Coast warehouse" },
+              { state: "PA", role: "East Coast warehouse" },
+              { state: "WY", role: "Corporate" },
+            ].map((chip) => (
+              <div
+                key={chip.state}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  textAlign: "left",
+                }}
+              >
+                <span
+                  aria-hidden
+                  style={{
+                    flex: "0 0 auto",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: 30,
+                    height: 30,
+                    background: "#c7362c",
+                    color: "#fff",
+                    fontFamily: "var(--font-display), 'Oswald', sans-serif",
+                    fontSize: 12,
+                    fontWeight: 800,
+                    letterSpacing: "0.5px",
+                    border: "2px solid #1B2A4A",
+                    borderRadius: 6,
+                  }}
+                >
+                  {chip.state}
+                </span>
+                <span style={{ fontSize: 12, color: "#1B2A4A", lineHeight: 1.3 }}>
+                  {chip.role}
+                </span>
               </div>
             ))}
           </div>

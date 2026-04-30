@@ -34,12 +34,14 @@ const MIN_QTY = 1;
 const MAX_QTY = 10;
 
 // 2026-04-30: bundle ladder migrated to "Buy X Get Y FREE" tiers (5/7/10).
-// Slider milestones now mark the three bundle anchor points so the user
-// can see at a glance where the offers land + what they unlock.
+// Slider milestones now mark the three bundle anchor points. Short tag
+// label keeps the chip readable at any viewport width — the full
+// "Buy X, Get Y FREE" copy is duplicated on the price card below and the
+// CTA, so the slider can stay punchy.
 const MILESTONES = [
-  { qty: 5,  label: "Buy 4, Get 1 FREE", color: "#2D7A3A" },
-  { qty: 7,  label: "Buy 5, Get 2 FREE", color: "#1B2A4A" },
-  { qty: 10, label: "Buy 7, Get 3 FREE", color: "#c7362c" },
+  { qty: 5,  label: "+1 FREE", color: "#2D7A3A" },
+  { qty: 7,  label: "+2 FREE", color: "#1B2A4A" },
+  { qty: 10, label: "+3 FREE", color: "#c7362c" },
 ] as const;
 
 const FLAVOR_BEARS = [
@@ -501,26 +503,31 @@ export default function BagSlider({
           }}
         />
 
-        {/* Milestone markers */}
+        {/* Milestone markers — small dot + tag chip below the slider track */}
         {showMilestones && (
           <div className="absolute inset-x-0 top-0 h-full pointer-events-none" aria-hidden="true">
             {MILESTONES.map((m) => (
               <button
                 key={m.qty}
                 onClick={() => snapToMilestone(m.qty)}
-                className="pointer-events-auto absolute -translate-x-1/2 top-[22px] flex flex-col items-center"
+                className="pointer-events-auto absolute -translate-x-1/2 top-[20px] flex flex-col items-center"
                 style={{ left: `${pct(m.qty)}%` }}
                 aria-label={`Select ${m.qty} bags — ${m.label}`}
               >
                 <span
-                  className="h-2 w-2 rounded-full border-2 border-white"
-                  style={{ backgroundColor: m.color }}
+                  className="h-2.5 w-2.5 rounded-full border-2 border-white"
+                  style={{ backgroundColor: m.color, boxShadow: `0 0 0 2px ${m.color}33` }}
                 />
                 <span
-                  className="mt-0.5 text-[9px] font-bold leading-none whitespace-nowrap"
-                  style={{ color: m.color }}
+                  className="mt-1 inline-block rounded-full px-2 py-[2px] text-[10px] font-extrabold leading-none whitespace-nowrap text-white"
+                  style={{ backgroundColor: m.color }}
                 >
                   {m.label}
+                </span>
+                <span
+                  className="mt-0.5 text-[10px] font-bold leading-none text-[#1B2A4A]/70"
+                >
+                  {m.qty} bags
                 </span>
               </button>
             ))}
@@ -528,8 +535,8 @@ export default function BagSlider({
         )}
       </div>
 
-      {/* Spacing for milestone labels */}
-      {showMilestones && <div className="h-5" />}
+      {/* Spacing for milestone labels — taller so the two-line chips don't crash into the price card */}
+      {showMilestones && <div className="h-12" />}
 
       {/* Social proof */}
       <div className="mt-3 text-center">
