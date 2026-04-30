@@ -23,6 +23,7 @@
 import type { ApprovalRequest, AuditLogEntry } from "./types";
 import type { PausedAgentRecord } from "./enforcement";
 import type { SalesCommandSlice } from "@/lib/ops/sales-command-center";
+import type { OnboardingBlockersSummary } from "@/lib/sales/onboarding-blockers";
 import type { ReorderFollowUpSummary } from "@/lib/sales/reorder-followup";
 import type { SampleQueueHealth } from "@/lib/sales/sample-queue";
 import type { StaleBuyerSummary } from "@/lib/sales/stale-buyer";
@@ -166,6 +167,16 @@ export interface BriefInput {
    * candidates across any channel.
    */
   reorderFollowUps?: ReorderFollowUpSummary;
+  /**
+   * Morning-only: Phase D3 wholesale-onboarding blockers. Surfaces
+   * stalled flows (currentStep has a nextStep, lastTimestamp is older
+   * than `stallHours`) from the wholesale-onboarding KV store. The
+   * existing Rene-review surface (`/api/ops/wholesale/onboarding`) +
+   * dedicated digest (`/api/ops/wholesale/onboarding-digest`) remain
+   * the source of truth for the financials channel; this brief slot
+   * is the morning glance for Ben.
+   */
+  onboardingBlockers?: OnboardingBlockersSummary;
   /**
    * Morning-only: dispatch throughput in the previous 24h. Populated
    * by the daily-brief route from `buildDispatchBoardRows` +
@@ -511,6 +522,21 @@ export function composeDailyBrief(input: BriefInput): BriefOutput {
       blocks.push({
         type: "section",
         text: { type: "mrkdwn", text: reorderText },
+      });
+    }
+  }
+
+  // ---- Wholesale onboarding blockers (Phase D3, morning only) ----
+  // Stalled flows from the wholesale-onboarding KV store, projected
+  // into a morning-glance line for Ben. The dedicated digest in
+  // #financials (Phase 35.f.5.b) remains for Rene; this is the brief
+  // companion. Quiet-collapse when zero stalled.
+  if (input.kind === "morning" && input.onboardingBlockers) {
+    const blockerText = renderOnboardingBlockersMarkdown(input.onboardingBlockers);
+    if (blockerText) {
+      blocks.push({
+        type: "section",
+        text: { type: "mrkdwn", text: blockerText },
       });
     }
   }
@@ -1000,6 +1026,44 @@ export function renderReorderFollowUpsMarkdown(slice: ReorderFollowUpSummary): s
       .map((b) => `${b.channel} ${b.count} (${b.windowDays}d)`)
       .join(", ");
     lines.push(`_Per-channel: ${perChannel}_`);
+  }
+  return lines.join("\n");
+}
+
+/**
+ * Phase D3 — render the wholesale-onboarding-blockers slice.
+ *
+ * Quiet-collapses (returns "") when topBlockers is empty.
+ *
+ * Layout:
+ *   *Wholesale onboarding stalled — N flow(s) past Xh*  _(scanned Y total)_
+ *   • `payment-path` — 4d — Bryce Glamp & Camp ($3,141) — Call buyer to clarify CC vs AP
+ *   • `ap-info` — 5d — Indian Pueblo Stores — Email buyer requesting AP contact + tax ID
+ *   _Per-step: payment-path 1, ap-info 1_  ·  _Open: /ops/wholesale/onboarding_
+ */
+export function renderOnboardingBlockersMarkdown(
+  slice: OnboardingBlockersSummary,
+): string {
+  if (slice.topBlockers.length === 0) return "";
+  const lines: string[] = [];
+  lines.push(
+    `*Wholesale onboarding stalled — ${slice.stalledTotal} flow(s) past ${slice.stallHours}h* _(scanned ${slice.flowsScanned} total)_`,
+  );
+  for (const b of slice.topBlockers) {
+    const dollars = b.totalSubtotalUsd
+      ? ` ($${b.totalSubtotalUsd.toLocaleString("en-US")})`
+      : "";
+    lines.push(
+      `• \`${b.currentStep}\` — ${b.daysSinceLastTouch}d — ${b.displayName}${dollars} — _${b.nextAction}_`,
+    );
+  }
+  if (slice.byStep.length > 0) {
+    const perStep = slice.byStep
+      .map((s) => `${s.step} ${s.count}`)
+      .join(", ");
+    lines.push(
+      `_Per-step: ${perStep}_  ·  _Open: <https://www.usagummies.com/ops/wholesale/onboarding|/ops/wholesale/onboarding>_`,
+    );
   }
   return lines.join("\n");
 }

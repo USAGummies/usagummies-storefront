@@ -380,3 +380,119 @@ describe("composeDailyBrief — reorderFollowUps slice rendering", () => {
     expect(json).not.toContain("Reorder follow-ups");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase D3 — wholesale onboarding blockers
+// ---------------------------------------------------------------------------
+
+import type { OnboardingBlockersSummary } from "@/lib/sales/onboarding-blockers";
+import { renderOnboardingBlockersMarkdown } from "@/lib/ops/control-plane/daily-brief";
+
+function blockers(overrides: Partial<OnboardingBlockersSummary> = {}): OnboardingBlockersSummary {
+  return {
+    asOf: NOW.toISOString(),
+    topBlockers: [
+      {
+        flowId: "flow-1",
+        displayName: "Bryce Glamp & Camp",
+        currentStep: "payment-path",
+        daysSinceLastTouch: 4,
+        stallHours: 24,
+        nextAction: "Call buyer to clarify CC vs AP — they paused on payment path",
+        hubspotDealId: "hs-100",
+        totalSubtotalUsd: 3141,
+      },
+      {
+        flowId: "flow-2",
+        displayName: "Indian Pueblo Stores",
+        currentStep: "ap-info",
+        daysSinceLastTouch: 5,
+        stallHours: 24,
+        nextAction: "Email buyer requesting AP contact + tax ID — they didn't finish AP info",
+      },
+    ],
+    byStep: [
+      { step: "payment-path", count: 1 },
+      { step: "ap-info", count: 1 },
+    ],
+    flowsScanned: 12,
+    stalledTotal: 2,
+    stallHours: 24,
+    source: { system: "wholesale-onboarding-kv", retrievedAt: NOW.toISOString() },
+    ...overrides,
+  };
+}
+
+describe("renderOnboardingBlockersMarkdown — D3 formatting", () => {
+  it("returns empty string when topBlockers is empty (quiet-collapse)", () => {
+    const text = renderOnboardingBlockersMarkdown(
+      blockers({ topBlockers: [], byStep: [], stalledTotal: 0 }),
+    );
+    expect(text).toBe("");
+  });
+
+  it("renders header + bullets + per-step footer + open-link", () => {
+    const text = renderOnboardingBlockersMarkdown(blockers());
+    expect(text).toContain("Wholesale onboarding stalled — 2 flow(s) past 24h");
+    expect(text).toContain("scanned 12 total");
+    expect(text).toContain("`payment-path` — 4d — Bryce Glamp & Camp ($3,141)");
+    expect(text).toContain("`ap-info` — 5d — Indian Pueblo Stores");
+    expect(text).toContain("Per-step: payment-path 1, ap-info 1");
+    expect(text).toContain("/ops/wholesale/onboarding");
+  });
+
+  it("omits dollar amount when totalSubtotalUsd is undefined", () => {
+    const text = renderOnboardingBlockersMarkdown(
+      blockers({
+        topBlockers: [
+          {
+            flowId: "flow-1",
+            displayName: "Foo Co",
+            currentStep: "info",
+            daysSinceLastTouch: 3,
+            stallHours: 24,
+            nextAction: "Send first-touch chase",
+          },
+        ],
+        byStep: [{ step: "info", count: 1 }],
+        stalledTotal: 1,
+      }),
+    );
+    expect(text).toContain("`info` — 3d — Foo Co —");
+    expect(text).not.toMatch(/Foo Co \(\$/);
+  });
+});
+
+describe("composeDailyBrief — onboardingBlockers slice rendering", () => {
+  it("renders the section in morning brief when non-empty", () => {
+    const out = composeDailyBrief({ ...baseInput(), onboardingBlockers: blockers() });
+    const json = JSON.stringify(out.blocks);
+    expect(json).toContain("Wholesale onboarding stalled");
+    expect(json).toContain("Bryce Glamp & Camp");
+  });
+
+  it("OMITS the section when slice is undefined", () => {
+    const out = composeDailyBrief(baseInput());
+    const json = JSON.stringify(out.blocks);
+    expect(json).not.toContain("Wholesale onboarding stalled");
+  });
+
+  it("OMITS the section when topBlockers is empty (quiet-collapse)", () => {
+    const out = composeDailyBrief({
+      ...baseInput(),
+      onboardingBlockers: blockers({ topBlockers: [], byStep: [], stalledTotal: 0 }),
+    });
+    const json = JSON.stringify(out.blocks);
+    expect(json).not.toContain("Wholesale onboarding stalled");
+  });
+
+  it("OMITS the section on EOD even when slice is provided", () => {
+    const out = composeDailyBrief({
+      ...baseInput(),
+      kind: "eod",
+      onboardingBlockers: blockers(),
+    });
+    const json = JSON.stringify(out.blocks);
+    expect(json).not.toContain("Wholesale onboarding stalled");
+  });
+});

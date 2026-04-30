@@ -70,6 +70,11 @@ import {
   type ReorderFollowUpSummary,
 } from "@/lib/sales/reorder-followup";
 import { listAmazonCustomers } from "@/lib/ops/amazon-customers";
+import {
+  summarizeOnboardingBlockers,
+  type OnboardingBlockersSummary,
+} from "@/lib/sales/onboarding-blockers";
+import { listRecentFlows } from "@/lib/wholesale/onboarding-store";
 import { listDivisions } from "@/lib/ops/control-plane/divisions";
 import { getChannel } from "@/lib/ops/control-plane/channels";
 import {
@@ -340,6 +345,7 @@ async function composeAndPost(req: Request): Promise<Response> {
   let staleBuyers: StaleBuyerSummary | undefined;
   let sampleQueue: SampleQueueHealth | undefined;
   let reorderFollowUps: ReorderFollowUpSummary | undefined;
+  let onboardingBlockers: OnboardingBlockersSummary | undefined;
   if (kind === "morning") {
     try {
       const deals = await listRecentDeals({ limit: 200 });
@@ -398,6 +404,34 @@ async function composeAndPost(req: Request): Promise<Response> {
       degradations.push(
         `stale-buyers/sample-queue: ${err instanceof Error ? err.message : String(err)}`,
       );
+    }
+
+    // Phase D3 — wholesale onboarding blockers. Reads the existing
+    // wholesale-onboarding KV store. Independent of HubSpot.
+    //
+    // KV-not-configured (test envs, local dev without Vercel KV) is
+    // NOT a degradation — it means the surface isn't wired in this
+    // environment, same way `salesCommand` quiet-degrades when its
+    // readers can't reach their stores. Only push to degradations
+    // when the failure is unexpected (i.e. KV IS configured but the
+    // call failed). This matches the listAmazonCustomers fail-soft
+    // pattern in src/lib/ops/amazon-customers.ts.
+    const kvConfigured =
+      Boolean(process.env.KV_REST_API_URL?.trim()) &&
+      Boolean(process.env.KV_REST_API_TOKEN?.trim());
+    if (kvConfigured) {
+      try {
+        const flows = await listRecentFlows({ limit: 200 });
+        onboardingBlockers = summarizeOnboardingBlockers(
+          flows,
+          now,
+          new Date().toISOString(),
+        );
+      } catch (err) {
+        degradations.push(
+          `onboarding-blockers: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
     }
   }
 
@@ -553,6 +587,7 @@ async function composeAndPost(req: Request): Promise<Response> {
     staleBuyers,
     sampleQueue,
     reorderFollowUps,
+    onboardingBlockers,
     dispatch,
     signals,
     degradations,
