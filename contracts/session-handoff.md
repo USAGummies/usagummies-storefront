@@ -1,14 +1,14 @@
 # Session Handoff — USA Gummies 3.0 storefront
 
 **Status:** AUTO-MAINTAINED — kept fresh by every commit cycle
-**Last updated:** 2026-04-29 (post P0-1..P0-7 ship + Faire wired + OpenAI MCP composed)
+**Last updated:** 2026-04-30 (post Phase D full-loop ship + sales-tour v0.1→v0.3 + email-intel incident postmortem + pricing v2.3 ratification template)
 **Purpose:** 1-page brief for any new Claude Code / Codex / human session — what's in flight, what's parked, what's broken, what's next. Save 10-20 minutes of re-orientation per session.
 
 ---
 
 ## Where the build is right now
 
-**Test suite:** 2,795 green across 167 files. **Latest baseline:** the OpenAI-MCP/agent-packs-snapshot integration commit (this push).
+**Test suite:** 3,083 green across 188 files. **Latest baseline:** Phase D5 v0.2 Apollo enrichment routes (`3508ada`) + pricing v2.3 ratification thread template (`9445c2a`).
 
 **ALL 7 P0s from `/contracts/agent-architecture-audit.md` §10 shipped 2026-04-28..29:**
 
@@ -33,9 +33,18 @@
 - All prior doctrine still LOCKED: `/contracts/wholesale-pricing.md` v2.2, `/contracts/operating-memory.md` v1.1 (BCC-Rene rule), `/contracts/wholesale-onboarding-flow.md` v1.0, `/contracts/approval-taxonomy.md` v1.4 ("Drew owns nothing").
 
 **Active build directive (Ben 2026-04-29):** P0 roadmap closed. Next phases per `/contracts/agent-architecture-audit.md`:
-- B2B Revenue operating loop (Phase D in original mission directive — morning-brief actions, stale-buyer detection, sample queue health, wholesale onboarding blockers, reorder follow-up, Apollo enrichment with provenance).
-- Sales tour prep for May 11-13 Ashford → Grand Canyon trip (12 days out — voice-note → freight quote → vendor signup form → on-spot price quote workflow).
-- Research agent runtime activation (R-1..R-7 latent, awaiting Ben's external tool decisions).
+- ✅ **B2B Revenue operating loop (Phase D)** — DONE 2026-04-30. All six sub-lanes shipped:
+  - **D1 stale-buyer detection** (`be3ef3c`) — 8 stalest deals per stage with next-action templates, surfaced in morning brief.
+  - **D2 sample queue health** (`a4581b6`) — awaiting-ship + behind-queue + shipped-awaiting-response counts.
+  - **D3 wholesale onboarding blockers** (`5454d76`) — stalled flow detection from existing Phase 35.f.5 KV store.
+  - **D4 reorder follow-ups** (`234977c`) — channel-aware: Amazon FBM 60d + wholesale 90d (Shopify DTC 90d slot reserved for v0.2).
+  - **D5 Apollo enrichment** v0.1 helpers (`a9cab02`) + v0.2 routes (`3508ada`) — `/api/ops/sales/apollo-enrich/[contactId]` + `/sweep`. Bulk auto-cron deferred to v0.3.
+  - **D6 morning-brief integration** (folded into D1).
+  Morning brief in `#ops-daily` now surfaces FIVE sales slices in priority order (Sales Command → Stale buyers → Sample queue → Onboarding blockers → Reorder follow-ups), all quiet-collapse on zero signal, EOD-skipped.
+- ✅ **Sales tour field workflow (Ashford → Grand Canyon May 11–17 trip — 11 days out)** — v0.1 typed-input booth → Slack quote (`1cdd8b9`); v0.2 voice + Twilio SMS to Ben (`692d48f`); v0.3 SMS to buyer with prefilled NCS-001 deeplink + real-time HubSpot deal autosync (`cfb56dd`). Doctrine at `/contracts/sales-tour-field-workflow.md`. Trip-ready end-to-end.
+- 🟡 **Pricing v2.3 reconciliation** — proposal at `/contracts/proposals/pricing-grid-v2.3-route-reconciliation.md` (`1b3027b`); ratification thread template at `/contracts/proposals/pricing-grid-v2.3-ratification-thread-template.md` (`9445c2a`). Awaits Class C `pricing.change` Slack thread between Ben + Rene.
+- 🟡 **Email-intel incident postmortem** (`261fe79`) — classifier + template fixes shipped; kill switch stays default-OFF + crons stay removed per Ben's incident brief; box 3 (approval-gate audit) awaits Ben's Slack-log confirmation. Doctrine at `/contracts/incident-2026-04-30-email-intel.md`.
+- ⏸ **Research agent runtime activation** (R-1..R-7 latent, awaiting Ben's external tool decisions).
 
 **Recommended first 5 minutes of any new session:**
 1. `git log --oneline -10` — see what just shipped.
@@ -51,16 +60,15 @@
 | Lane | Owner | State | Commit |
 |---|---|---|---|
 | P0-1..P0-7 (full agent-architecture-audit roadmap) | Claude Code | DONE | 9 commits in `49a0498..ab35711` (2026-04-29 push) |
-| Faire token wired in Vercel env + production redeploy | Ben + Claude Code | DONE | env-only change (no code commit) 2026-04-29 |
-| Digest cadence cron + approval-expiry cron + Shopify Payments wiring | Claude Code | DONE | `ab35711` |
-| OpenAI / ChatGPT workspace MCP connector (Phase 0 registry + auth + JSON-RPC handler) | Codex | DONE | `03d3c30..62222d2` (6 commits) |
-| OpenAI MCP `ops.agent.packs` + `ops.operating-memory.search` backing routes wired | Claude Code | DONE | this push |
+| OpenAI / ChatGPT workspace MCP connector (Phase 0) | Codex | DONE | `03d3c30..62222d2` (6 commits) |
+| Sales-tour booth field workflow v0.1 → v0.2 → v0.3 | Claude Code | DONE 2026-04-30 | `1cdd8b9`, `692d48f`, `cfb56dd` |
+| Phase D B2B Revenue operating loop (D1+D2+D3+D4+D5+D6) | Claude Code | DONE 2026-04-30 | `be3ef3c`, `a4581b6`, `5454d76`, `234977c`, `a9cab02`, `3508ada` |
+| Email-intel incident postmortem (classifier + template fixes; gate held off) | Claude Code | DONE 2026-04-30 | `261fe79` (after Ben's containment commit `24de7b6`) |
+| Shopify auto-ship `Tag: Internal` cosmetic fix | Claude Code | DONE 2026-04-30 | `6b63d3a` |
+| Pricing v2.3 ratification thread template | Claude Code | DONE 2026-04-30 | `9445c2a` (proposal `1b3027b`) |
+| Sales-tour prospect list (Ashford → Grand Canyon) | Codex / Ben | DONE | `b117995`, `6ca4282` |
 | QBO invoice PUT `poNumber` field support | Codex | DONE | `483bf1d` |
-| Storefront audit fixes (conversion-blockers, FTC risk, freight quoting, COGS) | Codex / Ben | DONE | `fdf96f4`, `f8f9996`, `d177cca`, `d50e497` |
-| Sales-tour prospect list (Ashford → Grand Canyon May 11-13) | Codex / Ben | DONE | `b117995`, `6ca4282` |
-| Brand story rewrite (anonymous voice + 3-state supply chain) | Codex / Ben | DONE | `c7361ee` |
-| Free-shipping pricing ladder + buy-widget mobile-first | Codex / Ben | DONE | `abe8da5`, `b2c705a` |
-| Ad-creative-performance kill-list + budget concentration tool | Codex / Ben | DONE | `8aae948` |
+| Brand story / supply-chain copy / pricing ladder + ad kill-list | Codex / Ben | DONE | `c7361ee`, `abe8da5`, `b2c705a`, `8aae948` |
 
 ---
 
@@ -69,10 +77,13 @@
 | Item | Blocker | Owner |
 |---|---|---|
 | `qbo.bill.create.from-receipt` closer wiring (the actual "create the QBO bill on Rene approval" hop) | Rene's CoA mapping per category | Rene → Ben |
-| Faire token rotation | Token was generated + pasted in chat history; rotate to invalidate exposed copy | Ben (1 min in Faire portal + Vercel) |
+| Faire token rotation | Ben explicitly DROPPED 2026-04-29 ("im not rotating the token, let it go") — no longer parked, just noted | Ben (decided not to) |
 | Powers B0001 batch pickup form (count + final date) | First production batch | Ben |
 | Snow Leopard Ventures vendor PDF attachment to QBO #78 | Resolved 2026-04-12 in code (commit `14a0d61`) — actual attach pending Ben's manual pickup | Ben |
-| 6-step tradeshow field workflow (voice → freight quote → vendor form → price → invoice → ship) | Pending design + dispatcher build for May 11 trip | Claude Code (next session) |
+| Pricing v2.3 ratification — Q1–Q5 Slack thread | Awaits Ben + Rene reply via the template at `/contracts/proposals/pricing-grid-v2.3-ratification-thread-template.md` | Ben + Rene |
+| Email-intel re-enable box 3 (approval-gate audit) | Awaits Ben's confirmation: did he click approve in Slack on the Eric Miller send, or was there no Slack approval at all? | Ben (read `/contracts/incident-2026-04-30-email-intel.md` §4) |
+| Sales-tour env config for v0.2 + v0.3 | `TWILIO_ACCOUNT_SID` + `TWILIO_AUTH_TOKEN` + `TWILIO_FROM_NUMBER` + `SALES_TOUR_BEN_SMS_TO` + `SALES_TOUR_BUYER_SMS_ENABLED=true` + Slack `files:read` scope on bot | Ben (~5 min in Vercel env + api.slack.com/apps) |
+| Apollo enrichment — manual sweep watch | Run `POST /api/ops/sales/apollo-enrich/sweep?dryRun=true` first, watch a few real sweeps before D5 v0.3 cron auto-schedules | Ben (next sales-call window) |
 | Research agents R-1..R-7 runtime | External tool decisions: Feedly / Muck Rack / SerpAPI / USPTO TESS / SEC EDGAR / Finbox | Ben |
 | Slack `:white_check_mark:` reaction → mark-dispatched | Slack app event subscriptions (`reaction_added` + `reaction_removed`) + `reactions:read` scope + reinstall | Ben (one-time, ~2 min at api.slack.com/apps) |
 | Mike Hippler / Thanksgiving Point first wholesale onboarding | Awaiting customer NCS-001 return | Mike (external) |
@@ -84,10 +95,13 @@
 | What | Status | Workaround |
 |---|---|---|
 | Make.com bridge | Broken since ~Apr 13 per memory; Ben to fix eventually | `/api/leads` bypasses Make.com via direct HubSpot `createDeal()` (Phase 1.b) |
+| Email-intel auto-replier | DISABLED 2026-04-29 after Eric Miller incident; kill switch default-OFF + crons removed (`24de7b6`); structural fixes shipped (`261fe79`); awaits Ben's box-3 sign-off before re-enable | Postmortem at `/contracts/incident-2026-04-30-email-intel.md`; do NOT flip `EMAIL_INTEL_ENABLED=true` until §0 boxes ticked |
 | Vercel CLI auth on this worktree | No credentials in `.vercel/` | Pull env vars manually via Chrome MCP from Vercel UI when needed |
-| `files:read` Slack scope | Not on bot token | Use `conversations.history` to resolve message ts |
+| `files:read` Slack scope | Not on bot token (blocks sales-tour v0.2 voice transcription) | Add at api.slack.com/apps + reinstall to workspace; v0.1 typed input still works |
 | Notion canon manifest fetcher | Not wired into P0-7 lockstep auditor | Auditor degrades gracefully (notionManifest=null); add when needed |
 | Live recon agent currently shows 0 Faire/Shopify payout lines | 14-day window is just quiet — Faire pays Tue/Fri, no payouts hit recently | Verified token + scope are wired; will populate when next payout settles |
+| D4 Shopify DTC reorder slot | Reserved in `ReorderChannel` enum but not populated — needs Shopify admin Customer-with-last-order query | Amazon FBM 60d + wholesale 90d already fully wired; v0.2 adds Shopify |
+| D5 brief integration + auto-cron | Per-contact + bulk routes shipped; brief slot + cron deferred until Ben watches a few manual sweeps | Hit `POST /api/ops/sales/apollo-enrich/sweep?dryRun=true` first to preview |
 
 ---
 
