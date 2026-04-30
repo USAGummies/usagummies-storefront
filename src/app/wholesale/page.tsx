@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 import { JsonLd } from "@/components/JsonLd";
-import { PageHero } from "@/components/lp/PageHero";
 import { AMAZON_REVIEWS } from "@/data/amazonReviews";
 import { US_MAP_SVG } from "@/lib/marketing/us-map-svg";
 import { WholesaleForm } from "./WholesaleForm";
@@ -90,12 +90,85 @@ export default function WholesalePage() {
         </div>
       </div>
 
-      <PageHero
-        eyebrow="For Distributors, Retailers, and Bulk Buyers"
-        headline="Wholesale"
-        scriptAccent="USA Gummies."
-        sub="Pricing, MOQs, and lead times sent within one business day. Master cartons (36 bags) and pallet quantities — landed or buyer-paid freight."
-      />
+      {/* Logo-led hero — brand identity first, "Wholesale" as the role label
+          underneath. No more typography-only blocks. */}
+      <section className="relative overflow-hidden bg-[var(--lp-cream)]">
+        <div className="lp-bunting" aria-hidden />
+        <div className="relative mx-auto max-w-[1100px] px-5 py-12 text-center sm:px-8 sm:py-16">
+          <Image
+            src="/brand/logo-full.png"
+            alt="USA Gummies"
+            width={1118}
+            height={645}
+            priority
+            sizes="(max-width: 640px) 220px, 320px"
+            className="mx-auto h-auto w-[220px] sm:w-[280px] lg:w-[320px]"
+          />
+          <p className="lp-label mt-6 text-[var(--lp-red)]">★ For Distributors, Retailers &amp; Bulk Buyers ★</p>
+          <h1 className="lp-display mt-3 text-[clamp(3rem,8vw,5.5rem)] leading-[0.95] text-[var(--lp-ink)]">
+            Wholesale.
+          </h1>
+          <p className="lp-sans mx-auto mt-5 max-w-[54ch] text-[1.05rem] leading-[1.55] text-[var(--lp-ink)]/85">
+            Master cartons (36 bags), pallet quantities, and custom programs — landed or buyer-paid freight.
+            Pricing &amp; MOQs returned within one business day.
+          </p>
+        </div>
+        <div className="lp-bunting-thin" aria-hidden />
+      </section>
+
+      {/* Product hero band — give buyers a clean look at the bag and what's
+          inside before they fill out a form. */}
+      <section className="bg-[var(--lp-off-white)] border-t-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[1100px] px-5 py-12 sm:px-8 sm:py-16">
+          <div className="grid grid-cols-1 items-center gap-8 sm:grid-cols-2 sm:gap-10">
+            <div className="relative aspect-[4/3] overflow-hidden border-[3px] border-[var(--lp-ink)] bg-[var(--lp-cream-soft)]"
+                 style={{ boxShadow: "8px 8px 0 var(--lp-red)" }}>
+              <Image
+                src="/brand/photos/bag-1776.jpg"
+                alt="USA Gummies — All American Gummy Bears, 7.5 oz bag"
+                fill
+                sizes="(max-width: 640px) 90vw, 540px"
+                className="object-cover"
+              />
+            </div>
+            <div>
+              <p className="lp-label text-[var(--lp-red)]">★ The Product ★</p>
+              <h2 className="lp-display mt-3 text-[clamp(1.7rem,4vw,2.4rem)] leading-tight text-[var(--lp-ink)]">
+                7.5 oz bag.
+                <br />
+                <span className="lp-script text-[var(--lp-red)]">Five fruit flavors.</span>
+              </h2>
+              <p className="lp-sans mt-3 text-[0.98rem] leading-[1.55] text-[var(--lp-ink)]/80">
+                Classic gummy bear shape. Made with real fruit juice. No artificial dyes, no high-fructose corn syrup,
+                no synthetic flavors. Patriotic packaging built to stand out on a shelf or in a gift set.
+              </p>
+              <div className="mt-6 grid grid-cols-5 gap-2">
+                {[
+                  { color: "red", label: "Cherry" },
+                  { color: "orange", label: "Orange" },
+                  { color: "yellow", label: "Lemon" },
+                  { color: "green", label: "Apple" },
+                  { color: "pink", label: "Strawberry" },
+                ].map((f) => (
+                  <div key={f.color} className="flex flex-col items-center text-center">
+                    <Image
+                      src={`/brand/gummies/gummy-${f.color}.png`}
+                      alt={`${f.label} gummy bear`}
+                      width={400}
+                      height={400}
+                      sizes="80px"
+                      className="h-auto w-full max-w-[64px]"
+                    />
+                    <span className="lp-sans mt-1 text-[0.7rem] font-bold uppercase tracking-wider text-[var(--lp-ink)]/70">
+                      {f.label}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* Form is the primary CTA — no anchor-scroll, no buried-below-marketing-copy. */}
       <section className="bg-[var(--lp-cream)] border-t-2 border-[var(--lp-ink)]">
@@ -141,38 +214,47 @@ export default function WholesalePage() {
           </div>
           <div className="wholesale-map" dangerouslySetInnerHTML={{ __html: US_MAP_SVG }} aria-hidden="true" />
 
-          {/* Production row */}
-          <div className="mt-10 text-center">
-            <p className="lp-label text-[var(--lp-red)]">PRODUCTION</p>
-          </div>
-          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3 max-w-[820px] mx-auto">
+          {/* Single condensed legend — five role chips inline. */}
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[0.85rem]">
             {[
-              { state: "Indiana", role: "Gummies crafted" },
-              { state: "Wisconsin", role: "Packaging printed" },
-              { state: "Washington", role: "Repacked at a veteran-owned facility" },
-            ].map((step) => (
-              <div key={step.state} className="border-2 border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-4 text-center">
-                <div className="lp-display text-[1.15rem] text-[var(--lp-ink)]">{step.state}</div>
-                <div className="lp-sans mt-1 text-[0.85rem] text-[var(--lp-ink)]/70">{step.role}</div>
+              { state: "IN", role: "Gummies crafted" },
+              { state: "WI", role: "Packaging" },
+              { state: "WA", role: "West Coast warehouse" },
+              { state: "PA", role: "East Coast warehouse" },
+              { state: "WY", role: "Corporate" },
+            ].map((chip) => (
+              <div key={chip.state} className="flex items-center gap-2">
+                <span
+                  className="inline-flex h-7 w-7 items-center justify-center border-2 border-[var(--lp-ink)] bg-[var(--lp-red)] text-[0.7rem] font-bold text-white"
+                  aria-hidden
+                >
+                  {chip.state}
+                </span>
+                <span className="lp-sans text-[var(--lp-ink)]/80">{chip.role}</span>
               </div>
             ))}
           </div>
+        </div>
+      </section>
 
-          {/* Operations row */}
-          <div className="mt-8 text-center">
-            <p className="lp-label text-[var(--lp-ink)]">HEADQUARTERS &amp; SHIPPING</p>
-          </div>
-          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3 max-w-[820px] mx-auto">
-            {[
-              { state: "Wyoming", role: "Corporate offices" },
-              { state: "Washington", role: "West Coast warehouse" },
-              { state: "Pennsylvania", role: "East Coast warehouse" },
-            ].map((step) => (
-              <div key={step.state} className="border-2 border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-4 text-center">
-                <div className="lp-display text-[1.15rem] text-[var(--lp-ink)]">{step.state}</div>
-                <div className="lp-sans mt-1 text-[0.85rem] text-[var(--lp-ink)]/70">{step.role}</div>
+      {/* Visual stats band — three big numbers, no paragraphs. */}
+      <section className="bg-[var(--lp-red)] border-t-2 border-[var(--lp-ink)]">
+        <div className="mx-auto max-w-[1100px] px-5 py-10 sm:px-8 sm:py-14">
+          <div className="grid grid-cols-1 gap-6 text-center text-white sm:grid-cols-3 sm:gap-4">
+            <div>
+              <div className="lp-display text-[clamp(2.6rem,6vw,3.6rem)] leading-none">
+                {AMAZON_REVIEWS.aggregate.rating.toFixed(1)}★
               </div>
-            ))}
+              <div className="lp-label mt-2 text-white/85">Avg. customer rating</div>
+            </div>
+            <div className="border-l-0 border-r-0 sm:border-l-2 sm:border-r-2 sm:border-white/30 sm:px-4">
+              <div className="lp-display text-[clamp(2.6rem,6vw,3.6rem)] leading-none">36</div>
+              <div className="lp-label mt-2 text-white/85">Bags / master carton</div>
+            </div>
+            <div>
+              <div className="lp-display text-[clamp(2.6rem,6vw,3.6rem)] leading-none">5</div>
+              <div className="lp-label mt-2 text-white/85">States in our supply chain</div>
+            </div>
           </div>
         </div>
       </section>
