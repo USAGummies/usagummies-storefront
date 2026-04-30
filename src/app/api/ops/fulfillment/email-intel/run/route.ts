@@ -107,8 +107,15 @@ interface RunResult {
 }
 
 function isEnabled(): boolean {
+  // 2026-04-30 incident: this route auto-replied to Eric Miller @ Event Network
+  // with a stale "1-pack/5-pack/master case" sample-request template after he
+  // had already confirmed sample receipt. To prevent recurrence, default is now
+  // OFF — must be explicitly enabled with EMAIL_INTEL_ENABLED=true. Re-enable
+  // ONLY after (a) the approval gate is verified to catch 100% of class-B
+  // sends and (b) the stale templates in src/lib/ops/email-intelligence/draft.ts
+  // are replaced with current SKU language.
   const v = process.env.EMAIL_INTEL_ENABLED?.trim().toLowerCase();
-  return v !== "false" && v !== "0" && v !== "off";
+  return v === "true" || v === "1" || v === "on";
 }
 
 function describeWindow(cursorSec: number, nowMs: number): string {

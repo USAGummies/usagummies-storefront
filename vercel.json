@@ -83,26 +83,6 @@
     {
       "path": "/api/ops/inventory/burn-rate?refresh=true",
       "schedule": "30 3 * * 0"
-    },
-    {
-      "path": "/api/ops/fulfillment/email-intel/run",
-      "schedule": "0 15 * * *"
-    },
-    {
-      "path": "/api/ops/fulfillment/email-intel/run",
-      "schedule": "0 19 * * *"
-    },
-    {
-      "path": "/api/ops/fulfillment/email-intel/run",
-      "schedule": "0 22 * * *"
-    },
-    {
-      "path": "/api/ops/fulfillment/email-intel/run",
-      "schedule": "0 1 * * *"
-    },
-    {
-      "path": "/api/ops/fulfillment/email-intel/run",
-      "schedule": "0 4 * * *"
     }
   ]
 }
