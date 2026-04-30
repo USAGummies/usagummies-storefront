@@ -148,6 +148,20 @@ def find_or_create_deal(
     tokens = [w for w in raw_words if len(w) >= 2 and w.lower() not in STOP]
     if not tokens:
         tokens = [company]
+    # HubSpot search API limits a filterGroup to 6 filters total. We need
+    # 1 filter for `pipeline` + N filters for the company-name tokens, so
+    # cap company tokens to 5. Bias toward LONGER tokens (more distinctive)
+    # to keep dedup precision high. Wave 2 (2026-04-30 PM) crashed on
+    # "Ripley's Believe It or Not! World Entertainment" (7 tokens) before
+    # this cap was added.
+    HUBSPOT_FILTER_GROUP_MAX = 6
+    PIPELINE_FILTER_COST = 1
+    MAX_TOKENS = HUBSPOT_FILTER_GROUP_MAX - PIPELINE_FILTER_COST  # = 5
+    if len(tokens) > MAX_TOKENS:
+        # keep the 5 longest tokens (most distinctive), preserving original order
+        ranked = sorted(enumerate(tokens), key=lambda x: -len(x[1]))[:MAX_TOKENS]
+        keep_idx = {i for i, _ in ranked}
+        tokens = [t for i, t in enumerate(tokens) if i in keep_idx]
     filters = [{"propertyName": "dealname", "operator": "CONTAINS_TOKEN", "value": t} for t in tokens]
     filters.append({"propertyName": "pipeline", "operator": "EQ", "value": pipeline})
     res = hs_request(
