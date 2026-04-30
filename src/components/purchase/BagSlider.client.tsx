@@ -31,12 +31,15 @@ type BagSliderProps = {
 /* ------------------------------------------------------------------ */
 
 const MIN_QTY = 1;
-const MAX_QTY = 12;
+const MAX_QTY = 10;
 
+// 2026-04-30: bundle ladder migrated to "Buy X Get Y FREE" tiers (5/7/10).
+// Slider milestones now mark the three bundle anchor points so the user
+// can see at a glance where the offers land + what they unlock.
 const MILESTONES = [
-  { qty: 5, label: "$5.00/bag", color: "#2D7A3A" },
-  { qty: 8, label: "Most popular", color: "#1B2A4A" },
-  { qty: 12, label: "Best price", color: "#c7362c" },
+  { qty: 5,  label: "Buy 4, Get 1 FREE", color: "#2D7A3A" },
+  { qty: 7,  label: "Buy 5, Get 2 FREE", color: "#1B2A4A" },
+  { qty: 10, label: "Buy 7, Get 3 FREE", color: "#c7362c" },
 ] as const;
 
 const FLAVOR_BEARS = [

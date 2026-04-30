@@ -12,14 +12,14 @@ import { AMAZON_REVIEWS } from "@/data/amazonReviews";
 import { GummyIconRow, HeroPackIcon } from "@/components/ui/GummyIcon";
 import { storeCartId, getStoredCartId } from "@/lib/cartClientUtils";
 
-const QUICK_QTYS = [1, 2, 3, 4, 5, 8, 12];
+const QUICK_QTYS = [1, 5, 7, 10];
 const SAVINGS_LADDER = [
-  { qty: 5, label: "Save + free ship", caption: "5+ bags" },
-  { qty: 8, label: "Most popular", caption: "8 bags" },
-  { qty: 12, label: "Best price", caption: "12 bags" },
+  { qty: 5,  label: "Buy 4, Get 1 FREE",  caption: "5 bags · $4.79/bag" },
+  { qty: 7,  label: "Buy 5, Get 2 FREE",  caption: "7 bags · $4.28/bag" },
+  { qty: 10, label: "Buy 7, Get 3 FREE",  caption: "10 bags · $4.19/bag" },
 ];
-const MISSION_TARGET_QTY = 8;
-const MISSION_SOCIAL_PROOF = "Most popular pick: 8 bags.";
+const MISSION_TARGET_QTY = 7;
+const MISSION_SOCIAL_PROOF = "Buy 5, Get 2 FREE — most popular bundle.";
 
 type QuickViewProps = {
   product: any;
@@ -45,7 +45,7 @@ function money(amount?: number, currencyCode = "USD") {
 
 export default function QuickView({ product, detailHref, bundleHref, children }: QuickViewProps) {
   const [open, setOpen] = useState(false);
-  const [selectedQty, setSelectedQty] = useState(8);
+  const [selectedQty, setSelectedQty] = useState(7);
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { bagCount } = useCartBagCount();

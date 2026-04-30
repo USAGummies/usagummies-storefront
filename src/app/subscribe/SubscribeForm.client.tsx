@@ -10,7 +10,7 @@ import {
 } from "@/lib/bundles/pricing";
 import { AMAZON_REVIEWS } from "@/data/amazonReviews";
 
-const QTY_OPTIONS = [5, 8, 12] as const;
+const QTY_OPTIONS = [5, 7, 10] as const;
 
 const SUBSCRIBE_PERKS = [
   { icon: "💰", text: "Save $0.50/bag vs bundles" },
@@ -128,7 +128,7 @@ export function SubscribeForm() {
             const sub = subscriptionPricingForQty(q);
             const retailTotal = (BASE_PRICE * q).toFixed(2);
             const isSelected = qty === q;
-            const badge = q === 5 ? "Most Popular" : q === 12 ? "Best Value" : null;
+            const badge = q === 5 ? "Buy 4, Get 1 FREE" : q === 7 ? "Buy 5, Get 2 FREE" : q === 10 ? "Buy 7, Get 3 FREE" : null;
             return (
               <button
                 key={q}
@@ -141,7 +141,7 @@ export function SubscribeForm() {
                 }`}
               >
                 {badge && (
-                  <span className={`absolute -top-2.5 right-3 rounded-full px-2.5 py-0.5 text-[10px] font-bold text-white ${q === 12 ? "bg-[#c7362c]" : "bg-[#2D7A3A]"}`}>
+                  <span className={`absolute -top-2.5 right-3 rounded-full px-2.5 py-0.5 text-[10px] font-bold text-white ${q === 10 ? "bg-[#c7362c]" : "bg-[#2D7A3A]"}`}>
                     {badge}
                   </span>
                 )}

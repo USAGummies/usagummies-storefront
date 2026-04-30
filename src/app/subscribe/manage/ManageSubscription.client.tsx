@@ -7,7 +7,7 @@ import {
   subscriptionPricingForQty,
 } from "@/lib/bundles/pricing";
 
-const QTY_OPTIONS = [5, 8, 12] as const;
+const QTY_OPTIONS = [5, 7, 10] as const;
 
 type Subscription = {
   email: string;
