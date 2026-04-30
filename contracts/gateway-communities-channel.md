@@ -297,6 +297,89 @@ Examples: Springfield IL (Lincoln sites), Sturgis SD (rally + Black Hills), Cust
 
 ---
 
+## 🛻 Independent Truck Stops Channel — LOCKED 2026-04-29 PM (Ben directive)
+
+**Verbatim:** _"identify all the independently owned and operated truck stops in the country, they will love to have our kind of product. We want to be in every resort and tourist town in america, we want to be everywhere."_
+
+### Why independent truck stops win
+
+- **Skip the chains.** Pilot / Love's / TA / Flying J have centralized procurement = unwinnable for a small premium SKU. Their snack walls are slotting-fee plays at corporate.
+- **Independents are owner-operated.** The owner IS the buyer. A 5-minute taste-test → "yes, send me a master carton" decision. No vendor portal, no SKU committee.
+- **Patriotic / Americana over-index.** Family-owned rural truck stops over-index hard on Made-in-USA, veteran-owned-co-packer, dye-free, "real candy" — all of our brand vectors.
+- **Volume is real.** A busy independent truck stop with a candy/snack wall turns 4-8 master cartons/month easy at $3.49/bag landed. Translates to a single B4 pallet (25 MC) clearing in 3-4 months per location.
+- **Geographic complement to gateway/tourist towns.** Truck stops live on the corridors BETWEEN tourist destinations — they fill the "drive-day economics" gap. Every founder-drive trip routes past 40-80 of them.
+
+### Tier 10 — Independent truck stops (Ben directive 2026-04-29)
+
+**Research priority order (highest density of independents first):**
+
+| Region | Why first | Trip linkage |
+|---|---|---|
+| **Tier 10.1 — TX + OK + MO** | Highest density of family-owned "travel center" + truck stop independents in the country | Layers on Batch 8 Texas spearhead |
+| **Tier 10.2 — IA + NE + KS** | Midwest farmer + driver corridors, family-run | Drive-corridor between WA warehouse + Texas trips |
+| **Tier 10.3 — GA + AL + TN + KY** | South/Southeast independent corridor, patriotic-heritage market | Layers on Batch 9 Southern Beach lane |
+| **Tier 10.4 — ID + MT + WY + OR** | Rocky Mountain + I-84 / I-90 / I-25 corridors, low-population independent territory | Layers on May trip Batch 5 (W. Yellowstone) + Batch 11 (I-5/Oregon) |
+
+### Per-truck-stop research format
+
+Same as gateway towns + 2 truck-stop-specific fields:
+- Named owner / buyer + verified email + confidence %
+- Phone fallback (independents often have no digital surface)
+- Walk-in flag for routes Ben/Drew is already driving
+- **Independent confirmation:** verify NOT a Pilot / Love's / TA / Flying J / Speedway / Casey's / Maverik / Sheetz / RaceTrac / QuikTrip / Wawa franchise (those are chain-owned, skip)
+- **Candy section confirmed:** TripAdvisor / Google reviews mention candy/snack wall (skip pure-fuel truck stops without retail)
+
+### Channel pacing
+
+- Pace: 1 region per drop, 30-50 named-buyer prospects per drop. Same as Batch 9 saturation lane.
+- Outreach: same `scripts/sales/send-and-log.py` canonical helper as everything else.
+- Founder-drive integration: every Ben/Drew trip should map "trip-day truck stop walk-ins" as a parallel pass to the gateway-town schedule. ~5-10 truck stop walk-ins per driving day, no time cost.
+
+---
+
+## 🛣️ I-5 Corridor + Pacific Northwest Founder-Drive Lane — LOCKED 2026-04-29 PM (Ben directive)
+
+**Verbatim:** _"lets do some research on portland, and oregon, and the entire i5 corridor."_
+
+### Why the I-5 lane wins
+
+- **Closest to our warehouse.** Ashford WA → Portland OR is a 3-hour drive. Ashford → Eugene is 4.5 hours. Ashford → Medford is 7 hours. Ashford → Sacramento is 11 hours. **Every single Pacific NW + NorCal stop is a founder-drive without overnight cost.**
+- **Same 17-pallet truck economics apply.** ~$1,400 fuel for a WA → CA roundtrip vs $8-10K LTL. ~$5K freight moat per pallet load. Founder-drive economics from `/contracts/gateway-communities-channel.md` § "Why founder-drives win."
+- **High retail density in patriot-friendly small markets.** Oregon Coast (Cannon Beach → Brookings) + Bend / Sisters / Sunriver + Crater Lake = same family-tourist demographic as Yellowstone gateway + OBX.
+- **Powell's, OMSI, Saturday Market, Pittock Mansion** — Portland heritage retail anchors with curated buyer programs.
+
+### Tier 11 — I-5 Corridor sub-regions (priority order)
+
+| Sub-region | Anchor venues | Trip pacing |
+|---|---|---|
+| **11.1 — Portland metro + Oregon Coast** ⭐ START HERE | Powell's, OMSI, Saturday Market, Pittock Mansion, Lan Su Garden, Cannon Beach, Seaside, Lincoln City, Newport, Florence, Bandon, Brookings, Mt Hood/Timberline | 3-day founder-drive from Ashford |
+| **11.2 — Eugene + Bend + Sisters / Central OR** | Bend Old Mill, Sunriver Resort, Sisters Western district, **High Desert Museum** ⭐, Crater Lake NPS (Xanterra) | 4-day add-on through I-84/97 |
+| **11.3 — Northern CA I-5** (Redding → Sacramento) | Lake Shasta, Olive Pit Corning, Bidwell Mansion, Sutter's Fort, Old Sacramento Schoolhouse Museum | 2-day add-on |
+| **11.4 — Central CA I-5** (Stockton → Bakersfield) | Forestiere Underground Gardens, Kearney Mansion gift shops, Stockton/Modesto/Fresno tourist retail | 2-day add-on |
+| **11.5 — Southern CA I-5** (LA basin → San Diego) | Olvera St, Old Town Pasadena, Universal CityWalk independents, Mission San Juan Capistrano, Old Town San Diego, Cabrillo NM, Coronado | 3-4 day endpoint |
+
+### Strategic recall (existing PNW beachhead)
+
+- **Powers Confections (Spokane WA)** — co-packer, in-channel itself
+- **Pendleton Round-Up (Pendleton OR)** — Nicole Herranen contact, sent during May trip outreach
+- **Sun Valley Resort (ID)** — Alison Enoch, Director of Procurement (Batch 1 Priority 3)
+- **Stinker Stores (Boise ID)** — Zack Damon, Category Manager (Batch 1 Priority 3)
+- **Cannon Beach + Seaside** — known coastal heritage retail strips, no shop-by-shop research yet
+
+### Per-shop research format
+
+Same as Batch 9 / gateway towns: named buyer + verified email + confidence % + phone fallback + walk-in flag.
+
+### Trip-cycle integration
+
+The I-5 corridor is the **default operating lane** for Ashford-based founder-drives. Every Q the lane should run:
+- Q1 / Q3: Portland + Oregon Coast (Tier 11.1)
+- Q2 / Q4: Bend + Central OR (Tier 11.2) + add-ons
+
+Long-haul trips down to Northern + Central + Southern CA (Tiers 11.3-11.5) are 7-10 day commitments and should be scheduled when the I-5 pipeline justifies the truck (≥10 paid orders queued).
+
+---
+
 ## Methodology — how to research gateway towns at scale
 
 Apply [`/contracts/research-methodology.md`](research-methodology.md) (Viktor's company-first playbook) to every town. Per-town research sequence:
