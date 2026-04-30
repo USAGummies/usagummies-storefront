@@ -51,9 +51,11 @@ import {
   type LocationDraftCounts,
   type PendingApprovalSummary,
   type SalesPipelineSummary,
+  type SalesTourCounts,
   type SourceState,
 } from "@/lib/ops/sales-command-center";
 import { buildProspectPlaybookReport } from "@/lib/sales/prospect-playbook";
+import { buildSalesTourPlaybookReport } from "@/lib/sales/tour-playbook";
 import {
   classifyAgingInput,
   type AgingItem,
@@ -62,6 +64,7 @@ import {
 
 const KV_AP_SENT_PREFIX = "ap-packets:sent:";
 const DAY1_PROSPECT_SOURCE = "docs/playbooks/wholesale-prospects-day1.csv";
+const SALES_TOUR_SOURCE = "contracts/sales-tour-may-2026-prospect-list.md";
 
 export async function readFaireInvites(): Promise<
   SourceState<FaireInviteCounts>
@@ -262,6 +265,30 @@ export async function readDay1Prospects(): Promise<
   } catch (err) {
     return sourceError(
       `Day 1 prospect playbook read failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+}
+
+export async function readSalesTourPlaybook(): Promise<
+  SourceState<SalesTourCounts>
+> {
+  try {
+    const markdown = await readFile(join(process.cwd(), SALES_TOUR_SOURCE), "utf8");
+    const report = buildSalesTourPlaybookReport(markdown, {
+      generatedAt: new Date(0).toISOString(),
+      source: SALES_TOUR_SOURCE,
+    });
+    return sourceWired({
+      total: report.summary.total,
+      warmOrHot: report.summary.warmOrHot,
+      verifiedEmails: report.summary.verifiedEmails,
+      alreadySent: report.summary.alreadySent,
+      researchNeeded: report.summary.researchNeeded,
+      callTasks: report.summary.callTasks,
+    });
+  } catch (err) {
+    return sourceError(
+      `May sales-tour playbook read failed: ${err instanceof Error ? err.message : String(err)}`,
     );
   }
 }

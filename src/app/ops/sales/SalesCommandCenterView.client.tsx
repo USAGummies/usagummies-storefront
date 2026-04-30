@@ -119,6 +119,14 @@ interface Report {
       needsManualResearch: number;
       priorityA: number;
     }>;
+    salesTour: SourceState<{
+      total: number;
+      warmOrHot: number;
+      verifiedEmails: number;
+      alreadySent: number;
+      researchNeeded: number;
+      callTasks: number;
+    }>;
     pipeline: SourceState<SalesPipelineSummary>;
     apPackets: SourceState<ApPacketCounts>;
     links: Array<{ href: string; label: string }>;
@@ -503,6 +511,31 @@ function WholesaleOnboardingSection({ report }: { report: Report }) {
             </span>
             <span style={{ color: GOLD }}>
               Priority A: <strong>{v.priorityA}</strong>
+            </span>
+          </div>
+        ))}
+      </div>
+      <div style={{ marginBottom: 8 }}>
+        <SubLabel>May sales tour</SubLabel>
+        {renderSourceState(report.wholesaleOnboarding.salesTour, (v) => (
+          <div style={{ display: "flex", gap: 16, fontSize: 13, flexWrap: "wrap" }}>
+            <span>
+              Total: <strong>{v.total}</strong>
+            </span>
+            <span style={{ color: GOLD }}>
+              Warm / hot: <strong>{v.warmOrHot}</strong>
+            </span>
+            <span style={{ color: GREEN }}>
+              Verified: <strong>{v.verifiedEmails}</strong>
+            </span>
+            <span style={{ color: GREEN }}>
+              Sent: <strong>{v.alreadySent}</strong>
+            </span>
+            <span style={{ color: AMBER }}>
+              Research: <strong>{v.researchNeeded}</strong>
+            </span>
+            <span style={{ color: AMBER }}>
+              Calls: <strong>{v.callTasks}</strong>
             </span>
           </div>
         ))}

@@ -85,6 +85,20 @@ export const OPENAI_WORKSPACE_TOOLS: readonly OpenAIWorkspaceTool[] = Object.fre
     safetyNotes: READ_ONLY_NOTES,
   },
   {
+    id: "ops.sales.tour-playbook",
+    name: "May 2026 sales-tour playbook",
+    description:
+      "Read the canonical May 2026 Ashford-to-Grand-Canyon sales-tour prospect contract, including route segments, vicinity tiers, verified/generic contact status, and research/call-task buckets. Read-only; no sends, HubSpot writes, Apollo lookups, or synthetic buyer data.",
+    mode: "read",
+    status: "ready",
+    audience: "Ben",
+    readOnly: true,
+    requiresHumanApproval: false,
+    backingRoute: "/api/ops/sales/tour",
+    backingSurface: "/ops/sales/tour",
+    safetyNotes: READ_ONLY_NOTES,
+  },
+  {
     id: "ops.readiness.snapshot",
     name: "Ops readiness snapshot",
     description:

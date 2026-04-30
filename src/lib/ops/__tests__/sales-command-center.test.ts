@@ -1030,3 +1030,66 @@ describe("buildSalesCommandCenter — Day 1 prospect playbook", () => {
     );
   });
 });
+
+describe("buildSalesCommandCenter — May sales-tour playbook", () => {
+  it("surfaces the wired sales-tour counts under wholesale onboarding", () => {
+    const report = buildSalesCommandCenter(
+      {
+        ...emptyInput(),
+        salesTour: sourceWired({
+          total: 92,
+          warmOrHot: 12,
+          verifiedEmails: 18,
+          alreadySent: 9,
+          researchNeeded: 41,
+          callTasks: 16,
+        }),
+      },
+      { now: NOW },
+    );
+
+    expect(report.wholesaleOnboarding.salesTour.status).toBe("wired");
+    if (report.wholesaleOnboarding.salesTour.status !== "wired") return;
+    expect(report.wholesaleOnboarding.salesTour.value.warmOrHot).toBe(12);
+    expect(report.wholesaleOnboarding.links).toContainEqual({
+      href: "/ops/sales/tour",
+      label: "May sales tour",
+    });
+  });
+
+  it("positive sales-tour counts do not trip anyAction by themselves", () => {
+    const report = buildSalesCommandCenter(
+      {
+        ...emptyInput(),
+        salesTour: sourceWired({
+          total: 92,
+          warmOrHot: 12,
+          verifiedEmails: 18,
+          alreadySent: 9,
+          researchNeeded: 41,
+          callTasks: 16,
+        }),
+      },
+      { now: NOW },
+    );
+
+    expect(report.todaysRevenueActions.anyAction).toBe(false);
+  });
+
+  it("missing sales-tour reader is explicit in blockers, not silently zero", () => {
+    const report = buildSalesCommandCenter(
+      {
+        ...emptyInput(),
+        salesTour: sourceNotWired("May sales-tour playbook reader not wired."),
+      },
+      { now: NOW },
+    );
+    const note = report.blockers.notes.find((row) => row.source === "salesTour");
+    expect(note).toEqual(
+      expect.objectContaining({
+        state: "not_wired",
+        reason: expect.stringContaining("sales-tour"),
+      }),
+    );
+  });
+});

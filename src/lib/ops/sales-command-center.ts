@@ -99,6 +99,15 @@ export interface Day1ProspectCounts {
   priorityA: number;
 }
 
+export interface SalesTourCounts {
+  total: number;
+  warmOrHot: number;
+  verifiedEmails: number;
+  alreadySent: number;
+  researchNeeded: number;
+  callTasks: number;
+}
+
 export interface PendingApprovalSummary {
   /** Total pending approvals across all entity types. */
   total: number;
@@ -134,6 +143,9 @@ export interface SalesCommandCenterInput {
   /** Checked-in Day 1 prospect playbook. Read-only: no outreach send,
    *  no HubSpot write, no Apollo lookup. */
   day1Prospects?: SourceState<Day1ProspectCounts>;
+  /** Checked-in May 2026 sales-tour contract. Read-only: no sends,
+   *  no HubSpot write, no Apollo lookup, no fabricated contacts. */
+  salesTour?: SourceState<SalesTourCounts>;
   pendingApprovals: SourceState<PendingApprovalSummary>;
   apPackets: SourceState<ApPacketCounts>;
   locationDrafts: SourceState<LocationDraftCounts>;
@@ -201,6 +213,7 @@ export interface SectionFollowUps {
 export interface SectionWholesaleOnboarding {
   inquiries: SourceState<{ total: number; lastSubmittedAt?: string }>;
   day1Prospects: SourceState<Day1ProspectCounts>;
+  salesTour: SourceState<SalesTourCounts>;
   pipeline: SourceState<SalesPipelineSummary>;
   apPackets: SourceState<ApPacketCounts>;
   links: Array<{ href: string; label: string }>;
@@ -548,6 +561,9 @@ export function buildSalesCommandCenter(
   if (input.day1Prospects) {
     checks.push(["day1Prospects", input.day1Prospects]);
   }
+  if (input.salesTour) {
+    checks.push(["salesTour", input.salesTour]);
+  }
   for (const [name, state] of checks) {
     if (state.status === "not_wired" || state.status === "error") {
       notes.push({ source: name, state: state.status, reason: state.reason });
@@ -586,11 +602,15 @@ export function buildSalesCommandCenter(
       day1Prospects:
         input.day1Prospects ??
         sourceNotWired("Day 1 prospect playbook reader not wired."),
+      salesTour:
+        input.salesTour ??
+        sourceNotWired("May sales-tour playbook reader not wired."),
       pipeline:
         input.salesPipeline ??
         sourceNotWired("HubSpot sales pipeline reader not wired."),
       apPackets: input.apPackets,
       links: [
+        { href: "/ops/sales/tour", label: "May sales tour" },
         { href: "/ops/sales/prospects/day1", label: "Day 1 prospect playbook" },
         { href: "/ops/ap-packets", label: "AP packet dashboard" },
         { href: "/ops/finance/review", label: "Finance review" },

@@ -34,6 +34,7 @@ import {
   readLocationDrafts,
   readPendingApprovals,
   readSalesPipeline,
+  readSalesTourPlaybook,
   readWholesaleInquiries,
 } from "@/lib/ops/sales-command-readers";
 import { readAllChannelsLast7d } from "@/lib/ops/revenue-kpi-readers";
@@ -91,6 +92,7 @@ export async function GET(req: Request): Promise<Response> {
     revenueChannels,
     wholesaleInquiries,
     day1Prospects,
+    salesTour,
     salesPipeline,
   ] = await Promise.all([
     readFaireInvites(),
@@ -102,6 +104,7 @@ export async function GET(req: Request): Promise<Response> {
     readAllChannelsLast7d(now),
     readWholesaleInquiries(),
     readDay1Prospects(),
+    readSalesTourPlaybook(),
     readSalesPipeline(now),
   ]);
 
@@ -162,6 +165,7 @@ export async function GET(req: Request): Promise<Response> {
       locationDrafts,
       wholesaleInquiries,
       day1Prospects,
+      salesTour,
       salesPipeline,
       missingEnv: readMissingEnv(),
       agingItems: aging.items,

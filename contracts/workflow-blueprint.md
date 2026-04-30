@@ -350,6 +350,21 @@ Each row uses the schema:
 - **Tests (Phase 6.1):** `sales-pipeline.test.ts` covers open-count math, malformed-count normalization, preview caps, and brief copy. `sales-command-readers-pipeline.test.ts` covers wired success, HubSpot failure → `error`, and thrown-client isolation. `sales-command-center.test.ts` covers dashboard surfacing, blockers behavior, and slice projection. `daily-brief.test.ts` covers the rendered pipeline line. Focused suite: 118 green before full verification.
 - **Monday MVP:** 🟢 — Ben sees B2B pipeline state in `/ops/sales` and the morning Slack brief without a second daily digest and without introducing HubSpot mutations.
 
+#### Phase 6.2 — May sales-tour playbook surface (NEW)
+- **Why:** The May 11–17 Ashford → Grand Canyon route plan is now a canonical contract (`contracts/sales-tour-may-2026-prospect-list.md`) plus a Notion mirror. Operators need a sortable internal view without turning the planning doc into an outreach sender. Notion explicitly says the repo contract wins on conflict, so the route reads the checked-in contract only.
+- **Architecture:**
+  - `src/lib/sales/tour-playbook.ts` is a pure markdown-table parser/projector. It reads route segment rows plus vicinity Tier 1 / Tier 2 / supplemental rows, skips explicit `(gap to be researched)` placeholder rows, and classifies contact status (`verified_email`, `generic_email`, `sent`, `phone_or_call`, `research_needed`, `closed_or_customer`) and priority signal (`hot`, `warm`, `closed`, `new`, `cold`, `deprioritized`, `unknown`).
+  - `GET /api/ops/sales/tour` is auth-gated and read-only. It reads the contract file and returns `{ ok, generatedAt, source, summary, sections, prospects }`. It imports no Gmail, HubSpot, Apollo, QBO, Shopify, KV, Slack-send, or approval-store clients.
+  - `/ops/sales/tour` renders a filterable internal dashboard with summary cards, section chips, and per-prospect cards. It contains no send buttons and no HubSpot write buttons.
+  - `readSalesTourPlaybook()` wires the same summary counts into `/api/ops/sales`; `/ops/sales` shows the May tour under Wholesale / B2B onboarding. Positive counts are context-only and do not trip `todaysRevenueActions.anyAction`.
+  - The OpenAI workspace registry exposes `ops.sales.tour-playbook` as a read-only ChatGPT connector tool backed by `/api/ops/sales/tour` and `/ops/sales/tour`.
+- **Hard rules locked by tests:**
+  - **No fabricated contacts.** `TBD` rows never become `verified_email`; generic inboxes remain `generic_email`.
+  - **No placeholder prospects.** `(gap to be researched)` rows are skipped and counted separately as `gapsSkipped`.
+  - **Read-only.** Route static-source assertion locks out send / CRM / QBO / Shopify / KV / approval imports; only `GET` is exported.
+  - **Context-only in Sales Command.** Tour counts do not create action pressure by themselves; they surface as planning context and blockers only when the reader errors/not-wired.
+- **Monday MVP:** 🟢 — Ben has one internal tour cockpit and ChatGPT has a safe read surface for answering "who do I need to hit on this route?" without any path to send or mutate CRM.
+
 #### Phase 7 — Receipt OCR extraction (prepare-for-review only) (NEW)
 - **Why:** `/ops/finance/review` already aggregates the receipt review queue, but Rene/Ben were doing field-by-field data entry by hand. Phase 7 attaches a *suggestion* to each captured receipt so reviewers see vendor/date/amount/currency/tax/last4/payment hints proposed before they fill in the canonical fields. Promotion remains 100% human — no auto-fill, no QBO write.
 - **Architecture:**

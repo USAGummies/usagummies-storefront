@@ -61,6 +61,18 @@ describe("OpenAI workspace tool registry", () => {
     expect(t?.description).toMatch(/no sends/i);
   });
 
+  it("ops.sales.tour-playbook is exposed as a read-only route playbook", () => {
+    const t = getOpenAIWorkspaceTool("ops.sales.tour-playbook");
+    expect(t).toBeDefined();
+    expect(t?.status).toBe("ready");
+    expect(t?.mode).toBe("read");
+    expect(t?.readOnly).toBe(true);
+    expect(t?.requiresHumanApproval).toBe(false);
+    expect(t?.backingRoute).toBe("/api/ops/sales/tour");
+    expect(t?.backingSurface).toBe("/ops/sales/tour");
+    expect(t?.description).toMatch(/no sends/i);
+  });
+
   it("all read tools are actually read-only and never require approval", () => {
     const readTools = OPENAI_WORKSPACE_TOOLS.filter((tool) => tool.mode === "read");
     expect(readTools.length).toBeGreaterThan(0);

@@ -121,6 +121,7 @@ The repo is already close to a ChatGPT workspace-agent architecture:
 - Agent contracts and packs define who owns what.
 - `/ops/sales`, `/ops/readiness`, `/ops/finance/review`, `/ops/faire-direct`, and receipt review-packet routes are already curated read surfaces.
 - `/ops/sales/prospects/day1` exposes the checked-in Day 1 wholesale prospect playbook as read-only context; sends still require the canonical validator + Class B approval path.
+- `/ops/sales/tour` exposes the checked-in May 2026 sales-tour contract as read-only context; it classifies route prospects, verified/generic contacts, research gaps, and call tasks without sending outreach or writing HubSpot.
 - Slack approval cards and closers already enforce Class B / Class C boundaries.
 - Operating-memory and agent-pack work is present in the active worktree and should become the second phase once stabilized.
 
