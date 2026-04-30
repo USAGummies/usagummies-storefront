@@ -260,6 +260,42 @@ The five decisions below are the irreducible policy choices. Everything else in 
 
 **Claude's read:** Option A. The proposal's hard rule `R7` already says escalation language is mandatory on reorder, landed, or strategic offers. Option A extends "always" to *every* outbound including the published B-grid quotes — and it's the cheapest insurance against a customer arguing later that "you said this price; it never came with conditions." Templates absorb the clause once; the marginal text is two sentences. Option B exempts pickup, which is fine if pickup is going to be rare; Option C is the path of least resistance now and most regret later.
 
+### Q6. Buyer-paid-freight surcharge (NEW — raised by Rene 2026-04-30)
+
+> *Rene 2026-04-30 5:46 AM CT (`#financials`): "is there any reason buyer paid freight we don't increase the pricing by $0.25/bag? this would be anytime a buyer pays freight — we still have to handle and should get something for it and it can push them to us shipping easier — thoughts?"*
+
+The proposal: every buyer-pays line gets *+$0.25/bag* because (a) we still pick/pack/stage the order — that work has cost, (b) the price gap pushes buyers toward landed (which we ship easier and convert to higher gross revenue).
+
+**Today's grid + the proposed surcharge:**
+
+| Line | Today | With +$0.25 surcharge | Delta vs landed equivalent |
+|---|---:|---:|---|
+| `B3` master carton buyer-pays | $3.25 | **$3.50** | now $0.01 *higher* than B2 landed ($3.49) |
+| `B5` pallet buyer-pays | $3.00 | **$3.25** | now equal to B4 landed ($3.25) |
+| `C-PU` pickup floor (if Q1=A keeps off-grid) | $2.00 | **$2.25** | still pickup-only; no landed comparison |
+
+**The intentional inversion:** at +$0.25 the buyer-pays prices are equal to or *higher* than the landed equivalents — not because we want to discourage buyer-pays, but because it makes "landed" the obvious default. Buyers with cheaper-than-our-cost freight (distributors with their own carriers) still come out ahead choosing buyer-pays; everyone else picks landed.
+
+**Decision options:**
+
+- **Option A — YES, +$0.25 surcharge across all buyer-pays lines.** Updates B3 → $3.50, B5 → $3.25, C-PU → $2.25 (if Q1=A grid-resident). Locked into `wholesale-pricing.md` v2.3.
+- **Option B — YES on master carton (B3), NO on pallet (B5).** Rationale: at pallet scale (900 bags) the handling cost per unit is tiny vs at master carton scale (36 bags). Surcharge stays on smaller orders only.
+- **Option C — NO, keep current grid.** Rationale: the existing $0.24–$0.25 delta between B2/B3 + B4/B5 already covers freight; doubling that gap risks losing buyer-pays customers entirely.
+
+**Claude's read:** Option A is the cleanest implementation of Rene's logic. It eliminates the marginal-incentive ambiguity (today a buyer with $0.50/bag freight saves money picking buyer-pays; with the surcharge they don't unless their freight is *much* cheaper). It also makes the price card simpler to communicate. Option B is the right answer if Ben prefers to keep B5 attractive as a distributor-only door — but the existing distributor commitments (Inderbitzin, Glacier) are at *delivered* prices anyway (per `/contracts/distributor-pricing-commitments.md`), so they're unaffected. Option C preserves status quo but loses the structural incentive Rene flagged.
+
+**Margin impact** (per `/contracts/proforma-channel-margins.md` §1.9 + §1.11):
+
+| Tier | Today GM/bag | Option A GM/bag | Delta |
+|---|---:|---:|---:|
+| B3 master carton buyer-pays | $1.48 | $1.73 | +$0.25 |
+| B5 pallet buyer-pays | $1.23 | $1.48 | +$0.25 |
+| C-PU pickup floor (if grid-resident) | $0.23 | $0.48 | +$0.25 |
+
+Volume impact unknown until we observe buyer behavior post-change — flag for the first 90 days as a watch item.
+
+→ Reply: `Q6: A` / `Q6: B` / `Q6: C`. Ben's call (commercial); Rene already pre-signaled YES (he raised it).
+
 ---
 
 ## 7. Risk + migration considerations

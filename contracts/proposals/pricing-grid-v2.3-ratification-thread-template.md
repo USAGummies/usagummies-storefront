@@ -59,7 +59,15 @@ time, or only when outside approved route corridors?*
   • C — NO, Ben's discretion (recommended but not required)
   → Reply: `Q5: A` (or B / C)
 
-After both of you have answered all 5, I'll synthesize the v2.3 grid +
+*Q6 (NEW — raised by Rene 2026-04-30): Buyer-paid-freight +$0.25/bag surcharge?*
+  • A — YES, +$0.25 across ALL buyer-pays lines (B3 → $3.50, B5 → $3.25,
+    C-PU → $2.25). Inverts price gap so landed becomes the default. ← _Claude's read_
+  • B — YES on master carton (B3) only, NO on pallet (B5). Handling
+    cost per unit smaller at pallet scale.
+  • C — NO, keep current grid ($3.25 B3 / $3.00 B5).
+  → Reply: `Q6: A` (or B / C). Rene's pre-signaled yes; Ben's call.
+
+After both of you have answered all 6, I'll synthesize the v2.3 grid +
 queue the follow-up commit:
   - `wholesale-pricing.md` graduates to v2.3 with the new tier rows
   - `pricing-route-governance.md` §11 marked CLOSED
