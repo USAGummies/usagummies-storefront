@@ -21,20 +21,24 @@ import { storeCartId, getBagsPerUnit } from "@/lib/cartClientUtils";
 
 type MoneyV2 = { amount: string; currencyCode: string };
 
-const FEATURED_BUNDLE_QTYS = [5, 8, 12];
+// 2026-04-30: bundle ladder now matches the BXGY tiers.
+//   5 bags  → Buy 4, Get 1 FREE  ($23.96 / $4.79 per bag)
+//   7 bags  → Buy 5, Get 2 FREE  ($29.95 / $4.28 per bag)
+//   10 bags → Buy 7, Get 3 FREE  ($41.93 / $4.19 per bag)
+const FEATURED_BUNDLE_QTYS = [5, 7, 10];
 const SAVINGS_LADDER = [
-  { qty: 5, label: "$5.00/bag", caption: "5 bags" },
-  { qty: 8, label: "Most picked", caption: "8 bags" },
-  { qty: 12, label: "Best price", caption: "12 bags" },
+  { qty: 5,  label: "Buy 4, Get 1 FREE", caption: "5 bags · $4.79/bag" },
+  { qty: 7,  label: "Buy 5, Get 2 FREE", caption: "7 bags · $4.28/bag" },
+  { qty: 10, label: "Buy 7, Get 3 FREE", caption: "10 bags · $4.19/bag" },
 ];
 const PROGRESS_MILESTONES = [
-  { qty: 5, label: "$5.00/bag" },
-  { qty: 8, label: "Most picked" },
-  { qty: 12, label: "Best price" },
+  { qty: 5,  label: "Buy 4, Get 1 FREE" },
+  { qty: 7,  label: "Buy 5, Get 2 FREE" },
+  { qty: 10, label: "Buy 7, Get 3 FREE" },
 ];
-const MISSION_TARGET_QTY = 8;
-const MISSION_SOCIAL_PROOF = "8 bags is the most picked option.";
-const COMPLETE_TARGETS = [5, 8, 12];
+const MISSION_TARGET_QTY = 7;
+const MISSION_SOCIAL_PROOF = "Buy 5, Get 2 FREE — most popular bundle.";
+const COMPLETE_TARGETS = [5, 7, 10];
 
 const resolveLineImageAlt = (line: any) =>
   line?.merchandise?.image?.altText ||
@@ -105,17 +109,17 @@ function useCountUp(value: number, duration = 520) {
 }
 
 function bundleLabel(qty: number) {
-  if (qty === 5) return "Free shipping";
-  if (qty === 8) return "Most picked";
-  if (qty === 12) return "Bulk savings";
+  if (qty === 5) return "Buy 4, Get 1 FREE";
+  if (qty === 7) return "Buy 5, Get 2 FREE";
+  if (qty === 10) return "Buy 7, Get 3 FREE";
   return "";
 }
 
 function dealToastMessage(milestone: { qty: number; label: string }) {
-  if (milestone.qty === 5) return "Price update: bundle pricing unlocked — $5.00/bag.";
-  if (milestone.qty === 8) return "Price update: most picked price unlocked.";
-  if (milestone.qty === 12) return "Price update: best per-bag price unlocked.";
-  return `Price update: ${milestone.label.toLowerCase()}.`;
+  if (milestone.qty === 5) return "Bundle unlocked: Buy 4, Get 1 FREE — $23.96.";
+  if (milestone.qty === 7) return "Bundle unlocked: Buy 5, Get 2 FREE — $29.95.";
+  if (milestone.qty === 10) return "Bundle unlocked: Buy 7, Get 3 FREE — $41.93.";
+  return `Bundle update: ${milestone.label}.`;
 }
 
 function buildGaItems(lines: any[]) {
@@ -240,13 +244,17 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
 
   let cartHeadline = "";
   if (totalBags < 5) {
-    cartHeadline = "Add 5 bags to drop to $5.00/bag.";
-  } else if (totalBags < 8) {
-    cartHeadline = "Bundle pricing active — $5.00/bag.";
-  } else if (totalBags === 8) {
-    cartHeadline = "Most picked size active.";
-  } else if (totalBags > 8 && totalBags < 12) {
-    cartHeadline = "Bundle pricing active.";
+    cartHeadline = `Add ${5 - totalBags} more bag${totalBags === 4 ? "" : "s"} to unlock Buy 4, Get 1 FREE.`;
+  } else if (totalBags === 5) {
+    cartHeadline = "Buy 4, Get 1 FREE — $23.96 unlocked.";
+  } else if (totalBags === 7) {
+    cartHeadline = "Buy 5, Get 2 FREE — $29.95 unlocked.";
+  } else if (totalBags === 10) {
+    cartHeadline = "Buy 7, Get 3 FREE — $41.93 unlocked (best value).";
+  } else if (totalBags < 7) {
+    cartHeadline = `Add ${7 - totalBags} more bag${7 - totalBags === 1 ? "" : "s"} to unlock Buy 5, Get 2 FREE.`;
+  } else if (totalBags < 10) {
+    cartHeadline = `Add ${10 - totalBags} more bag${10 - totalBags === 1 ? "" : "s"} to unlock Buy 7, Get 3 FREE.`;
   } else {
     cartHeadline = "Best per-bag price active.";
   }
@@ -407,7 +415,7 @@ export function CartView({ cart, onClose }: { cart: any; onClose?: () => void })
   const drawerSavingsLine = hasSavings
     ? "Bundle pricing active — free shipping included."
     : totalBags > 0
-      ? "Add 5 bags to drop to $5.00/bag — free shipping on every order."
+      ? "Add 5 bags total to unlock Buy 4, Get 1 FREE — free shipping on every order."
       : "";
   const bundleSavingsText = bundleSavings > 0
     ? `You're saving ${formatNumber(bundleSavings, summaryCurrency)} with your bundle`

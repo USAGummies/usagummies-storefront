@@ -117,9 +117,23 @@ export default function GoLandingPage() {
         }
         /* Supply-chain US map — base styles + highlight the 5 active states.
            The SVG's internal <defs><style> block was stripped (hydration
-           mismatch); we recreate the base styles here. */
-        .supply-chain-map { max-width: 760px; margin: 28px auto 0; padding: 0 4px; }
-        .supply-chain-map svg { width: 100%; height: auto; display: block; }
+           mismatch); we recreate the base styles here.
+           2026-04-30: mobile fix — bump min-height + force preserveAspectRatio
+           via container so the SVG doesn't render as a tiny postage stamp on
+           narrow viewports. */
+        .supply-chain-map {
+          width: 100%;
+          max-width: 760px;
+          margin: 24px auto 0;
+          padding: 0;
+        }
+        .supply-chain-map svg {
+          width: 100%;
+          height: auto;
+          min-height: 200px;
+          display: block;
+          aspect-ratio: 960 / 600;
+        }
         .supply-chain-map svg .state path { fill: #e6e1d6; }
         .supply-chain-map svg .borders { stroke: #d6d0c3; stroke-width: 0.75; }
         .supply-chain-map svg .dccircle { display: none; }
@@ -128,6 +142,9 @@ export default function GoLandingPage() {
         .supply-chain-map svg path.wa,
         .supply-chain-map svg path.wy,
         .supply-chain-map svg path.pa { fill: #c7362c; }
+        @media (max-width: 480px) {
+          .supply-chain-map svg { min-height: 220px; }
+        }
       `}</style>
 
       {/* Header */}

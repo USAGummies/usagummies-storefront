@@ -104,12 +104,12 @@ const FAQS: FaqItem[] = [
   {
     question: "Can I buy a single bag?",
     answer:
-      "Yes. You can order any quantity with free shipping on every order. 1-4 bags ship at $5.99 per bag. Bundle savings kick in at 5 bags ($5.00 per bag) and grow with quantity.",
+      "Yes. You can order any quantity with free shipping on every order. 1-4 bags ship at $5.99 per bag. The bundle deals start at 5 bags: Buy 4, Get 1 FREE for $23.96 ($4.79/bag).",
   },
   {
-    question: "How do bag count savings work?",
+    question: "How do the bundle deals work?",
     answer:
-      `Savings pricing lowers the per-bag cost as you add more bags. Most customers choose 5, 8, or 12 bags, and ${FREE_SHIPPING_PHRASE.toLowerCase()}.`,
+      `Three bundle tiers: 5-Pack — Buy 4, Get 1 FREE ($23.96, $4.79/bag); 7-Pack — Buy 5, Get 2 FREE ($29.95, $4.28/bag); 10-Pack — Buy 7, Get 3 FREE ($41.93, $4.19/bag). ${FREE_SHIPPING_PHRASE} on every order.`,
   },
   {
     question: "Which bag count should I choose?",

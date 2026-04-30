@@ -75,7 +75,11 @@ type BundleOption = {
   currencyCode?: string;
 };
 
-const VISIBLE_QUANTITIES = [5, 8, 12];
+// 2026-04-30: bundle ladder migrated to "Buy X Get Y FREE" tiers (5/7/10).
+// Slider only surfaces the three real bundle sizes — off-tier qtys
+// (6, 8, 9, 11, 12) bill at retail × qty so we don't tease users with a
+// position that costs more per bag than its neighbors.
+const VISIBLE_QUANTITIES = [5, 7, 10];
 function money(amount?: number, currencyCode = "USD") {
   const n = Number(amount);
   if (!Number.isFinite(n)) return "--";
@@ -96,9 +100,9 @@ function formatQtyLabel(qty: number) {
 }
 
 function badgeForTotal(qty: number) {
-  if (qty === 5) return "Save + free shipping";
-  if (qty === 8) return "Most popular";
-  if (qty === 12) return "Best price";
+  if (qty === 5) return "Buy 4, Get 1 FREE";
+  if (qty === 7) return "Buy 5, Get 2 FREE";
+  if (qty === 10) return "Buy 7, Get 3 FREE";
   return "";
 }
 
@@ -440,11 +444,13 @@ export default function PurchaseBox({
   }
 
   const curatedStatus =
-    selectedNextBags >= 12
-      ? "Best price selected."
-      : selectedNextBags >= 8
-        ? "Most popular bundle selected."
-        : "Free shipping bundle selected.";
+    selectedNextBags === 10
+      ? "Buy 7, Get 3 FREE — best value."
+      : selectedNextBags === 7
+        ? "Buy 5, Get 2 FREE."
+        : selectedNextBags === 5
+          ? "Buy 4, Get 1 FREE."
+          : "Free shipping on every order.";
   const cardHint = curatedStatus;
 
   return (
@@ -466,8 +472,8 @@ export default function PurchaseBox({
         <div className="pbx__grid">
           <div className="pbx__panel" role="group" aria-label="Bundle selection">
             <div className="pbx__panelTop">
-              <div className="pbx__panelTitle">Lock in your savings</div>
-              <div className="pbx__panelSub">Best value bundles: 5, 8, and 12 bags.</div>
+              <div className="pbx__panelTitle">Buy X, Get Y FREE</div>
+              <div className="pbx__panelSub">Pick a pack — every order ships free.</div>
               <div className="pbx__segmented" role="radiogroup" aria-label="Bag counts">
                 {featuredOptions.map((o) => {
                   const active = selectedQty === o.qty;
@@ -746,8 +752,18 @@ export default function PurchaseBox({
           background: rgba(239,59,59,0.12);
           box-shadow: inset 0 1px 0 rgba(255,255,255,0.8);
         }
-        .pbx__segmentQty{ display:block; font-size:12px; font-weight:800; }
-        .pbx__segmentMeta{ display:block; font-size:10px; font-weight:700; opacity:0.7; }
+        .pbx__segmentQty{ display:block; font-size:13px; font-weight:800; }
+        .pbx__segmentMeta{
+          display:block;
+          margin-top:4px;
+          font-size:10px;
+          font-weight:800;
+          letter-spacing:0.5px;
+          text-transform:uppercase;
+          color:#c7362c;
+          opacity:1;
+        }
+        .pbx__segment--active .pbx__segmentMeta{ color:#9b211a; }
         .pbx__panelMid{
           display:flex;
           flex-direction:column;

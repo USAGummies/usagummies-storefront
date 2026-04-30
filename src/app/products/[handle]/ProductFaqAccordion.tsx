@@ -20,9 +20,9 @@ const PRODUCT_FAQS = [
       "We do not make a gluten-free claim. Our ingredients are gelatin, cane sugar, corn syrup, citric acid, natural flavors, fruit and vegetable extracts, and carnauba wax. Please review the ingredient panel on the bag if you have a gluten sensitivity.",
   },
   {
-    question: "What is the 5-pack deal?",
+    question: "What's the bundle deal?",
     answer:
-      "The 5-pack is $25.00 ($5.00 per bag) — that's over 15% off the single-bag retail price. Free shipping is included on every order.",
+      "Three bundle tiers: 5-Pack at $23.96 (Buy 4, Get 1 FREE — $4.79/bag), 7-Pack at $29.95 (Buy 5, Get 2 FREE — $4.28/bag), or 10-Pack at $41.93 (Buy 7, Get 3 FREE — $4.19/bag). Free shipping included on every order.",
   },
   {
     question: "How should I store gummy bears?",
