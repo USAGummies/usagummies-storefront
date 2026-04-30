@@ -234,8 +234,10 @@ def run_validator(
     body_path: Path,
     company: str,
     skip_apollo: bool,
-    skip_deal: bool,
 ) -> tuple[int, str]:
+    """Always passes --skip-deal because send-and-log does its own deal dedup
+    (find_or_create_deal). The validator's DEAL_DEDUP gate is for ad-hoc /
+    manual sends that DON'T flow through this helper."""
     cmd = [
         "node",
         str(VALIDATOR),
@@ -244,11 +246,13 @@ def run_validator(
         f"--company={company}",
         # Gmail check has no runtime — always skip. Repeat guard inside send-email.sh.
         "--skip-gmail",
+        # Helper does its own deal dedup atomically, so always skip validator's
+        # blocking gate. The find_or_create_deal step below WILL attach to the
+        # existing master deal, never create a duplicate.
+        "--skip-deal",
     ]
     if skip_apollo:
         cmd.append("--skip-apollo")
-    if skip_deal:
-        cmd.append("--skip-deal")
     proc = subprocess.run(cmd, capture_output=True, text=True)
     out = (proc.stdout or "") + (proc.stderr or "")
     return proc.returncode, out
@@ -283,7 +287,6 @@ def main() -> int:
     ap.add_argument("--pipeline", default=DEFAULT_PIPELINE)
     ap.add_argument("--stage", default=DEFAULT_STAGE)
     ap.add_argument("--skip-apollo", action="store_true")
-    ap.add_argument("--skip-deal", action="store_true")
     ap.add_argument("--dry-run", action="store_true", help="Run validator + HubSpot dedup but do NOT send or log engagement")
     args = ap.parse_args()
 
@@ -301,7 +304,7 @@ def main() -> int:
 
     # ------------------------------------------------------------- 1. Validator
     print(f"[1/7] Validator gate: {args.email} / {args.company}", flush=True)
-    rc, out = run_validator(args.email, body_path, args.company, args.skip_apollo, args.skip_deal)
+    rc, out = run_validator(args.email, body_path, args.company, args.skip_apollo)
     print(out)
     if rc != 0:
         print("VALIDATOR BLOCK — aborting send.", file=sys.stderr)
