@@ -36,6 +36,8 @@ import { composeBoothQuote, DEFAULT_TOUR_ID } from "@/lib/sales-tour/compose-boo
 import { formatBoothQuoteReply } from "@/lib/sales-tour/format-booth-reply";
 import { parseBoothMessage } from "@/lib/sales-tour/parse-booth-message";
 import { smsQuoteSummary } from "@/lib/sales-tour/sms-quote";
+import { smsBuyerNcsLink } from "@/lib/sales-tour/sms-buyer";
+import { autosyncBoothQuoteToHubSpot } from "@/lib/sales-tour/hubspot-autosync";
 import { transcribeSlackVoiceFile } from "@/lib/sales-tour/transcribe-voice";
 
 export const runtime = "nodejs";
@@ -67,6 +69,18 @@ interface BoothRequestBody {
    * after-hours quotes Ben doesn't need to ping his phone.
    */
   noSms?: boolean;
+  /**
+   * Suppress the SMS-to-buyer (v0.3). Default: send when
+   * SALES_TOUR_BUYER_SMS_ENABLED=true AND buyer phone was captured.
+   * Set true for tests / preview runs.
+   */
+  noBuyerSms?: boolean;
+  /**
+   * Suppress the HubSpot deal autosync (v0.3). Default: create
+   * deal when HUBSPOT_PRIVATE_APP_TOKEN is configured. Set true
+   * for tests / preview runs / when you want a Slack-only quote.
+   */
+  noHubSpotAutosync?: boolean;
 }
 
 export async function POST(req: Request): Promise<Response> {
@@ -206,7 +220,7 @@ export async function POST(req: Request): Promise<Response> {
     };
   }
 
-  // Step 8 — SMS to Ben's phone (Twilio v0.2). Fail-soft — when Twilio
+  // Step 8a — SMS to Ben's phone (Twilio v0.2). Fail-soft — when Twilio
   // env isn't configured, returns { ok: false, skipped: true } and we
   // continue posting Slack as the audit truth.
   let smsResult: Awaited<ReturnType<typeof smsQuoteSummary>> | { skipped: true; ok: false; error: string } = {
@@ -216,6 +230,32 @@ export async function POST(req: Request): Promise<Response> {
   };
   if (body.noSms !== true) {
     smsResult = await smsQuoteSummary(quote);
+  }
+
+  // Step 8b — SMS to BUYER's phone with prefilled NCS deeplink (v0.3).
+  // Gated on SALES_TOUR_BUYER_SMS_ENABLED=true (explicit opt-in to
+  // prevent accidental customer-facing sends) AND a captured buyer
+  // phone in the booth intent.
+  let buyerSmsResult: Awaited<ReturnType<typeof smsBuyerNcsLink>> | { skipped: true; ok: false; error: string } = {
+    ok: false,
+    skipped: true,
+    error: "noBuyerSms flag set or skipped by caller",
+  };
+  if (body.noBuyerSms !== true) {
+    buyerSmsResult = await smsBuyerNcsLink(quote);
+  }
+
+  // Step 8c — HubSpot deal autosync (v0.3). Real-time create the
+  // booth-quote deal so it surfaces in the existing wholesale-pipeline
+  // dashboards without a manual handoff. Fail-soft when HUBSPOT env
+  // not configured (test envs).
+  let hubspotResult: Awaited<ReturnType<typeof autosyncBoothQuoteToHubSpot>> | { skipped: true; ok: false; error: string } = {
+    ok: false,
+    skipped: true,
+    error: "noHubSpotAutosync flag set or skipped by caller",
+  };
+  if (body.noHubSpotAutosync !== true) {
+    hubspotResult = await autosyncBoothQuoteToHubSpot(quote);
   }
 
   // Step 9 — audit envelope.
@@ -237,6 +277,11 @@ export async function POST(req: Request): Promise<Response> {
       transcriptionOk: transcriptionInfo.used ? transcriptionInfo.ok : undefined,
       smsOk: smsResult.ok,
       smsSkipped: "skipped" in smsResult ? smsResult.skipped : undefined,
+      buyerSmsOk: buyerSmsResult.ok,
+      buyerSmsSkipped: "skipped" in buyerSmsResult ? buyerSmsResult.skipped : undefined,
+      hubspotDealId: "dealId" in hubspotResult ? hubspotResult.dealId : undefined,
+      hubspotContactId: "contactId" in hubspotResult ? hubspotResult.contactId : undefined,
+      hubspotSkipped: "skipped" in hubspotResult ? hubspotResult.skipped : undefined,
     },
     sourceCitations: [
       { system: "regional-table-v0.1", id: `${quote.freight.state ?? "?"}-${quote.intent.scale}-${quote.intent.count}` },
@@ -254,6 +299,8 @@ export async function POST(req: Request): Promise<Response> {
     slackText,
     slack: slackResult,
     sms: smsResult,
+    buyerSms: buyerSmsResult,
+    hubspot: hubspotResult,
     transcription: transcriptionInfo.used ? transcriptionInfo : undefined,
     kvKey,
   });
