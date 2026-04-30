@@ -202,4 +202,5 @@ src/app/api/ops/sales-tour/
 
 ## 10. Version history
 
+- **0.2 — 2026-04-29** — Voice memo transcription via OpenAI Whisper (`src/lib/sales-tour/transcribe-voice.ts`) + Twilio SMS-to-Ben companion (`src/lib/sales-tour/sms-quote.ts`). Booth route gains `slackFileId` + `noSms` body fields. Fail-soft on every error path (Twilio env-missing returns `{ skipped: true }`; Whisper errors return `{ ok: false, error }` and the route requires either `message` or a successful transcription). v0.3 (SMS to buyer with NCS-001 deeplink + real-time HubSpot deal create via `scripts/sales/send-and-log.py`) scoped as follow-on. Required env (additive): `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER`, `SALES_TOUR_BEN_SMS_TO`, `OPENAI_API_KEY` (existing), `SLACK_BOT_TOKEN` with `files:read` scope (one-time scope add at api.slack.com/apps).
 - **0.1 — 2026-04-29** — First publication. Defines v0.1 (typed Slack input → Slack quote reply with tier classification + corridor freight + escalation clause). v0.2 (voice + SMS to Ben) and v0.3 (SMS to buyer + HubSpot autosync) scoped as follow-on. Implementation + tests + Slack route shipping in the companion commit.

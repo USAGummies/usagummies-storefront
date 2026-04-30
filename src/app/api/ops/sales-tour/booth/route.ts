@@ -35,6 +35,8 @@ import { postMessage } from "@/lib/ops/control-plane/slack/client";
 import { composeBoothQuote, DEFAULT_TOUR_ID } from "@/lib/sales-tour/compose-booth-quote";
 import { formatBoothQuoteReply } from "@/lib/sales-tour/format-booth-reply";
 import { parseBoothMessage } from "@/lib/sales-tour/parse-booth-message";
+import { smsQuoteSummary } from "@/lib/sales-tour/sms-quote";
+import { transcribeSlackVoiceFile } from "@/lib/sales-tour/transcribe-voice";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -44,12 +46,27 @@ const KV_TTL_SECONDS = 60 * 24 * 3600; // 60-day retention covers the trip + pos
 
 interface BoothRequestBody {
   message?: string;
+  /**
+   * Slack file ID for a voice memo (v0.2). When provided, the route
+   * downloads the audio via Slack `files.info` + bot token, transcribes
+   * via OpenAI Whisper, and uses the transcript as `message`. If both
+   * `message` and `slackFileId` are provided, the transcript is appended
+   * to `message` (helpful when Ben types a contact name + sends a
+   * voice note describing the rest).
+   */
+  slackFileId?: string;
   slackChannel?: string; // default: #wholesale (or "#ops-audit" in dry mode)
   slackThreadTs?: string; // when posting in-thread
   tourId?: string;
   dryRun?: boolean;
   /** Internal escape hatch — disables LLM fallback. Used in tests. */
   noLlm?: boolean;
+  /**
+   * Suppress the SMS-to-Ben companion send (default: send when Twilio
+   * env is configured). Set to `true` for tests, audit-only runs, or
+   * after-hours quotes Ben doesn't need to ping his phone.
+   */
+  noSms?: boolean;
 }
 
 export async function POST(req: Request): Promise<Response> {
@@ -62,11 +79,40 @@ export async function POST(req: Request): Promise<Response> {
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
-  const message = (body.message ?? "").trim();
+  // v0.2 — if a Slack voice file is provided, transcribe it and use
+  // the result as (or append to) the message.
+  let message = (body.message ?? "").trim();
+  let transcriptionInfo: {
+    used: boolean;
+    ok: boolean;
+    error?: string;
+    durationSeconds?: number;
+  } = { used: false, ok: false };
+  if (body.slackFileId) {
+    const t = await transcribeSlackVoiceFile(body.slackFileId);
+    transcriptionInfo = {
+      used: true,
+      ok: t.ok,
+      error: t.error,
+      durationSeconds: t.durationSeconds,
+    };
+    if (t.ok && t.text) {
+      message = message ? `${message}\n${t.text}` : t.text;
+    } else if (!message) {
+      // Voice-only send + transcription failed → return a useful error.
+      return NextResponse.json(
+        {
+          error: `Voice transcription failed: ${t.error ?? "unknown"}`,
+          hint: "Send the booth message as typed text instead, or check OPENAI_API_KEY + SLACK_BOT_TOKEN (files:read).",
+        },
+        { status: 422 },
+      );
+    }
+  }
   if (!message) {
     return NextResponse.json(
       {
-        error: "Missing `message` in request body",
+        error: "Missing `message` (or `slackFileId`) in request body",
         hint: "Try: { \"message\": \"/booth 36 to Bryce Glamp UT, landed, contact Sarah 555-1212\" }",
       },
       { status: 400 },
@@ -102,6 +148,7 @@ export async function POST(req: Request): Promise<Response> {
       intent,
       quote,
       slackText,
+      transcription: transcriptionInfo.used ? transcriptionInfo : undefined,
     });
   }
 
@@ -159,7 +206,19 @@ export async function POST(req: Request): Promise<Response> {
     };
   }
 
-  // Step 8 — audit envelope.
+  // Step 8 — SMS to Ben's phone (Twilio v0.2). Fail-soft — when Twilio
+  // env isn't configured, returns { ok: false, skipped: true } and we
+  // continue posting Slack as the audit truth.
+  let smsResult: Awaited<ReturnType<typeof smsQuoteSummary>> | { skipped: true; ok: false; error: string } = {
+    ok: false,
+    skipped: true,
+    error: "noSms flag set or skipped by caller",
+  };
+  if (body.noSms !== true) {
+    smsResult = await smsQuoteSummary(quote);
+  }
+
+  // Step 9 — audit envelope.
   const auditEntry = buildAuditEntry(run, {
     action: "sales-tour.booth-quote.composed",
     entityType: "booth-visit",
@@ -174,6 +233,10 @@ export async function POST(req: Request): Promise<Response> {
       slackTs: slackResult.ts,
       slackError: slackResult.error,
       kvKey,
+      transcriptionUsed: transcriptionInfo.used,
+      transcriptionOk: transcriptionInfo.used ? transcriptionInfo.ok : undefined,
+      smsOk: smsResult.ok,
+      smsSkipped: "skipped" in smsResult ? smsResult.skipped : undefined,
     },
     sourceCitations: [
       { system: "regional-table-v0.1", id: `${quote.freight.state ?? "?"}-${quote.intent.scale}-${quote.intent.count}` },
@@ -183,13 +246,15 @@ export async function POST(req: Request): Promise<Response> {
   await auditStore().append(auditEntry);
   await auditSurface().mirror(auditEntry).catch(() => void 0);
 
-  // Step 9 — return.
+  // Step 10 — return.
   return NextResponse.json({
     ok: true,
     intent,
     quote,
     slackText,
     slack: slackResult,
+    sms: smsResult,
+    transcription: transcriptionInfo.used ? transcriptionInfo : undefined,
     kvKey,
   });
 }
