@@ -52,6 +52,7 @@ import {
   createLabelForShipStationOrder,
   isShipStationConfigured,
   listOrdersAwaitingShipment,
+  resolveChannelForStoreId,
   type ShipStationOrderSummary,
 } from "@/lib/ops/shipstation-client";
 import {
@@ -131,12 +132,29 @@ function isAutoShipEnabled(): boolean {
  * Identify the source channel from a ShipStation order's advancedOptions.
  * `source` / `storeId` are what we have to work with — maps to a human
  * label so Slack + audit entries read naturally.
+ *
+ * Two-tier inference:
+ *   1. Fast path — `advancedOptions.source` is a substring match for a
+ *      known channel ("amazon" / "shopify" / "faire"). This works for
+ *      ShipStation's classic Amazon SP-API integration which populates
+ *      `source` with the marketplace name.
+ *   2. Slow path — when `source` is null/empty (ShipStation V3's Shopify
+ *      integration leaves it empty), look up the `storeId` against the
+ *      cached `/stores` API and resolve via `marketplaceName`.
+ *
+ * Returns "manual" when neither tier resolves so `deriveAutoShipTag`
+ * falls through to the defensive "Internal" tag.
  */
-function sourceLabelFor(order: ShipStationOrderSummary): string {
+async function sourceLabelFor(order: ShipStationOrderSummary): Promise<string> {
   const source = order.advancedOptions.source?.toLowerCase() ?? "";
   if (source.includes("amazon")) return "amazon";
   if (source.includes("shopify")) return "shopify";
   if (source.includes("faire")) return "faire";
+  // Slow path: V3 Shopify integration leaves `source` empty. Resolve via
+  // ShipStation's stores list (cached in-process) so the auto-ship Slack
+  // post reads `Tag: Wholesale` / `Tag: Sample` instead of `Tag: Internal`.
+  const resolved = await resolveChannelForStoreId(order.advancedOptions.storeId);
+  if (resolved) return resolved;
   if (order.advancedOptions.storeId) return `store:${order.advancedOptions.storeId}`;
   return "manual";
 }
@@ -206,7 +224,7 @@ async function autoShipOrder(
   order: ShipStationOrderSummary,
   opts: { dryRun: boolean; slackChannel: string },
 ): Promise<UnifiedAutoShipResult> {
-  const source = sourceLabelFor(order);
+  const source = await sourceLabelFor(order);
   const bags = totalBagsForItems(order.items);
 
   // Packaging eligibility
@@ -813,7 +831,7 @@ export async function POST(req: Request): Promise<Response> {
   const slackChannel = body.slackChannel ?? "shipping";
   const results: UnifiedAutoShipResult[] = [];
   for (const order of queue) {
-    const source = sourceLabelFor(order);
+    const source = await sourceLabelFor(order);
     if (recentSet.has(`${source}:${order.orderNumber}`)) {
       results.push({
         orderNumber: order.orderNumber,

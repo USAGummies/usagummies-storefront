@@ -126,6 +126,109 @@ export function isShipStationConfigured(): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// Stores list — channel inference for awaiting-shipment classification
+// ---------------------------------------------------------------------------
+//
+// ShipStation V3's Shopify integration leaves `advancedOptions.source` empty
+// on imported orders (only `storeId` is populated), so the auto-ship route's
+// `sourceLabelFor` heuristic falls through to "Internal" for Shopify orders
+// — wrong tag in `#shipping`. Fix: fetch the V1 `/stores` list once per
+// process, build a `storeId → marketplaceName` map, and use it to derive a
+// canonical channel string ("amazon" / "shopify" / "faire") even when
+// `advancedOptions.source` is null.
+//
+// In-process cache only (no KV) — V1 stores list is small and stable; a
+// per-cold-start refresh is more than enough for cron lifetimes.
+
+export type ShipStationStoreSummary = {
+  storeId: number;
+  storeName: string | null;
+  marketplaceId: number | null;
+  marketplaceName: string | null;
+  active: boolean;
+};
+
+let cachedStores: ShipStationStoreSummary[] | null = null;
+let cachedStoresFetchedAt = 0;
+const STORES_CACHE_TTL_MS = 30 * 60 * 1000; // 30 min
+
+/**
+ * Fetch the ShipStation V1 stores list (cached). Returns `[]` on auth
+ * failure / network error so callers can fall through to existing
+ * heuristics rather than throwing.
+ */
+export async function listShipStationStores(): Promise<ShipStationStoreSummary[]> {
+  if (cachedStores && Date.now() - cachedStoresFetchedAt < STORES_CACHE_TTL_MS) {
+    return cachedStores;
+  }
+  const auth = getAuthHeader();
+  if (!auth) return [];
+  let res: Response;
+  try {
+    res = await fetch("https://ssapi.shipstation.com/stores", {
+      method: "GET",
+      headers: { Authorization: auth, Accept: "application/json" },
+    });
+  } catch {
+    return cachedStores ?? [];
+  }
+  if (!res.ok) return cachedStores ?? [];
+  let json: unknown;
+  try {
+    json = await res.json();
+  } catch {
+    return cachedStores ?? [];
+  }
+  const arr = Array.isArray(json) ? json : [];
+  const stores: ShipStationStoreSummary[] = arr
+    .filter((s): s is Record<string, unknown> => typeof s === "object" && s !== null)
+    .map((s) => ({
+      storeId: typeof s.storeId === "number" ? s.storeId : Number(s.storeId) || 0,
+      storeName: (s.storeName as string) ?? null,
+      marketplaceId: typeof s.marketplaceId === "number" ? s.marketplaceId : null,
+      marketplaceName: (s.marketplaceName as string) ?? null,
+      active: s.active !== false,
+    }))
+    .filter((s) => s.storeId > 0);
+  cachedStores = stores;
+  cachedStoresFetchedAt = Date.now();
+  return stores;
+}
+
+/**
+ * Resolve a ShipStation `storeId` to a canonical channel slug used by
+ * `deriveAutoShipTag` ("amazon" | "shopify" | "faire") or `null` if the
+ * store can't be matched (network error, unknown marketplace, etc.).
+ *
+ * Matches against `marketplaceName` first (ShipStation's authoritative
+ * label, e.g. "Amazon", "Shopify"), then falls back to `storeName`
+ * substring match for stores set up with a custom name. Case-insensitive
+ * substring tolerant on both fields.
+ */
+export async function resolveChannelForStoreId(
+  storeId: number | null | undefined,
+): Promise<string | null> {
+  if (!storeId || storeId <= 0) return null;
+  const stores = await listShipStationStores();
+  const match = stores.find((s) => s.storeId === storeId);
+  if (!match) return null;
+  const haystack = `${match.marketplaceName ?? ""} ${match.storeName ?? ""}`.toLowerCase();
+  if (haystack.includes("amazon")) return "amazon";
+  if (haystack.includes("shopify")) return "shopify";
+  if (haystack.includes("faire")) return "faire";
+  return null;
+}
+
+/**
+ * Test/dev escape hatch: clear the cached stores list. Call between tests
+ * to force a fresh fetch.
+ */
+export function clearShipStationStoresCache(): void {
+  cachedStores = null;
+  cachedStoresFetchedAt = 0;
+}
+
+// ---------------------------------------------------------------------------
 // Rate quote
 // ---------------------------------------------------------------------------
 
