@@ -14,12 +14,14 @@ You replace the legacy "Abra" agent system. All references to "Abra" in the code
 
 These are the ONLY current team members.
 
-## Fulfillment Rules (HARD)
+## Fulfillment Rules (HARD) — REVISED 2026-04-30 PM
 
 - **Orders → Ben, from Ashford, WA.** Every wholesale order, retail order, or paid transaction ships from Ben's warehouse in Ashford, Washington. Ben packs and ships personally. Do NOT route order fulfillment to Drew.
-- **Samples → Drew, from the East Coast.** Drew's fulfillment role is limited to (a) samples, and (b) anything that specifically needs an East Coast origin (faster transit to northeast/mid-Atlantic prospects). When in doubt, samples = Drew, orders = Ben.
+- **Samples → Ben, from Ashford, WA (current state).** Per Ben 2026-04-30: *"all samples are a case of gummies (6 bags with a strip clip and hook in a 7×7×7 box) shipped from Ashford right now."* The earlier "samples = Drew, East Coast" rule is **DEFERRED** until an East Coast staging warehouse re-activates with a confirmed canonical address. Until then, every sample also originates from Ashford.
+- **Canonical sample-shipment spec:** 1 inner case (6 × 7.5 oz bags + 1 strip clip + 1 metal hook) in a 7×7×7 box, ~3.4 lb gross. Sales sheet (`output/assets/sell-sheet.pdf`) tucked inside. UPS Ground or USPS Ground Advantage (carrier-pick by cheaper rate). See `/contracts/integrations/shipstation.md` §3.5 for the full spec.
+- **Sample shipment automation target:** every sample queue creates a Shopify draft order (`tag:sample`, zero-revenue, captures inventory move) + ShipStation order + buys label + posts to `#shipping` channel + creates HubSpot engagement on the deal. Single endpoint `/api/ops/sample/queue`. Class A (autonomous) for non-whales, Class B (Ben single-approve) for whales (Buc-ee's, KeHE, McLane, Eastern National, Xanterra). Build status: §3.6 of the ShipStation contract.
 - **Pack sheets + ship-ready Slack pings** for customer orders go to Ben (ben@usagummies.com), NOT to Drew (andrew@usagummies.com).
-- **Drew is still in the loop** on production, vendor portals (Belmark Link, Powers), and supply-chain artifacts — but not on customer order fulfillment.
+- **Drew is still in the loop** on production, vendor portals (Belmark Link, Powers), and supply-chain artifacts — but not on customer order fulfillment AND not on sample fulfillment as of 2026-04-30.
 
 ## Slack Channels
 
@@ -73,10 +75,15 @@ These rules override all other behavior:
 ## Inventory & COGS Model
 
 - **Atomic bag-level inventory (LOCKED 2026-04-27).** All inventory tracked at the single 7.5 oz bag. Cases / master cartons / pallets are commercial + packaging abstractions that decrement bag inventory at order time. **Do NOT create case/carton/pallet inventory SKUs.** See [`/contracts/wholesale-pricing.md`](contracts/wholesale-pricing.md) §1.
-- **Operating COGS: $1.77/bag** (LOCKED 2026-04-29 PM by Ben as final pricing for COGS). Build:
-  - **$1.52** — Powers manufacturing + Belmark primary packaging (gummies + film/label per bag)
-  - **$0.25** — Uline secondary packaging per bag (master carton + 6 inner cases + 6 strip clips + 6 hooks per master carton, $8.84 per master / 36 bags)
-  - All margin / pricing / forecasting models default to $1.77/bag going forward.
+- **Operating COGS: $1.79/bag** (LOCKED 2026-04-30 PM by Ben — Class C `pricing.change` v2.2 → v2.3 ratified, replacing prior $1.77 lock). Build verified against actual paid invoices in QBO + Gmail + BoA:
+  - **Factory portion = $1.544/bag**, broken out by 3 vendors:
+    - **$1.037** — Albanese Confectionary Group (raw gummies). BoA 7020 outflow 2026-03-17 = $55,244.50 / 53,280 bags. Item 50270 — `5 Natural Flavor Gummi Bears 4ct 5lb` × 1,260 cases. Inv #INV23-206741.
+    - **$0.131** — Belmark, Inc (film/primary packaging). BoA 7020 outflow 2026-03-18 = $6,989.66 / 53,280 bags. Quote Q1250326 (50,000 impressions × $0.11947 + $150 art prep + freight). Inv #2084578 / PO# EM031626.
+    - **$0.376** — Powers Inc. (assembly labor + cartons). BoA 7020 outflow 2026-03-31 = $10,020.25 / 26,640 bags Run 1. Greg's locked pricing: $0.35/bag labor + $0.85/case carton. Run 2 invoice pending. SO_0284052CM_20260409.
+  - **$0.25** — Uline secondary packaging per bag (master carton S-12605 + 6 inner cases S-4315 + 6 strip clips S-12559 + 6 hooks S-20269 = $8.84 per master / 36 bags). Paid via Capital One Platinum / QuicksilverOne (CC line items, not yet broken out per-merchant in QBO).
+  - **TOTAL = $1.544 + $0.25 = $1.794 → $1.79/bag.**
+  - Replaces prior $1.77 lock from 2026-04-29 PM — that lock was based on a $1.52 factory placeholder before the 3 vendor invoices were reconciled. The $1.52 was $0.024 LOW vs actual ($1.544). All margin / pricing / forecasting models use $1.79/bag going forward.
+  - Loose-pack format adjustments (per `scripts/quote.py`): standard $1.79 / loose-inner $1.62 / loose-no-secondary $1.54.
 - Inventory is an ASSET. When goods ship, inventory MOVES to COGS on Income Statement.
 - Revenue channels tracked separately: Amazon, Shopify DTC, Faire, Wholesale, Interbitzin, Glacier, AVG.
 - Amazon is consignment (FBA), not wholesale. Shipping TO Amazon = inventory transfer (still our asset). Revenue recorded when Amazon SELLS units.
@@ -124,7 +131,7 @@ Slack is the company's running tally board, not just chat:
 - Dimensions: **master 22×14×8 in (Uline S-12605); inner 7×7×7 in (Uline S-4315)**; mailer 9×6×2 in
 - **Strip clip** = 1 per inner case · Uline S-12559 (21" plastic display strip) · ~$0.32 each
 - **Metal hook** = 1 per strip clip · Uline S-20269 (S-hook, pinched) · ~$0.10 each
-- **Per-master-carton Uline secondary build cost:** $2.68 (master) + 6 × $0.61 (inner cases) + 6 × $0.32 (strips) + 6 × $0.10 (hooks) = **$8.84 / master = ~$0.25 / bag** (factored into $1.77 COGS above).
+- **Per-master-carton Uline secondary build cost:** $2.68 (master) + 6 × $0.61 (inner cases) + 6 × $0.32 (strips) + 6 × $0.10 (hooks) = **$8.84 / master = ~$0.25 / bag** (factored into $1.79 COGS above).
 - Uline reorder per run: `12 masters + 72 cases + 72 strip clips + 72 hooks` for 432 bags (reference: 2026-04-20 shipping batch). Branded mailer SKU separate — reorder based on Amazon FBM burn rate.
 - **⚠️ Uline 12-master pack-out is INBOUND packaging supply ONLY.** It is NOT the outbound shipping pallet. The wholesale outbound pallet is **25 master cartons / 900 bags** (Ti×Hi 6×4 + 1 cap, ~530 lb packed, 48×40×~52 in skid) per `/contracts/wholesale-pricing.md` §2 + `/contracts/outreach-pitch-spec.md` §5. Conflating the two was the v1.0 → v2.0 wholesale-pricing drift (corrected in v2.1 on 2026-04-28).
 - Full integration doctrine: [`/contracts/integrations/shipstation.md`](contracts/integrations/shipstation.md)

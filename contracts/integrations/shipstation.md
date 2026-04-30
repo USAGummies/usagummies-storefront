@@ -6,16 +6,20 @@
 
 ---
 
-## 1. Ship-from locations (the two-origin rule)
+## 1. Ship-from locations (origin doctrine — current state 2026-04-30)
 
-Per CLAUDE.md + blueprint §14.4:
+Per Ben 2026-04-30 PM directive: *"all samples are a case of gummies (6 bags with a strip clip and hook in a 7×7×7 box) shipped from Ashford right now."*
 
 | Origin | Address | Used for |
 |---|---|---|
-| **Ashford** | 30027 SR 706 E, Ashford WA 98304 — Ben personally packs | **All paid orders** (DTC, wholesale, B2B, Amazon FBM). One hard rule: orders ship from Ashford. |
-| **East Coast** | Drew's warehouse address (TBD — canonical value enters here once Drew confirms in writing) | **Samples only** + anything that specifically needs East Coast transit (faster to northeast / mid-Atlantic prospects). |
+| **Ashford** | 30027 SR 706 E, Ashford WA 98304 — Ben personally packs | **All paid orders + all samples (current state).** Wholesale, B2B, Amazon FBM, DTC, sample packets — every shipment leaves Ashford until East Coast warehouse capacity reactivates. |
+| **East Coast** (DEFERRED) | Drew's warehouse — currently inactive for sample fulfillment | Reserved for future re-activation if/when an East Coast staging warehouse comes back online. *Not used for sample fulfillment as of 2026-04-30.* |
 
-**Hard rule (blueprint + Viktor contract §6.7):** Viktor and every specialist agent refuses to instruct Drew to ship a customer order. If an agent is asked to ship something marked `tag:sample=false` from East Coast, that's a contract violation → pause + review per governance §6.
+**Hard rule:** every sample-shipment label is purchased with `from = Ashford` until this contract is updated.
+
+**History:** Earlier doctrine (pre-2026-04-30) routed samples through Drew's East Coast warehouse to save transit days for northeast/mid-Atlantic prospects. Ben re-locked sample origin to Ashford on 2026-04-30 PM because (a) Drew warehouse address never resolved canonically, (b) the sample-tag automation rule was firing without an active East Coast staging location, and (c) consolidating all sample fulfillment into one origin removes the moving-parts overhead Ben flagged.
+
+**Hard rule (blueprint + Viktor contract §6.7) — preserved:** Viktor and every specialist agent refuses to instruct Drew to ship a customer order. The Drew-doctrine guardrail stays intact (it prevents Drew getting accidentally tagged for paid wholesale orders). It just no longer fires for samples either, because samples now route to Ashford.
 
 ## 2. Package presets (22.B D.1)
 
@@ -31,15 +35,106 @@ SKU dimensions + weight profiles — these drive `createLabel` calls in [`src/li
 
 Source: [`PACKAGE_PROFILES` in shipstation-client.ts](../../src/lib/ops/shipstation-client.ts). The fulfillment hub's "Buy UPS Ground label" modal exposes the same two options.
 
-## 3. Automation rule: origin routing (22.B D.3)
+## 3. Automation rule: origin routing (22.B D.3) — REVISED 2026-04-30 PM
 
-The ShipStation automation rule **must mirror** our code-side origin decision. Precedence:
+**All shipments now origin from Ashford.** The ShipStation automation rule:
 
-1. If order tags contain `sample` OR `tag:sample` OR `purpose:sample` → East Coast origin.
-2. Else if order tags contain `origin:east-coast` → East Coast origin (explicit override).
-3. Else → Ashford origin (default).
+1. **All orders, all tags → Ashford origin.** (Default + only active rule.)
+2. East Coast origin rules are deferred until an East Coast warehouse re-activates.
 
-This rule is set **inside ShipStation's UI** (Automation → Rules) by Ben; it is mirrored here so every agent proposing a shipment knows which origin to label it with when drafting for Ben's approval. The two must match; the weekly drift audit samples ShipStation shipments against this rule and flags a violation if they diverge.
+This rule must be set **inside ShipStation's UI** (Automation → Rules) by Ben; it is mirrored here so every agent proposing a shipment knows which origin to label. The two must match; the weekly drift audit samples ShipStation shipments against this rule and flags a violation if any shipment originates from a non-Ashford from-address.
+
+**Sample-tag still has meaning** for inventory accounting (Shopify draft order tagged `tag:sample` = inventory-out without revenue) and for the Touch-2 reply automation, but no longer routes origin.
+
+---
+
+## 3.5. Canonical sample-shipment spec (added 2026-04-30 PM)
+
+**Status:** CANONICAL — Ben locked 2026-04-30 PM.
+
+Every sample shipment USA Gummies sends is **identical in spec.** When the system says "queue a sample to X," this is what fires:
+
+| Field | Value | Notes |
+|---|---|---|
+| Contents | 1 inner case = 6 bags All American Gummy Bears (7.5 oz each) | Includes 1 strip clip + 1 metal hook (canonical retail-ready) |
+| Box | 7 × 7 × 7 in | Canonical inner-case dim |
+| Gross weight | ~3.4 lb | Per `/CLAUDE.md` packaging spec |
+| Sales sheet | 1 copy of `output/assets/sell-sheet.pdf` | Tucked inside box; v3 with $5.99 MSRP + named flavors |
+| Origin | **Ashford WA 98304** | Always — see §1 |
+| Service | UPS Ground (default) or USPS Ground Advantage (light/cheap fallback per cost) | Carrier-pick is auto: cheaper of the two for the destination |
+| Shopify draft order | `tag:sample` + `tag:no-revenue` + zero-revenue line | Captures inventory move without booking revenue |
+| HubSpot engagement | Touch-2 tracking note auto-fires when label is created | Linked to the recipient's deal + contact |
+| Slack #shipping post | Required at queue-time (recipient + label PDF) AND at ship-time (tracking) | Audit trail visible to Ben + Drew + Rene |
+| Approval class | Class A (autonomous) when recipient is on a Sample-Stage HubSpot deal AND `branded_or_pl == usa_gummies`. Class B (Ben single-approve) for whales (Buc-ee's, KeHE, McLane, Eastern National, Xanterra, big chains). | See `/contracts/approval-taxonomy.md` |
+
+**Non-canonical sample asks (different size, branded private-label sample, multi-pack tour) require explicit Ben approval before queuing.**
+
+**Cost basis (for inventory accounting):** 1 sample case = 6 × $1.79 (LOCKED COGS per `/contracts/wholesale-pricing.md` §1) = **$10.74 / case** + ~$0.25/case Uline secondary packaging (already in the $1.79) + UPS/USPS label cost (varies). Posted to `500030.05 Samples - Promo/Outreach` (no invoice attached) per `/contracts/wholesale-pricing.md` §13.
+
+---
+
+## 3.6. Sample-shipment automation flow (target state)
+
+When the system or operator says "queue a sample to <recipient>," this is what should happen end-to-end:
+
+```
+1. Slack-channel #shipping post  ← queue intent (recipient, contact_id, deal_id)
+   ↓
+2. Shopify Admin API: createDraftOrder(
+     line_items: [{variant: 7.5oz bag SKU, qty: 6, price: 0.00}],
+     tags: ["sample", "no-revenue", "origin:ashford"],
+     shipping_address: <recipient>,
+     note: "SAMPLE-<COMPANY>-<YYYYMMDD>"
+   )
+   → Shopify draft order id = INV-S-XXXX
+   ↓
+3. ShipStation API: createOrder(
+     orderNumber: "INV-S-XXXX",
+     orderStatus: "awaiting_shipment",
+     shipFrom: ASHFORD,
+     shipTo: <recipient>,
+     items: [{name: "All American Gummy Bears 7.5oz Sample Case", qty: 1}],
+     packageCode: "case", // 14×10×8, ~3.4 lb (or 7×7×7 custom)
+     weight: { value: 3.4, units: "pounds" },
+     dimensions: { length: 7, width: 7, height: 7, units: "inches" },
+     advancedOptions: { customField1: "tag:sample" }
+   )
+   → ShipStation order id
+   ↓
+4. ShipStation API: createLabel(
+     carrierCode: <auto-pick: cheaper of ups_ground vs usps_ground_advantage>,
+     serviceCode: <derived>,
+     packageCode: "package",
+     ...
+   )
+   → tracking_number, label_pdf
+   ↓
+5. Slack #shipping channel: post tracking + label PDF + recipient summary
+   ↓
+6. HubSpot: create engagement on contact + deal:
+     "Sample case shipped UPS/USPS <tracking>, ETA <date>"
+   ↓
+7. Email to recipient (Touch-2): "Your sample is on the way — <tracking>"
+   ↓
+8. (Async, on UPS scan webhook): Shopify draft order → mark shipped
+```
+
+**Implementation status:**
+
+| Step | State | Blocker |
+|---|---|---|
+| 1. Queue trigger | Manual today (Slack/email) | Future: Slack slash command `/sample queue <recipient>` |
+| 2. Shopify draft order | **Wired** (`src/lib/shopify/admin.ts` already used for orders) | None |
+| 3. ShipStation order | **Wired** (`src/lib/ops/shipstation-client.ts`) | Confirm `SHIPSTATION_API_KEY` + `SHIPSTATION_API_SECRET` in Vercel production env |
+| 4. Buy label | **Wired** (`createUpsGroundLabel()`) | Same as step 3 |
+| 5. Slack #shipping post | **Wired** (Slack MCP) | None |
+| 6. HubSpot engagement | **Wired** (existing engagement-create pattern) | None |
+| 7. Touch-2 email | **Wired** (`scripts/send-email.sh`) | None |
+| 8. UPS scan webhook | **Parked** (`SHIPSTATION_API_KEY` provisioning was the historical blocker — verify current state) | See §6 |
+
+**The single missing piece:** an `/api/ops/sample/queue` POST endpoint that orchestrates steps 2–7 atomically. Build target: 1-2 hour implementation once Vercel env confirmed has the ShipStation creds. Class A (autonomous) for non-whale recipients; Class B for whales.
+
+---
 
 ## 4. Shipping presets (22.B D.2)
 
