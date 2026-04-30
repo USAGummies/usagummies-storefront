@@ -74,6 +74,16 @@ const BLOCKED = [
   { re: /30025\s+SR\s*706/i, label: "Blocked '30025 SR 706 E' — internal warehouse street address, never include in outbound." },
   { re: /\bWA\s+98304\b/i, label: "Blocked '98304' — internal warehouse zip, never include in outbound." },
   { re: /FOB\s+Ashford/i, label: "Blocked 'FOB Ashford' — never reference Ashford. Use 'FOB origin' or 'FOB our WA warehouse' if origin must be named." },
+  // 2026-04-30 incident: morning-wave drafts leaked the internal route-doctrine into customer-facing pitches.
+  // The customer should NEVER hear that we're using their order to subsidize freight to other accounts in
+  // their region. They get one fact: "At 3+ pallets, freight is on us." Everything else is internal economics.
+  { re: /anchors?\s+a\s+profitable\s+route\s+run/i, label: "Blocked 'anchors a profitable route run' — internal route-doctrine language, never customer-facing. Use 'At 3+ pallets, freight is on us.' Per Ben 2026-04-30 ruling." },
+  { re: /other\s+accounts\s+we'?ve\s+signed\s+up/i, label: "Blocked 'other accounts we've signed up' — tells customer we're shipping their competitors on the same truck. Internal-only language. Use 'At 3+ pallets, freight is on us.'" },
+  { re: /every\s+door\s+(we\s+already\s+have\s+signed|we'?ve\s+signed)\s+in\s+your\s+region/i, label: "Blocked 'every door we've signed in your region' — internal route-density language, leaks that we use customer orders to subsidize regional truck runs. Customer-facing freight pitch is just 'At 3+ pallets, freight is on us.'" },
+  { re: /6-?8\s+week\s+reorder\s+cycle.*restocks?/i, label: "Blocked '6-8 week reorder cycle face-to-face restocks' — internal route-cadence language, never in customer-facing emails. Per Ben 2026-04-30 ruling on internal-vs-external pitch separation." },
+  { re: /face-to-face\s+restocks/i, label: "Blocked 'face-to-face restocks' — internal route-doctrine language. Customer pitch stays focused on the offer (freight + price), not our delivery mechanics." },
+  { re: /(?:fills?|fill)\s+the\s+(?:remaining|other)\s+(?:14|fourteen)\s+pallets/i, label: "Blocked '17-pallet truck math' — internal economics. Customer never hears about pallet capacity allocation." },
+  { re: /17-?pallet\s+(truck|capacity|load)/i, label: "Blocked '17-pallet truck' — internal trucking economics, never in customer pitch." },
 ];
 
 // ---------------------------------------------------------- Required tokens

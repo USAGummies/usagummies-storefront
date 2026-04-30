@@ -330,13 +330,21 @@ Step 6: REORDER CYCLE → every 6-8 weeks, restock the route + introduce new SKU
 
 **Doctrine:** **Hunt the whale. Build the route behind.** Without the whale, the route can't run. Without the route, the whale is a one-shot win. Together = compounding sales engine on every truck cycle.
 
-### The pitch for the whale (locked language)
+### The pitch for the whale (locked language) — INTERNAL vs EXTERNAL
 
-When pitching a whale at 3+ pallets, lead with the freight economics:
+**🚫 CRITICAL — keep internal mechanics out of customer-facing emails.** A 2026-04-30 incident leaked the route-doctrine into 222 cold-outreach drafts before being caught. The customer should never know we're using their order to subsidize freight to other accounts in their region. They get one fact, and only one fact: at 3+ pallets, freight is on us.
 
-> _"At 3+ pallets we run the truck ourselves from our WA warehouse. That means freight is on us — and any other accounts we've signed up along the route get their delivery on the same truck. So your order anchors a profitable run, and we can introduce new products to you and the rest of the route every 6-8 weeks face-to-face. No middleman, no broker margin, no LTL freight surcharges."_
+**EXTERNAL (customer-facing — the only thing they see):**
 
-Pricing reference: `/contracts/pricing-route-governance.md` §6 — B5 Pallet @ $3.00/bag, buyer pays freight. **At 3+ pallets we waive freight** because the truck is justified.
+> _"At 3+ pallets, freight is on us."_
+
+That's the entire freight pitch. No mention of "route runs," "other accounts on the same truck," "6-8 week reorder cycles," "17-pallet truck capacity," "face-to-face restocks," or any of the internal mechanics. Pricing reference: `/contracts/pricing-route-governance.md` §6 — B5 Pallet @ $3.00/bag, buyer pays freight. **At 3+ pallets we waive freight.** Period.
+
+**INTERNAL (operating doctrine — for our team only, never quoted in any email):**
+
+The math we use to plan our calendar: a 3-pallet whale anchors a profitable WA→destination truck run; the remaining 14 pallets fill with route accounts; whale pays freight → route accounts get effectively free freight; restock cycle every 6-8 weeks introduces new SKUs face-to-face; ask each owner "who's the next shop down the street." This entire mechanic is in §"The thesis" above and is **internal-only** — it shapes how we plan trips, allocate inventory, and price routes, but it never appears in customer-facing copy.
+
+**Validator enforcement:** `scripts/outreach-validate.mjs` (commit pending) blocks the leaked phrases — "anchors a profitable route run," "other accounts we've signed up," "every door we've signed in your region," "6-8 week reorder cycle restocks," "face-to-face restocks," "17-pallet truck," "fills the remaining 14 pallets." Adding these to the BLOCKED list means future templates can't sneak them past us.
 
 ### Route-building signals (in research output)
 

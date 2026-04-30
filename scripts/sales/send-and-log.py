@@ -293,6 +293,16 @@ def main() -> int:
     ap.add_argument("--stage", default=DEFAULT_STAGE)
     ap.add_argument("--skip-apollo", action="store_true")
     ap.add_argument("--dry-run", action="store_true", help="Run validator + HubSpot dedup but do NOT send or log engagement")
+    # 2026-04-30 incident: cold outreach went out with internal route-doctrine language leaked
+    # into customer-facing pitch. Ben directive: "you don't get to just blast stuff out without
+    # approvals." From this point forward, every cold-outreach send requires --approved-by=<token>.
+    # Without it, the helper writes a draft preview to /tmp/sends/holds/ and exits with a HOLD
+    # status. Ben (or his designated approver) must explicitly invoke with the approval token to
+    # release the send.
+    ap.add_argument("--approved-by", default="",
+                    help="Approval token (REQUIRED for production send). Format: 'ben:<batch_id>' "
+                         "or 'ben:adhoc:<short_reason>'. Without it, the helper writes a draft "
+                         "preview to /tmp/sends/holds/ and exits HOLD without sending.")
     args = ap.parse_args()
 
     body_path = Path(args.body).resolve()
@@ -306,6 +316,43 @@ def main() -> int:
 
     body_text = body_path.read_text()
     new_dealname = args.dealname or f"Wholesale — {args.company}"
+
+    # ------------------------------------------------------------- 0. APPROVAL GATE (HARD)
+    # Default-OFF send. No --approved-by token = HOLD. Writes a draft preview to disk
+    # and exits 4 (HOLD code). Ben (or designated approver) must explicitly invoke with
+    # --approved-by="ben:<batch_id>" to release the send.
+    HOLD_DIR = Path("/tmp/sends/holds")
+    HOLD_DIR.mkdir(parents=True, exist_ok=True)
+    if not args.approved_by:
+        hold_id = f"{args.email.replace('@','_AT_').replace('.','_')}__{int(_dt.datetime.now(_dt.timezone.utc).timestamp())}"
+        hold_path = HOLD_DIR / f"{hold_id}.json"
+        with open(hold_path, "w") as f:
+            json.dump({
+                "status": "HOLD_pending_approval",
+                "to": args.email,
+                "company": args.company,
+                "subject": args.subject,
+                "first": args.first, "last": args.last, "jobtitle": args.jobtitle,
+                "body_path": str(body_path),
+                "body_preview_first_400": body_text[:400],
+                "queued_at": _dt.datetime.now(_dt.timezone.utc).isoformat(),
+                "release_command": (
+                    f'python3 scripts/sales/send-and-log.py '
+                    f'--company "{args.company}" --email {args.email} '
+                    f'--first "{args.first}" --last "{args.last}" --jobtitle "{args.jobtitle}" '
+                    f'--subject "{args.subject}" --body {body_path} --skip-apollo '
+                    f'--approved-by="ben:adhoc:CONFIRM"'
+                ),
+            }, f, indent=2)
+        print(f"[HOLD] Send held pending approval. Preview written to: {hold_path}")
+        print(f"[HOLD] To release this send, re-invoke with --approved-by=\"ben:<batch_id>\"")
+        print(f"[HOLD] Body preview (first 400 chars):")
+        print("─" * 70)
+        print(body_text[:400])
+        print("─" * 70)
+        return 4  # HOLD exit code (distinct from validator BLOCK=1, send-fail=3)
+
+    print(f"[APPROVAL] Token: {args.approved_by}")
 
     # ------------------------------------------------------------- 1. Validator
     print(f"[1/7] Validator gate: {args.email} / {args.company}", flush=True)
