@@ -135,6 +135,20 @@ interface BuyLabelRequest {
    * HubSpot outage does not fail the label buy).
    */
   hubspotDealId?: string;
+  /**
+   * Push label PDF(s) to #shipping (channel C0AS4635HFG) at buy-time.
+   * Default: true. Set false when the caller wants to handle posting
+   * itself or is testing. Best-effort — Slack failure does not fail
+   * the label buy. Added 2026-04-30 PM per Ben directive.
+   */
+  pushToSlack?: boolean;
+  /**
+   * Optional thread parent timestamp for the Slack push. When set, the
+   * label PDF posts as a reply in the given thread instead of as a new
+   * top-level message in #shipping. Useful for tying labels to the
+   * sample-shipment queue request thread.
+   */
+  slackThreadTs?: string;
 }
 
 export async function POST(req: Request): Promise<Response> {
@@ -465,6 +479,96 @@ export async function POST(req: Request): Promise<Response> {
     await kv.set(KV_FREIGHT_COMP_QUEUE, trimmed);
   }
 
+  // Slack #shipping channel auto-push. Drops every label PDF into
+  // #shipping at buy-time (channel id C0AS4635HFG) so Ben + Drew always
+  // have the artifact in one place. Best-effort — Slack failure does not
+  // fail the label buy. Per Ben 2026-04-30 PM: "you need to push both of
+  // those labels to the shipping channel in slack." This wires every
+  // future buy-label invocation to do it automatically.
+  //
+  // Skip rules: (a) caller can opt out with `pushToSlack: false`; (b) we
+  // skip if the buy was a `dryRun` (we never reached this branch in that
+  // case anyway, but defensive); (c) we skip if SLACK_BOT_TOKEN is not
+  // configured (uploadBufferToSlack returns ok:false and we surface it
+  // in the response so the caller knows the slot was skipped).
+  const SHIPPING_CHANNEL_ID = "C0AS4635HFG";
+  const slackPushes: Array<{
+    trackingNumber: string;
+    ok: boolean;
+    permalink?: string;
+    skipped?: boolean;
+    error?: string;
+  }> = [];
+  const shouldPushToSlack = body.pushToSlack !== false; // default ON
+  if (shouldPushToSlack) {
+    for (const label of labels) {
+      // labelUrl is `data:application/pdf;base64,<...>` from createShippingLabel.
+      const dataUrl = label.labelUrl ?? "";
+      if (!dataUrl.startsWith("data:application/pdf;base64,")) {
+        slackPushes.push({
+          trackingNumber: label.trackingNumber,
+          ok: false,
+          error: "labelUrl missing/non-data-URL — can't push to Slack",
+        });
+        continue;
+      }
+      const b64 = dataUrl.split(",", 2)[1] ?? "";
+      let buf: Buffer;
+      try {
+        buf = Buffer.from(b64, "base64");
+      } catch (err) {
+        slackPushes.push({
+          trackingNumber: label.trackingNumber,
+          ok: false,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        continue;
+      }
+      if (buf.byteLength === 0) {
+        slackPushes.push({
+          trackingNumber: label.trackingNumber,
+          ok: false,
+          error: "decoded label PDF is 0 bytes",
+        });
+        continue;
+      }
+      // Filename = SHIPSTATION-LABEL-<tracking>.pdf so audit-search is easy.
+      const filename = `SHIPSTATION-LABEL-${label.trackingNumber}.pdf`;
+      const comment =
+        `:label: *Label purchased* · ${label.carrier} ${label.service} · $${label.cost.toFixed(2)}\n` +
+        `*Tracking:* \`${label.trackingNumber}\`\n` +
+        `*Ship to:* ${body.destination.name}` +
+        (body.destination.company ? ` (${body.destination.company})` : "") +
+        ` — ${body.destination.city}, ${body.destination.state} ${body.destination.postalCode}\n` +
+        `*Keys:* \`${keys.join(", ")}\`` +
+        (body.hubspotDealId ? ` · *HubSpot deal:* \`${body.hubspotDealId}\`` : "");
+      try {
+        const upload = await uploadBufferToSlack({
+          channelId: SHIPPING_CHANNEL_ID,
+          threadTs: body.slackThreadTs,
+          filename,
+          mimeType: "application/pdf",
+          buffer: buf,
+          title: `Label · ${label.trackingNumber} · ${body.destination.city}, ${body.destination.state}`,
+          comment,
+        });
+        slackPushes.push({
+          trackingNumber: label.trackingNumber,
+          ok: upload.ok,
+          permalink: upload.permalink,
+          skipped: upload.skipped,
+          error: upload.ok ? undefined : upload.error,
+        });
+      } catch (err) {
+        slackPushes.push({
+          trackingNumber: label.trackingNumber,
+          ok: false,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+  }
+
   // HubSpot deal-stage auto-advance. When the caller supplies a
   // `hubspotDealId`, we patch the deal to `STAGE_SHIPPED` + attach a
   // note with tracking numbers. Best-effort — failures don't break
@@ -521,5 +625,6 @@ export async function POST(req: Request): Promise<Response> {
       : null,
     freightCompQueued,
     hubspotAdvance,
+    slackPushes,
   });
 }

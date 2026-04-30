@@ -187,7 +187,7 @@ def main():
     print()
     for t in TESTIMONIALS:
         img = make_card(t)
-        out = OUT_DIR / f"testimonial_{t['key']}_1080.png"
+        out = OUT_DIR / f"testimonial_{t['key']}_1080_v2.png"
         img.save(out, "PNG", quality=95)
         print(f"  ✓ {out.name}")
     print(f"\n{len(TESTIMONIALS)} cards generated.")
