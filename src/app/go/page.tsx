@@ -117,11 +117,11 @@ export default function GoLandingPage() {
         .supply-chain-map svg .state path { fill: #e6e1d6; }
         .supply-chain-map svg .borders { stroke: #d6d0c3; stroke-width: 0.75; }
         .supply-chain-map svg .dccircle { display: none; }
-        .supply-chain-map svg .in,
-        .supply-chain-map svg .wi,
-        .supply-chain-map svg .wa,
-        .supply-chain-map svg .wy,
-        .supply-chain-map svg .pa { fill: #c7362c; }
+        .supply-chain-map svg path.in,
+        .supply-chain-map svg path.wi,
+        .supply-chain-map svg path.wa,
+        .supply-chain-map svg path.wy,
+        .supply-chain-map svg path.pa { fill: #c7362c; }
       `}</style>
 
       {/* Header */}
