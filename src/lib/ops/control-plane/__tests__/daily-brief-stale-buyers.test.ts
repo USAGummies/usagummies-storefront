@@ -80,7 +80,7 @@ describe("renderStaleBuyersMarkdown — pure formatting", () => {
 
   it("renders the header with total stale count + active scan denominator", () => {
     const text = renderStaleBuyersMarkdown(summary());
-    expect(text).toContain("Stale buyers — 2 deal(s) need follow-up");
+    expect(text).toContain("FOLLOW-UP HIT LIST — 2 deal(s) waiting on you");
     expect(text).toContain("scanned 12 active");
   });
 
@@ -146,14 +146,14 @@ describe("composeDailyBrief — staleBuyers slice rendering", () => {
   it("includes the stale-buyers section in morning brief when present + non-empty", () => {
     const out = composeDailyBrief({ ...baseInput(), staleBuyers: summary() });
     const json = JSON.stringify(out.blocks);
-    expect(json).toContain("Stale buyers");
+    expect(json).toContain("FOLLOW-UP HIT LIST");
     expect(json).toContain("Indian Pueblo Stores");
   });
 
   it("OMITS the section when staleBuyers slice is undefined", () => {
     const out = composeDailyBrief(baseInput());
     const json = JSON.stringify(out.blocks);
-    expect(json).not.toContain("Stale buyers");
+    expect(json).not.toContain("FOLLOW-UP HIT LIST");
   });
 
   it("OMITS the section when staleBuyers.stalest is empty (quiet-collapse)", () => {
@@ -166,7 +166,7 @@ describe("composeDailyBrief — staleBuyers slice rendering", () => {
       }),
     });
     const json = JSON.stringify(out.blocks);
-    expect(json).not.toContain("Stale buyers");
+    expect(json).not.toContain("FOLLOW-UP HIT LIST");
   });
 
   it("OMITS the section on EOD even when slice is provided", () => {
@@ -176,7 +176,7 @@ describe("composeDailyBrief — staleBuyers slice rendering", () => {
       staleBuyers: summary(),
     });
     const json = JSON.stringify(out.blocks);
-    expect(json).not.toContain("Stale buyers");
+    expect(json).not.toContain("FOLLOW-UP HIT LIST");
   });
 });
 
@@ -236,14 +236,14 @@ describe("composeDailyBrief — sampleQueue slice rendering", () => {
   it("renders the sample-queue section in morning brief when non-zero", () => {
     const out = composeDailyBrief({ ...baseInput(), sampleQueue: sampleQueue() });
     const json = JSON.stringify(out.blocks);
-    expect(json).toContain("Sample queue:");
+    expect(json).toContain("SAMPLE PIPELINE:");
     expect(json).toContain("awaiting ship");
   });
 
   it("OMITS the section when sampleQueue is undefined", () => {
     const out = composeDailyBrief(baseInput());
     const json = JSON.stringify(out.blocks);
-    expect(json).not.toContain("Sample queue:");
+    expect(json).not.toContain("SAMPLE PIPELINE:");
   });
 
   it("OMITS the section when both buckets are zero (quiet-collapse)", () => {
@@ -252,7 +252,7 @@ describe("composeDailyBrief — sampleQueue slice rendering", () => {
       sampleQueue: sampleQueue({ awaitingShip: 0, shippedAwaitingResponse: 0 }),
     });
     const json = JSON.stringify(out.blocks);
-    expect(json).not.toContain("Sample queue:");
+    expect(json).not.toContain("SAMPLE PIPELINE:");
   });
 
   it("OMITS the section on EOD even when slice is provided", () => {
@@ -262,7 +262,7 @@ describe("composeDailyBrief — sampleQueue slice rendering", () => {
       sampleQueue: sampleQueue(),
     });
     const json = JSON.stringify(out.blocks);
-    expect(json).not.toContain("Sample queue:");
+    expect(json).not.toContain("SAMPLE PIPELINE:");
   });
 });
 
@@ -316,7 +316,7 @@ describe("renderReorderFollowUpsMarkdown — D4 formatting", () => {
 
   it("renders header + bullets + per-channel footer", () => {
     const text = renderReorderFollowUpsMarkdown(reorderSummary());
-    expect(text).toContain("Reorder follow-ups — 2 candidate(s)");
+    expect(text).toContain("REORDER WINDOW IS OPEN — 2 buyer(s) ready for round 2");
     expect(text).toContain("`wholesale` — 105d — Thanksgiving Point");
     expect(text).toContain("Shipped → reorder window");
     expect(text).toContain("`amazon-fbm` — 88d — Amy Catalano");
@@ -351,14 +351,14 @@ describe("composeDailyBrief — reorderFollowUps slice rendering", () => {
   it("renders the section in morning brief when non-empty", () => {
     const out = composeDailyBrief({ ...baseInput(), reorderFollowUps: reorderSummary() });
     const json = JSON.stringify(out.blocks);
-    expect(json).toContain("Reorder follow-ups");
+    expect(json).toContain("REORDER WINDOW IS OPEN");
     expect(json).toContain("Thanksgiving Point");
   });
 
   it("OMITS the section when reorderFollowUps is undefined", () => {
     const out = composeDailyBrief(baseInput());
     const json = JSON.stringify(out.blocks);
-    expect(json).not.toContain("Reorder follow-ups");
+    expect(json).not.toContain("REORDER WINDOW IS OPEN");
   });
 
   it("OMITS the section when topCandidates is empty (quiet-collapse)", () => {
@@ -367,7 +367,7 @@ describe("composeDailyBrief — reorderFollowUps slice rendering", () => {
       reorderFollowUps: reorderSummary({ topCandidates: [], byChannel: [], total: 0 }),
     });
     const json = JSON.stringify(out.blocks);
-    expect(json).not.toContain("Reorder follow-ups");
+    expect(json).not.toContain("REORDER WINDOW IS OPEN");
   });
 
   it("OMITS the section on EOD even when slice is provided", () => {
@@ -377,7 +377,7 @@ describe("composeDailyBrief — reorderFollowUps slice rendering", () => {
       reorderFollowUps: reorderSummary(),
     });
     const json = JSON.stringify(out.blocks);
-    expect(json).not.toContain("Reorder follow-ups");
+    expect(json).not.toContain("REORDER WINDOW IS OPEN");
   });
 });
 
@@ -433,7 +433,7 @@ describe("renderOnboardingBlockersMarkdown — D3 formatting", () => {
 
   it("renders header + bullets + per-step footer + open-link", () => {
     const text = renderOnboardingBlockersMarkdown(blockers());
-    expect(text).toContain("Wholesale onboarding stalled — 2 flow(s) past 24h");
+    expect(text).toContain("ONBOARDING JAMMED UP — 2 flow(s) parked past 24h");
     expect(text).toContain("scanned 12 total");
     expect(text).toContain("`payment-path` — 4d — Bryce Glamp & Camp ($3,141)");
     expect(text).toContain("`ap-info` — 5d — Indian Pueblo Stores");
@@ -467,14 +467,14 @@ describe("composeDailyBrief — onboardingBlockers slice rendering", () => {
   it("renders the section in morning brief when non-empty", () => {
     const out = composeDailyBrief({ ...baseInput(), onboardingBlockers: blockers() });
     const json = JSON.stringify(out.blocks);
-    expect(json).toContain("Wholesale onboarding stalled");
+    expect(json).toContain("ONBOARDING JAMMED UP");
     expect(json).toContain("Bryce Glamp & Camp");
   });
 
   it("OMITS the section when slice is undefined", () => {
     const out = composeDailyBrief(baseInput());
     const json = JSON.stringify(out.blocks);
-    expect(json).not.toContain("Wholesale onboarding stalled");
+    expect(json).not.toContain("ONBOARDING JAMMED UP");
   });
 
   it("OMITS the section when topBlockers is empty (quiet-collapse)", () => {
@@ -483,7 +483,7 @@ describe("composeDailyBrief — onboardingBlockers slice rendering", () => {
       onboardingBlockers: blockers({ topBlockers: [], byStep: [], stalledTotal: 0 }),
     });
     const json = JSON.stringify(out.blocks);
-    expect(json).not.toContain("Wholesale onboarding stalled");
+    expect(json).not.toContain("ONBOARDING JAMMED UP");
   });
 
   it("OMITS the section on EOD even when slice is provided", () => {
@@ -493,7 +493,7 @@ describe("composeDailyBrief — onboardingBlockers slice rendering", () => {
       onboardingBlockers: blockers(),
     });
     const json = JSON.stringify(out.blocks);
-    expect(json).not.toContain("Wholesale onboarding stalled");
+    expect(json).not.toContain("ONBOARDING JAMMED UP");
   });
 });
 
@@ -532,7 +532,7 @@ describe("renderEnrichmentOpportunitiesMarkdown — D5 v0.3 formatting", () => {
 
   it("renders header + top-5 fields + sweep hint", () => {
     const text = renderEnrichmentOpportunitiesMarkdown(enrichSummary());
-    expect(text).toContain("Enrichment opportunities — 18 contact(s) missing fields");
+    expect(text).toContain("INTEL UPGRADE — 18 contact(s) missing fields, ready to enrich");
     expect(text).toContain("scanned 50");
     expect(text).toContain("jobtitle 12");
     expect(text).toContain("phone 8");
@@ -551,13 +551,13 @@ describe("composeDailyBrief — enrichmentOpportunities slice rendering", () => 
   it("renders the section in morning brief when missingAny > 0", () => {
     const out = composeDailyBrief({ ...baseInput(), enrichmentOpportunities: enrichSummary() });
     const json = JSON.stringify(out.blocks);
-    expect(json).toContain("Enrichment opportunities");
+    expect(json).toContain("INTEL UPGRADE");
   });
 
   it("OMITS the section when slice is undefined", () => {
     const out = composeDailyBrief(baseInput());
     const json = JSON.stringify(out.blocks);
-    expect(json).not.toContain("Enrichment opportunities");
+    expect(json).not.toContain("INTEL UPGRADE");
   });
 
   it("OMITS the section when missingAny = 0 (quiet-collapse)", () => {
@@ -566,7 +566,7 @@ describe("composeDailyBrief — enrichmentOpportunities slice rendering", () => 
       enrichmentOpportunities: enrichSummary({ missingAny: 0, perField: [] }),
     });
     const json = JSON.stringify(out.blocks);
-    expect(json).not.toContain("Enrichment opportunities");
+    expect(json).not.toContain("INTEL UPGRADE");
   });
 
   it("OMITS the section on EOD even when slice is provided", () => {
@@ -576,6 +576,6 @@ describe("composeDailyBrief — enrichmentOpportunities slice rendering", () => 
       enrichmentOpportunities: enrichSummary(),
     });
     const json = JSON.stringify(out.blocks);
-    expect(json).not.toContain("Enrichment opportunities");
+    expect(json).not.toContain("INTEL UPGRADE");
   });
 });

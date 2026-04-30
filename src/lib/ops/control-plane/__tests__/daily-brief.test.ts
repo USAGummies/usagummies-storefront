@@ -89,7 +89,7 @@ describe("composeDailyBrief()", () => {
       pendingApprovals: [req],
     });
     const txt = JSON.stringify(out.blocks);
-    expect(txt).toContain("Pending approvals by division");
+    expect(txt).toContain("APPROVAL QUEUE — by division");
     expect(txt).toContain("sales");
     expect(txt).toContain("Send outreach email");
   });
@@ -189,7 +189,7 @@ describe("composeDailyBrief()", () => {
       },
     });
     const json = JSON.stringify(out.blocks);
-    expect(json).toContain("Sales Command");
+    expect(json).toContain("SALES COMMAND");
     expect(json).toContain("Faire invites awaiting review:");
     // Counts render with Slack bold markup.
     expect(json).toContain("*3*");
@@ -225,7 +225,7 @@ describe("composeDailyBrief()", () => {
         anyAction: true,
       },
     });
-    expect(JSON.stringify(out.blocks)).not.toContain("Sales Command");
+    expect(JSON.stringify(out.blocks)).not.toContain("SALES COMMAND");
   });
 
   it("Sales Command empty-state collapses to one quiet line when no actions", () => {
@@ -245,7 +245,7 @@ describe("composeDailyBrief()", () => {
       },
     });
     const json = JSON.stringify(out.blocks);
-    expect(json).toContain("Sales Command");
+    expect(json).toContain("SALES COMMAND");
     expect(json).toContain("No sales actions queued");
     // Counts NOT rendered as line items in the empty state.
     expect(json).not.toContain("Faire invites awaiting review:");
@@ -302,7 +302,7 @@ describe("composeDailyBrief()", () => {
       (b) =>
         b.type === "section" &&
         typeof b.text?.text === "string" &&
-        b.text.text.includes("Sales Command"),
+        b.text.text.includes("SALES COMMAND"),
     );
     expect(salesBlock).toBeDefined();
     const lineCount = (salesBlock!.text!.text! as string).split("\n").length;
@@ -311,7 +311,7 @@ describe("composeDailyBrief()", () => {
 
   it("Sales Command section is not rendered when slice is omitted", () => {
     const out = composeDailyBrief(baseInput()); // no salesCommand
-    expect(JSON.stringify(out.blocks)).not.toContain("Sales Command");
+    expect(JSON.stringify(out.blocks)).not.toContain("SALES COMMAND");
   });
 
   // ---- Phase 3 — aging callouts (max 3, critical-first) -----------------
@@ -411,7 +411,7 @@ describe("composeDailyBrief()", () => {
       (b) =>
         b.type === "section" &&
         typeof b.text?.text === "string" &&
-        b.text.text.includes("Sales Command"),
+        b.text.text.includes("SALES COMMAND"),
     );
     expect(salesBlock).toBeDefined();
     const text = salesBlock!.text!.text! as string;
@@ -524,7 +524,7 @@ describe("POST /api/ops/daily-brief", () => {
     // Keep Slack in degraded mode so the route doesn't hit the real API.
     delete process.env.SLACK_BOT_TOKEN;
     // Plaid unconfigured by default → resolvePlaidCashPosition returns
-    // an explicit "Plaid not configured" unavailable line, which the
+    // an explicit "plaid not configured" unavailable line, which the
     // composer renders honestly. Individual tests can flip this on.
     delete process.env.PLAID_CLIENT_ID;
     delete process.env.PLAID_SECRET;
@@ -816,7 +816,7 @@ describe("POST /api/ops/daily-brief", () => {
     const res = await POST(authed("https://example.test/api/ops/daily-brief?post=false"));
     const body = await res.json();
     const blocks = JSON.stringify(body.brief.blocks);
-    expect(blocks).toContain("Cash");
+    expect(blocks).toContain("WAR CHEST");
     expect(blocks).toContain("Plaid not configured");
     // No fabricated number.
     expect(blocks).not.toMatch(/\$[0-9]+\.[0-9]{2}/);
@@ -1059,7 +1059,7 @@ describe("POST /api/ops/daily-brief", () => {
       const body = await res.json();
       expect(res.status).toBe(200);
       expect(JSON.stringify(body.brief.blocks)).toContain("9999.99");
-      expect(JSON.stringify(body.brief.blocks)).not.toContain("Plaid not configured");
+      expect(JSON.stringify(body.brief.blocks)).not.toContain("plaid not configured");
     } finally {
       global.fetch = originalFetch;
     }
@@ -1127,7 +1127,7 @@ describe("composeDispatchBriefSlice + renderDispatchBriefMarkdown", () => {
     expect(renderDispatchBriefMarkdown(slice)).toBe("");
   });
 
-  it("renderDispatchBriefMarkdown emits a single-line :package: header on activity", async () => {
+  it("renderDispatchBriefMarkdown emits a single-line dispatch header on activity", async () => {
     const { renderDispatchBriefMarkdown, composeDispatchBriefSlice } =
       await import("../daily-brief");
     const slice = composeDispatchBriefSlice(
@@ -1140,7 +1140,7 @@ describe("composeDispatchBriefSlice + renderDispatchBriefMarkdown", () => {
       NOW,
     );
     const out = renderDispatchBriefMarkdown(slice);
-    expect(out).toMatch(/^:package:/);
+    expect(out).toMatch(/DISPATCH BOARD/);
     expect(out).toMatch(/\*2\* bought/);
     expect(out).toMatch(/\*1\* dispatched/);
     expect(out).toMatch(/\*1\* still on cart/);
@@ -1166,7 +1166,7 @@ describe("composeDispatchBriefSlice + renderDispatchBriefMarkdown", () => {
       dispatch: slice,
     });
     // Section blocks carry the brief content; `text` is the meta header only.
-    expect(JSON.stringify(out.blocks)).toContain("Dispatch (last 24h)");
+    expect(JSON.stringify(out.blocks)).toContain("DISPATCH BOARD — last 24h");
   });
 
   it("composeDailyBrief NEVER renders the dispatch line on EOD", async () => {
@@ -1186,7 +1186,7 @@ describe("composeDispatchBriefSlice + renderDispatchBriefMarkdown", () => {
       recentAudit: [],
       dispatch: slice,
     });
-    expect(JSON.stringify(out.blocks)).not.toContain("Dispatch (last 24h)");
+    expect(JSON.stringify(out.blocks)).not.toContain("DISPATCH BOARD — last 24h");
   });
 
   it("composeDailyBrief on morning + zero-activity slice renders no dispatch line", async () => {
@@ -1203,7 +1203,7 @@ describe("composeDispatchBriefSlice + renderDispatchBriefMarkdown", () => {
       recentAudit: [],
       dispatch: slice,
     });
-    expect(JSON.stringify(out.blocks)).not.toContain("Dispatch (last 24h)");
+    expect(JSON.stringify(out.blocks)).not.toContain("DISPATCH BOARD — last 24h");
   });
 });
 
@@ -1325,7 +1325,7 @@ describe("oldest-open-package callout (Phase 28h)", () => {
       NOW_STALE,
     );
     const out = renderDispatchBriefMarkdown(slice);
-    expect(out).not.toMatch(/Dispatch \(last 24h\)/);
+    expect(out).not.toMatch(/DISPATCH BOARD — last 24h/);
     expect(out).toMatch(/:warning:/);
     expect(out).toMatch(/5 days on the cart/);
   });
@@ -1348,7 +1348,7 @@ describe("oldest-open-package callout (Phase 28h)", () => {
       NOW,
     );
     const out = renderDispatchBriefMarkdown(slice);
-    expect(out).toMatch(/Dispatch \(last 24h\)/);
+    expect(out).toMatch(/DISPATCH BOARD — last 24h/);
     expect(out).toMatch(/:warning:/);
     // Two distinct lines.
     expect(out.split("\n")).toHaveLength(2);
@@ -1394,12 +1394,12 @@ describe("composeDailyBrief() — operational signals (Phase 32.1)", () => {
       ...baseInput(),
       signals: { lines: [], hasCritical: false },
     });
-    expect(JSON.stringify(out.blocks)).not.toContain("Operational signals");
+    expect(JSON.stringify(out.blocks)).not.toContain("FRONT-LINE SIGNALS");
   });
 
   it("section is OMITTED when signals is undefined (zero-config)", () => {
     const out = composeDailyBrief(baseInput());
-    expect(JSON.stringify(out.blocks)).not.toContain("Operational signals");
+    expect(JSON.stringify(out.blocks)).not.toContain("FRONT-LINE SIGNALS");
   });
 
   it("section renders with the lines when signals are present", () => {
@@ -1414,7 +1414,7 @@ describe("composeDailyBrief() — operational signals (Phase 32.1)", () => {
       },
     });
     const json = JSON.stringify(out.blocks);
-    expect(json).toContain("Operational signals");
+    expect(json).toContain("FRONT-LINE SIGNALS");
     expect(json).toContain("Stack — 1 service degraded");
     expect(json).toContain("USPTO trademarks");
   });
@@ -1429,7 +1429,7 @@ describe("composeDailyBrief() — operational signals (Phase 32.1)", () => {
     });
     const json = JSON.stringify(out.blocks);
     expect(json).toContain(":rotating_light:");
-    expect(json).toContain("Operational signals");
+    expect(json).toContain("RED ALERT");
   });
 
   it("header has NO :rotating_light: prefix when hasCritical=false", () => {
@@ -1443,7 +1443,7 @@ describe("composeDailyBrief() — operational signals (Phase 32.1)", () => {
     // The header itself shouldn't have the rotating_light, but the
     // signal line itself might (we look for the header marker).
     const json = JSON.stringify(out.blocks);
-    expect(json).not.toContain(":rotating_light: *Operational signals*");
-    expect(json).toContain("Operational signals");
+    expect(json).not.toContain(":rotating_light: *RED ALERT");
+    expect(json).toContain("FRONT-LINE SIGNALS");
   });
 });

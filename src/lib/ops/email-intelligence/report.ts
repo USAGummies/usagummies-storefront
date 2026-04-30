@@ -119,10 +119,10 @@ export function renderEmailReport(opts: {
   const lines: string[] = [];
 
   lines.push(
-    `:envelope_with_arrow: *Email intelligence — ${windowDescription}*`,
+    `📬 ⭐ *INBOX SWEEP — ${windowDescription}* ⭐`,
   );
   lines.push(
-    `_Scanned ${rollup.scanned}, classified ${rollup.classified}, skipped ${rollup.skipped} (already processed)._`,
+    `_${rollup.scanned} scanned · ${rollup.classified} classified · ${rollup.skipped} skipped (already in motion)_`,
   );
   lines.push("");
 
@@ -132,7 +132,7 @@ export function renderEmailReport(opts: {
     ...buckets.ap_finance.filter((s) => s.alreadyEngaged),
   ];
   if (critical.length > 0) {
-    lines.push(`:rotating_light: *Critical (${critical.length})*`);
+    lines.push(`🚨 *CRITICAL — ALL HANDS (${critical.length})*`);
     for (const s of critical.slice(0, 8)) lines.push(emailLine(s));
     if (critical.length > 8) lines.push(`  …and ${critical.length - 8} more`);
     lines.push("");
@@ -141,7 +141,7 @@ export function renderEmailReport(opts: {
   // 2. Needs approval (drafts created + awaiting Slack click)
   const needsApproval = scanned.filter((s) => s.hasApproval);
   if (needsApproval.length > 0) {
-    lines.push(`:ballot_box_with_ballot: *Needs approval (${needsApproval.length})*`);
+    lines.push(`🛂 *AWAITING YOUR CALL (${needsApproval.length})*`);
     for (const s of needsApproval.slice(0, 8)) {
       lines.push(`${emailLine(s)} — _#ops-approvals card posted_`);
     }
@@ -154,7 +154,7 @@ export function renderEmailReport(opts: {
     (s) => s.hasDraft && !s.hasApproval,
   );
   if (draftsReady.length > 0) {
-    lines.push(`:memo: *Drafts ready (${draftsReady.length})*`);
+    lines.push(`📝 *DRAFTS LOADED IN THE CHAMBER (${draftsReady.length})*`);
     for (const s of draftsReady.slice(0, 8)) lines.push(emailLine(s));
     if (draftsReady.length > 8) lines.push(`  …and ${draftsReady.length - 8} more`);
     lines.push("");
@@ -162,7 +162,7 @@ export function renderEmailReport(opts: {
 
   // 4. Sample requests
   if (buckets.sample_request.length > 0) {
-    lines.push(`:package: *Sample requests (${buckets.sample_request.length})*`);
+    lines.push(`📦 *SAMPLE REQUESTS — SHIP TO IMPRESS (${buckets.sample_request.length})*`);
     for (const s of buckets.sample_request.slice(0, 8)) lines.push(emailLine(s));
     lines.push("");
   }
@@ -170,42 +170,42 @@ export function renderEmailReport(opts: {
   // 5. AP / finance (non-critical)
   const apOnly = buckets.ap_finance.filter((s) => !s.alreadyEngaged);
   if (apOnly.length > 0) {
-    lines.push(`:moneybag: *Finance / AP (${apOnly.length})*`);
+    lines.push(`💰 *FINANCE / AP (${apOnly.length})*`);
     for (const s of apOnly.slice(0, 8)) lines.push(emailLine(s));
     lines.push("");
   }
 
   // 6. Vendor supply
   if (buckets.vendor_supply.length > 0) {
-    lines.push(`:factory: *Vendor / supply (${buckets.vendor_supply.length})*`);
+    lines.push(`🏭 *VENDOR / SUPPLY CHAIN (${buckets.vendor_supply.length})*`);
     for (const s of buckets.vendor_supply.slice(0, 6)) lines.push(emailLine(s));
     lines.push("");
   }
 
   // 7. B2B sales
   if (buckets.b2b_sales.length > 0) {
-    lines.push(`:handshake: *B2B sales (${buckets.b2b_sales.length})*`);
+    lines.push(`🤝 *B2B WHOLESALE — DEAL FLOW (${buckets.b2b_sales.length})*`);
     for (const s of buckets.b2b_sales.slice(0, 8)) lines.push(emailLine(s));
     lines.push("");
   }
 
   // 8. Customer support
   if (buckets.customer_support.length > 0) {
-    lines.push(`:bust_in_silhouette: *Customer support (${buckets.customer_support.length})*`);
+    lines.push(`🙋 *CUSTOMER CARE (${buckets.customer_support.length})*`);
     for (const s of buckets.customer_support.slice(0, 6)) lines.push(emailLine(s));
     lines.push("");
   }
 
   // 9. Marketing / PR
   if (buckets.marketing_pr.length > 0) {
-    lines.push(`:newspaper: *Marketing / PR (${buckets.marketing_pr.length})*`);
+    lines.push(`📰 *MARKETING / PR (${buckets.marketing_pr.length})*`);
     for (const s of buckets.marketing_pr.slice(0, 4)) lines.push(emailLine(s));
     lines.push("");
   }
 
   // 10. Receipts / docs (collapsed count + first few subjects)
   if (buckets.receipt_document.length > 0) {
-    lines.push(`:page_facing_up: *Receipts / docs (${buckets.receipt_document.length})*`);
+    lines.push(`🧾 *RECEIPTS / DOCS (${buckets.receipt_document.length})*`);
     for (const s of buckets.receipt_document.slice(0, 4)) lines.push(emailLine(s));
     lines.push("");
   }
@@ -213,13 +213,13 @@ export function renderEmailReport(opts: {
   // 11. Junk / FYI (count only)
   if (buckets.junk_fyi.length > 0) {
     lines.push(
-      `:grey_exclamation: *FYI / junk (${buckets.junk_fyi.length})* — collapsed`,
+      `🗂️ *Filed under noise (${buckets.junk_fyi.length})* — collapsed, no action needed`,
     );
     lines.push("");
   }
 
   if (rollup.classified === 0) {
-    lines.push("_Nothing actionable in this window._");
+    lines.push("✅ _Inbox is quiet — no actionable signal in this window. Carry on, soldier._");
   }
 
   return lines.join("\n");

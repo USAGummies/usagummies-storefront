@@ -264,16 +264,16 @@ function renderDigest(input: {
     day: "numeric",
     year: "numeric",
   });
-  const lines: string[] = [`🧭 *Compliance Specialist — ${today}*`, ``];
+  const lines: string[] = [`⚖️ ⭐ *COMPLIANCE WATCH — ${today}* ⭐`, ``];
 
   if (input.urgent.length === 0 && input.soon.length === 0) {
-    lines.push(`Nothing in the next ${WINDOW_DAYS} days. All ${input.totalRows} calendar rows clear.`);
+    lines.push(`✅ All clear — nothing on the radar in the next ${WINDOW_DAYS} days. ${input.totalRows} calendar rows scanned, all green.`);
     lines.push(``, `_Source: <${input.databaseUrl}|Compliance Calendar>_`);
     return lines.join("\n");
   }
 
   if (input.urgent.length > 0) {
-    lines.push(`*≤ ${URGENT_DAYS} days (URGENT):*`);
+    lines.push(`🚨 *INCOMING — ≤ ${URGENT_DAYS} DAYS (URGENT):*`);
     for (const r of input.urgent) {
       const prefix = r.daysUntil < 0 ? `🚨 OVERDUE by ${-r.daysUntil}d` : `⚠️ in ${r.daysUntil}d`;
       const ownerBit = r.owner ? ` · ${r.owner}` : "";
@@ -283,7 +283,7 @@ function renderDigest(input: {
   }
   if (input.soon.length > 0) {
     if (input.urgent.length > 0) lines.push("");
-    lines.push(`*${URGENT_DAYS + 1}–${WINDOW_DAYS} days (watch):*`);
+    lines.push(`👀 *ON THE HORIZON — ${URGENT_DAYS + 1}–${WINDOW_DAYS} DAYS:*`);
     for (const r of input.soon) {
       const ownerBit = r.owner ? ` · ${r.owner}` : "";
       lines.push(`  • in ${r.daysUntil}d — <${r.url}|${r.label}> (${r.dueISO})${ownerBit}`);

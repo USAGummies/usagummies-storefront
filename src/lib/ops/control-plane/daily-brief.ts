@@ -308,7 +308,13 @@ export interface BriefOutput {
 
 export function composeDailyBrief(input: BriefInput): BriefOutput {
   const asOfIso = input.asOf.toISOString();
-  const kindLabel = input.kind === "morning" ? "Morning brief" : "End-of-day wrap";
+  // Patriotic brand voice — these messages are USA Gummies' own ops bot,
+  // not a generic devops dashboard. The hour the brief fires is part of
+  // the brand: morning rallies the troops, EOD bookkeeps the win.
+  const kindLabel =
+    input.kind === "morning"
+      ? "USA GUMMIES — MORNING BRIEFING ⭐"
+      : "USA GUMMIES — END-OF-DAY DEBRIEF ⭐";
   const pendingCount = input.pendingApprovals.length;
   const pausedCount = input.pausedAgents.length;
   const degraded = (input.degradations ?? []).length > 0;
@@ -345,16 +351,16 @@ export function composeDailyBrief(input: BriefInput): BriefOutput {
   const priorities: string[] = [];
   priorities.push(
     pendingCount > 0
-      ? `*${pendingCount}* pending approval(s) in \`#ops-approvals\` — see breakdown below.`
-      : `*0* pending approvals.`,
+      ? `🎯 *${pendingCount}* approval(s) on the runway in \`#ops-approvals\` — let's clear the deck.`
+      : `✅ Approval queue is *clean*. Nothing blocking the line.`,
   );
   if (pausedCount > 0) {
     const agentList = input.pausedAgents.map((p) => `\`${p.agentId}\``).join(", ");
-    priorities.push(`🛑 *${pausedCount}* paused agent(s) require review: ${agentList}.`);
+    priorities.push(`🛑 *${pausedCount}* agent(s) standing down — review needed: ${agentList}.`);
   }
   blocks.push({
     type: "section",
-    text: { type: "mrkdwn", text: `*Priorities*\n${priorities.join("\n")}` },
+    text: { type: "mrkdwn", text: `*🎯 TODAY'S MISSION*\n${priorities.join("\n")}` },
   });
 
   // ---- Operational signals (Phase 32.1) ----
@@ -364,12 +370,14 @@ export function composeDailyBrief(input: BriefInput): BriefOutput {
   // (stack-down / agent-red / critical-USPTO / stale-inbox) get a
   // :rotating_light: header so they can't be missed at a glance.
   if (input.signals && input.signals.lines.length > 0) {
-    const headerPrefix = input.signals.hasCritical ? ":rotating_light: " : "";
+    const sectionHeader = input.signals.hasCritical
+      ? ":rotating_light: *RED ALERT — HEADS UP*"
+      : ":radio: *FRONT-LINE SIGNALS*";
     blocks.push({
       type: "section",
       text: {
         type: "mrkdwn",
-        text: `*${headerPrefix}Operational signals*\n${input.signals.lines.join("\n")}`,
+        text: `${sectionHeader}\n${input.signals.lines.join("\n")}`,
       },
     });
   }
@@ -401,7 +409,7 @@ export function composeDailyBrief(input: BriefInput): BriefOutput {
       .join("\n");
     blocks.push({
       type: "section",
-      text: { type: "mrkdwn", text: `*Revenue (yesterday)*\n${rows}` },
+      text: { type: "mrkdwn", text: `💵 *YESTERDAY'S RING-UP*\n${rows}` },
     });
   }
   // Slim mode: suppress the "Revenue unavailable — not wired" filler line.
@@ -418,7 +426,7 @@ export function composeDailyBrief(input: BriefInput): BriefOutput {
         type: "section",
         text: {
           type: "mrkdwn",
-          text: `*Cash (BoA checking 7020)*  $${cp.amountUsd.toFixed(2)}${src}`,
+          text: `🏦 *WAR CHEST — BoA checking 7020*  *$${cp.amountUsd.toFixed(2)}*${src}`,
         },
       });
     } else if (cp.amountUsd != null && !hasValidSource) {
@@ -426,7 +434,7 @@ export function composeDailyBrief(input: BriefInput): BriefOutput {
         type: "section",
         text: {
           type: "mrkdwn",
-          text: `*Cash (BoA checking 7020)*  unavailable — amount=${cp.amountUsd} suppressed: missing source.system or source.retrievedAt (no-fabrication rule)`,
+          text: `🏦 *WAR CHEST — BoA checking 7020*  unavailable — amount=${cp.amountUsd} suppressed: missing source.system or source.retrievedAt (no-fabrication rule)`,
         },
       });
     } else {
@@ -434,7 +442,7 @@ export function composeDailyBrief(input: BriefInput): BriefOutput {
         type: "section",
         text: {
           type: "mrkdwn",
-          text: `*Cash (BoA checking 7020)*  unavailable — ${cp.unavailableReason ?? "no reason given"}`,
+          text: `🏦 *WAR CHEST — BoA checking 7020*  unavailable — ${cp.unavailableReason ?? "no reason given"}`,
         },
       });
     }
@@ -591,7 +599,7 @@ export function composeDailyBrief(input: BriefInput): BriefOutput {
       .join("\n");
     blocks.push({
       type: "section",
-      text: { type: "mrkdwn", text: `*Pending approvals by division*\n${lines}` },
+      text: { type: "mrkdwn", text: `🛂 *APPROVAL QUEUE — by division*\n${lines}` },
     });
   }
 
@@ -662,8 +670,8 @@ function groupApprovalsByDivision(reqs: ApprovalRequest[]): Record<string, Appro
  */
 function renderARPositionMarkdown(ar: ARPosition): string {
   return [
-    `*AR Outstanding (sent invoices)*  ${renderARBucket(ar.outstanding)}`,
-    `*Drafts (not yet AR)*  ${renderARBucket(ar.drafts)}`,
+    `💸 *MONEY OWED TO US (sent invoices)*  ${renderARBucket(ar.outstanding)}`,
+    `📝 *Drafts (not yet AR)*  ${renderARBucket(ar.drafts)}`,
   ].join("\n");
 }
 
@@ -681,7 +689,7 @@ function renderARBucket(bucket: ARBucket): string {
 }
 
 function renderPreflightMarkdown(pf: FulfillmentPreflightSlice): string {
-  const lines: string[] = ["*Shipping Hub pre-flight*"];
+  const lines: string[] = ["🛫 *SHIPPING HUB — PRE-FLIGHT CHECK*"];
 
   // Wallet
   if (pf.walletAlerts.length > 0) {
@@ -744,11 +752,11 @@ function renderPreflightMarkdown(pf: FulfillmentPreflightSlice): string {
   // Only render the section when there's actually something to say.
   return lines.length > 1
     ? lines.join("\n")
-    : "*Shipping Hub pre-flight*\n✅ All clear — wallets above floor, ATP healthy, queue empty, no stale voids.";
+    : "🛫 *SHIPPING HUB — PRE-FLIGHT CHECK*\n✅ All clear, wheels up — wallets above floor, ATP healthy, queue empty, no stale voids.";
 }
 
 function renderFulfillmentTodayMarkdown(ft: FulfillmentTodayBriefSlice): string {
-  const lines: string[] = ["*Fulfillment — today in review*"];
+  const lines: string[] = ["📦 *FULFILLMENT — TODAY'S OUTBOUND*"];
 
   const bought = ft.labelsBought;
   if (bought.count === 0) {
@@ -816,7 +824,7 @@ function renderFulfillmentTodayMarkdown(ft: FulfillmentTodayBriefSlice): string 
  *     line so the body counts stay scannable.
  */
 export function renderSalesCommandMarkdown(slice: SalesCommandSlice): string {
-  const header = "*Sales Command — today's actions*";
+  const header = "🚀 *SALES COMMAND — TODAY'S PUSH*";
   const footer =
     "_Open: <https://www.usagummies.com/ops/sales|/ops/sales> · " +
     "<https://www.usagummies.com/ops/faire-direct|Faire Direct> · " +
@@ -948,7 +956,7 @@ const STALE_BUYERS_TOP_N_IN_BRIEF = 3;
 export function renderStaleBuyersMarkdown(slice: StaleBuyerSummary): string {
   if (slice.stalest.length === 0) return "";
   const totalStale = slice.staleByStage.reduce((s, x) => s + x.count, 0);
-  const header = `*Stale buyers — ${totalStale} deal(s) need follow-up* _(scanned ${slice.activeDealsScanned} active)_`;
+  const header = `🎯 *FOLLOW-UP HIT LIST — ${totalStale} deal(s) waiting on you* _(scanned ${slice.activeDealsScanned} active)_`;
   const lines: string[] = [header];
   const top = slice.stalest.slice(0, STALE_BUYERS_TOP_N_IN_BRIEF);
   for (const d of top) {
@@ -999,7 +1007,7 @@ export function renderSampleQueueMarkdown(slice: SampleQueueHealth): string {
   if (slice.shippedAwaitingResponse > 0) {
     headerParts.push(`${slice.shippedAwaitingResponse} shipped, waiting on buyer`);
   }
-  lines.push(`*Sample queue:* ${headerParts.join(" · ")}`);
+  lines.push(`📦 *SAMPLE PIPELINE:* ${headerParts.join(" · ")}`);
 
   // Aging tail line — only render when at least one bucket is non-zero.
   const tailParts: string[] = [];
@@ -1030,7 +1038,7 @@ export function renderReorderFollowUpsMarkdown(slice: ReorderFollowUpSummary): s
   if (slice.topCandidates.length === 0) return "";
   const lines: string[] = [];
   lines.push(
-    `*Reorder follow-ups — ${slice.total} candidate(s) past channel windows*`,
+    `🔁 *REORDER WINDOW IS OPEN — ${slice.total} buyer(s) ready for round 2*`,
   );
   for (const c of slice.topCandidates) {
     const extra = c.meta.extra ? ` (${c.meta.extra})` : "";
@@ -1064,7 +1072,7 @@ export function renderOnboardingBlockersMarkdown(
   if (slice.topBlockers.length === 0) return "";
   const lines: string[] = [];
   lines.push(
-    `*Wholesale onboarding stalled — ${slice.stalledTotal} flow(s) past ${slice.stallHours}h* _(scanned ${slice.flowsScanned} total)_`,
+    `🚧 *ONBOARDING JAMMED UP — ${slice.stalledTotal} flow(s) parked past ${slice.stallHours}h* _(scanned ${slice.flowsScanned} total)_`,
   );
   for (const b of slice.topBlockers) {
     const dollars = b.totalSubtotalUsd
@@ -1100,7 +1108,7 @@ export function renderEnrichmentOpportunitiesMarkdown(
   if (slice.missingAny === 0) return "";
   const lines: string[] = [];
   lines.push(
-    `*Enrichment opportunities — ${slice.missingAny} contact(s) missing fields* _(scanned ${slice.scanned})_`,
+    `🔎 *INTEL UPGRADE — ${slice.missingAny} contact(s) missing fields, ready to enrich* _(scanned ${slice.scanned})_`,
   );
   if (slice.perField.length > 0) {
     const top = slice.perField
@@ -1233,7 +1241,7 @@ export function renderDispatchBriefMarkdown(slice: DispatchBriefSlice): string {
           (slice.stillOpen === 1 ? " — go drop it off" : " — go drop them off"),
       );
     }
-    lines.push(`:package: *Dispatch (last 24h)*  ${parts.join(" · ")}`);
+    lines.push(`🚚 *DISPATCH BOARD — last 24h*  ${parts.join(" · ")}`);
   }
   if (stale && slice.oldestOpenAgeDays !== null) {
     const dayWord = slice.oldestOpenAgeDays === 1 ? "day" : "days";

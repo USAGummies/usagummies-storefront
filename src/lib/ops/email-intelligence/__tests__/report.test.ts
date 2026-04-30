@@ -56,8 +56,8 @@ describe("email-intelligence/report renderer", () => {
       },
       windowDescription: "last 3.0h",
     });
-    expect(out).toContain("Email intelligence");
-    expect(out).toContain("Nothing actionable");
+    expect(out).toContain("INBOX SWEEP");
+    expect(out).toContain("Inbox is quiet");
   });
 
   it("groups by category in priority order (critical first)", () => {
@@ -95,9 +95,9 @@ describe("email-intelligence/report renderer", () => {
       },
       windowDescription: "last 3.0h",
     });
-    const criticalIdx = out.indexOf("Critical");
-    const b2bIdx = out.indexOf("B2B sales");
-    const junkIdx = out.indexOf("FYI / junk");
+    const criticalIdx = out.indexOf("CRITICAL");
+    const b2bIdx = out.indexOf("B2B WHOLESALE");
+    const junkIdx = out.indexOf("Filed under noise");
     expect(criticalIdx).toBeGreaterThan(-1);
     expect(b2bIdx).toBeGreaterThan(criticalIdx);
     expect(junkIdx).toBeGreaterThan(b2bIdx);
@@ -126,7 +126,7 @@ describe("email-intelligence/report renderer", () => {
       },
       windowDescription: "last 3.0h",
     });
-    expect(out).toContain("Needs approval");
+    expect(out).toContain("AWAITING YOUR CALL");
     expect(out).toContain("approvals card posted");
   });
 

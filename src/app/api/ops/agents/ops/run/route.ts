@@ -423,9 +423,9 @@ function renderDigest(digest: DigestData, startedAt: string): string {
   const drewMention = DREW_SLACK_USER_ID ? ` (<@${DREW_SLACK_USER_ID}>)` : " (Drew)";
 
   const lines = [
-    `:factory: *Ops Agent Digest — ${dateLabel}*${drewMention}`,
+    `🏭 ⭐ *OPS WAR ROOM — ${dateLabel}* ⭐${drewMention}`,
     "",
-    `*Open POs* — ${digest.openPOCount} · ${money(digest.openPODollars)} total`,
+    `📋 *OPEN POs* — ${digest.openPOCount} · ${money(digest.openPODollars)} on the books`,
   ];
 
   if (digest.openPOs.length === 0) {
@@ -445,7 +445,7 @@ function renderDigest(digest: DigestData, startedAt: string): string {
   const vendorListText = VENDOR_LIST.map((v) => v.name).join(", ");
   lines.push(
     "",
-    `*Watched vendors:* ${vendorListText}`,
+    `🤝 *VENDOR PARTNERS:* ${vendorListText}`,
     digest.vendorFreshness.length === 0
       ? `  _Gmail query failed — check Gmail integration._`
       : digest.vendorFreshness
@@ -461,7 +461,7 @@ function renderDigest(digest: DigestData, startedAt: string): string {
           })
           .join("\n"),
     "",
-    `*Inventory low-threshold (< ${INVENTORY_LOW_THRESHOLD} units on-hand, Shopify):*`,
+    `🏪 *INVENTORY WATCH (< ${INVENTORY_LOW_THRESHOLD} units on-hand, Shopify):*`,
     digest.inventoryLow.length === 0 && digest.inventoryOk.length === 0
       ? "  _Shopify inventory query returned nothing — verify tracking enabled._"
       : digest.inventoryLow.length === 0
@@ -491,7 +491,7 @@ function renderDigest(digest: DigestData, startedAt: string): string {
   // Shipping Hub pre-flight — wallet / ATP / freight-comp / stale voids.
   if (digest.preflight) {
     const pf = digest.preflight;
-    lines.push("", "*Shipping Hub pre-flight*");
+    lines.push("", "🛫 *SHIPPING HUB — PRE-FLIGHT CHECK*");
 
     // Wallet status
     if (pf.walletAlerts.length > 0) {

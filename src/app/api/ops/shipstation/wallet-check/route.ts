@@ -146,7 +146,7 @@ export async function GET(req: Request): Promise<Response> {
 
   // --- Render digest ---
   const lines: string[] = [];
-  lines.push(":package: *ShipStation health check*");
+  lines.push("🚚 ⭐ *SHIPSTATION CHECKPOINT* ⭐");
   lines.push(`_Generated ${new Date().toISOString()}_`);
   lines.push("");
 
