@@ -394,8 +394,59 @@ Rene + Viktor coordinating on this directly (Rene: *"i can set up qbo with you"*
 
 ---
 
+## 15. Invoice timing rule (added v2.3 — 2026-04-30 PM)
+
+**Status:** CANONICAL · 2026-04-30
+**Source:** Ben + Rene email thread "FW: USA Gummies wholesale onboarding (Invoice 1539) - Thanksgiving Point" 2026-04-30 PM. Rene flagged hedging language ("no sooner") in customer-facing copy; Ben confirmed CPG-norm timing.
+
+### 15.1 The rule
+
+**Invoice date = shipment date.** The invoice is created and sent on the day product physically leaves the USA Gummies origin (Ashford, WA warehouse for Ben-direct orders, Powers Confections for any direct ex-factory ship, or contracted carrier pickup site for LTL).
+
+- **Not before shipment** — invoicing pre-shipment creates a receivable for goods we have not yet earned (GAAP ASC 606 revenue-recognition flag; auditor-flagged).
+- **Not after delivery** — buyer's payment terms (Net 10 / Net 15 / Net 30) run *from the invoice date*. Late invoicing burns float we earned.
+- **Same day as freight depart** — for founder-drive deliveries (Ben hand-delivers), "shipment" = the day Ben physically departs Ashford with the load, not the delivery date at the buyer's dock.
+
+### 15.2 Founder-drive worked example (Mike / Thanksgiving Point Invoice 1539)
+
+- Customer commit: hand-delivery May 11 (1-pallet at Thanksgiving Point Dino Museum south dock)
+- Ben's Utah departure from Ashford: May 8 or May 9 (whichever day the load actually leaves)
+- **Invoice 1539 dated + sent: May 8 or May 9** (= shipment date)
+- Net 10 from invoice date: clock starts when goods leave dock, not when they arrive
+
+### 15.3 Customer-facing language rule
+
+Per Rene's 2026-04-30 lock: invoice-timing language in customer emails is **factual, no hedges**. The line is a date statement, not a negotiation.
+
+**Before (retired — hedge phrasing):**
+> "Invoice goes out the day freight does, no sooner."
+
+**After (locked):**
+> "Invoice will be dated and sent on the day freight leaves Ashford — [actual date]. Net 10 from invoice date per [Invoice #] terms."
+
+**Why the change:** "no sooner" reads as defensive — answering a question the buyer didn't ask. Clean date-stating language matches the CPG B2B norm and removes the appearance of policy negotiation.
+
+### 15.4 Operator + auditor cross-references
+
+- **GAAP / ASC 606** — revenue recognition occurs at the point of shipment for FOB Origin / FOB Shipping Point terms (§3 freight modes for `landed` and `buyer-pays` default to origin-transfer). Invoice date matches the recognition event.
+- **INCOTERMS** — title transfers at shipment for FOB Origin; invoice timing follows title transfer.
+- **Net-term math** — Net 10 / Net 15 / Net 30 always run from invoice date. If invoice and shipment dates diverge, the audit trail breaks.
+- **QBO automation hook** — when the wholesale onboarding flow (Phase 35.f) advances a deal to `Shipped`, the QBO invoice DRAFT auto-flips to SENT with the day's date. Class C `qbo.invoice.send` (Ben + Rene) per `/contracts/approval-taxonomy.md`.
+
+### 15.5 Exceptions (require Class C signoff)
+
+| Scenario | Treatment |
+|---|---|
+| **Prepaid / deposit-required deals** | Deposit invoice issued at PO acceptance is fine, but it's a *deposit* invoice, not the goods invoice. Goods invoice still fires at shipment. |
+| **Multi-batch / staged-delivery deals** | Each batch shipment generates its own invoice on its own shipment date. No "lump invoice" for staged drops. |
+| **Sample / promo bags (no charge)** | No invoice — these post to `500030.05 / 500030.10` per the §13 Promo-bag CoA mapping. |
+| **Trade-show field sales (booth-day pickup)** | Invoice dated the booth day (= goods physically transfer at the booth = shipment-equivalent). |
+
+---
+
 ## Version history
 
+- **2.3 — 2026-04-30 PM** — Adds §15 *Invoice timing rule*. Rene flagged hedge language ("no sooner") in Ben's reply to Mike Hippler / Thanksgiving Point Invoice 1539 customer email. Ben confirmed CPG-norm timing: invoice date = shipment date (= day freight leaves Ashford), Net-term clock starts on that date, customer-facing copy is factual date-stating with no hedges. Source: Ben + Rene email thread "FW: USA Gummies wholesale onboarding (Invoice 1539) - Thanksgiving Point" 2026-04-30 PM. No code change in this version (doctrine + customer-language lock only); QBO automation hook lives in the Phase 35.f wholesale-onboarding flow already.
 - **2.2 — 2026-04-28 PM** — Adds §13 *Promo-bag + sample CoA mapping*. Rene 2026-04-28 PM directive: promo bags inside customer orders = COGS event under `500030 Samples - COGS`, NOT overhead under `660010 Promotion & Entertainment`. Two new sub-accounts created in QBO by Viktor: `500030.05 Samples - Promo/Outreach` (id 332) for no-invoice give-aways + `500030.10 Samples - Order Promo` (id 333) for promo bags on paid invoices. Names finalized by Rene's 2026-04-28 PM revision (was "Outreach" / "Order Promotion"). Memo templates locked. Inventory atomic-bag rule unchanged — split is downstream allocation only. Source: Slack `#financials` thread `1777266794.573699` 2026-04-28 PM. Operator action: Rene + Viktor coordinate the QBO Gear → Chart of Accounts edit to set account numbers + parent linkage manually (API limitation).
 - **2.1 — 2026-04-28 PM** — Reconciles outbound pallet quantity (12 MC / 432 bags ❌ → 25 MC / 900 bags ✅) against `/contracts/outreach-pitch-spec.md` §5 + the actual outbound shipping skid spec. The v1.0/v2.0 figure was wrong: it pulled "12 MC = 432 bags" from `/CLAUDE.md`'s Uline *inbound* reorder pack-out and applied it to the *outbound* wholesale pallet. Outbound 48×40 LTL skids hold 25 master cartons (Ti×Hi 6×4 + 1 cap, ~530 lb packed). Also re-frames §3 freight modes to surface the **3+ pallet free-freight tier** (canonical, matching outreach spec §6) instead of "custom quote" — Ben re-confirmed via the Cindy/Redstone FOB thread 2026-04-28 PM. Code-side mirror: `pricing-tiers.ts` BAGS_PER_UNIT B4/B5 = 900 + invoice labels updated. Re-baselined 4 test files. No customer-facing reissues needed (Cindy was always told 25 MC; Phase 35.f flow has no live customers through B4/B5 yet — only Rene's Snow Leopard test ID).
 - **2.0 — 2026-04-28** — Adds fulfillment-type code layer (LCD/MCL/MCBF/PL/PBF), batch SKU pattern `UG-B[NNNN]-[YYMMDD]-[FT]`, customer-facing invoice description rule (no tier prefix in description, code lives in SKU column), and show-deal/promo-bag treatment. B-tier internal ids preserved unchanged for audit-trail continuity (Mike's flow `wf_a54616e3-...` resolves cleanly under both v1.0 and v2.0). Source: Rene + Viktor `#financials` thread 2026-04-28; ratified by Ben "we want to build it completely, following rene's feedback". Code-side mirror: `src/lib/wholesale/pricing-tiers.ts` (TIER_INVOICE_LABEL clean prose + FulfillmentType helpers + canonical unitNoun) + `src/lib/wholesale/batch-skus.ts` (new module).
