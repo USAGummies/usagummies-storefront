@@ -169,6 +169,22 @@ describe("buildPacksView — invariants", () => {
     }
   });
 
+  it("All agents carry heartbeat metadata into the read model", async () => {
+    const view = await buildPacksView({
+      ghostProbe: GHOST_PROBE_EMPTY,
+      driftLoader: async () => emptyDriftReport(),
+      now: () => FIXED_NOW,
+    });
+    expect(view.invariants.allHeartbeatMetadataPresent).toBe(true);
+    for (const pack of view.packs) {
+      for (const a of pack.agents) {
+        expect(a.heartbeat, `${a.id} heartbeat`).not.toBeNull();
+        expect(a.heartbeat?.queueSource).toBeTruthy();
+        expect(a.heartbeat?.outputStates.length).toBeGreaterThan(0);
+      }
+    }
+  });
+
   it("No new divisions introduced", async () => {
     const view = await buildPacksView({
       ghostProbe: GHOST_PROBE_EMPTY,
@@ -436,6 +452,23 @@ describe("__INTERNAL.checkInvariants — directly", () => {
     ]);
     expect(result.allSlugsResolve).toBe(false);
     expect(result.noNewSlugs).toBe(false);
+  });
+
+  it("flags missing heartbeat metadata if a synthetic entry slips in", () => {
+    const result = __INTERNAL.checkInvariants([
+      ...AGENT_REGISTRY.map((a) => __INTERNAL.resolveAllSlugs(a)),
+      __INTERNAL.resolveAllSlugs({
+        id: "synthetic-no-heartbeat",
+        name: "synthetic",
+        contractPath: "fake.md",
+        division: "executive-control",
+        humanOwner: "Ben",
+        role: "test",
+        lifecycle: "live",
+        approvalSlugs: [],
+      }),
+    ]);
+    expect(result.allHeartbeatMetadataPresent).toBe(false);
   });
 });
 

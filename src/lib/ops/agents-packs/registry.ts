@@ -28,6 +28,7 @@
  */
 
 import type { DivisionId, HumanOwner } from "@/lib/ops/control-plane/types";
+import type { HeartbeatOutputState } from "@/lib/ops/agent-heartbeat/types";
 
 /**
  * Lifecycle of an agent in dashboard view.
@@ -92,6 +93,20 @@ export interface AgentEntry {
   blocker?: string;
   /** Optional Slack channel the agent posts to (display only). */
   channel?: string;
+}
+
+export type AgentHeartbeatCadenceKind = "cron" | "event" | "manual" | "latent";
+
+export interface AgentHeartbeatMetadata {
+  cadence: AgentHeartbeatCadenceKind;
+  schedule: string;
+  queueSource: string;
+  outputStates: readonly HeartbeatOutputState[];
+  budget: {
+    monthlyUsdLimit: number | null;
+    maxRunsPerDay: number | null;
+  };
+  nextPhase?: string;
 }
 
 export interface PackDef {
@@ -493,6 +508,217 @@ export const AGENT_REGISTRY: readonly AgentEntry[] = Object.freeze([
     channel: "#research",
   },
 ]);
+
+const OBSERVER_OUTPUTS = [
+  "no_action",
+  "failed_degraded",
+  "escalated",
+] as const satisfies readonly HeartbeatOutputState[];
+
+const APPROVAL_OUTPUTS = [
+  "no_action",
+  "drafted",
+  "approval_requested",
+  "blocked_missing_data",
+  "failed_degraded",
+  "escalated",
+] as const satisfies readonly HeartbeatOutputState[];
+
+const TASK_OUTPUTS = [
+  "no_action",
+  "task_created",
+  "failed_degraded",
+  "escalated",
+] as const satisfies readonly HeartbeatOutputState[];
+
+const BRIEF_OUTPUTS = [
+  "no_action",
+  "drafted",
+  "approval_requested",
+  "failed_degraded",
+  "escalated",
+] as const satisfies readonly HeartbeatOutputState[];
+
+const LATENT_OUTPUTS = [
+  "blocked_missing_data",
+  "failed_degraded",
+  "escalated",
+] as const satisfies readonly HeartbeatOutputState[];
+
+const DEFAULT_BUDGET: AgentHeartbeatMetadata["budget"] = Object.freeze({
+  monthlyUsdLimit: null,
+  maxRunsPerDay: null,
+});
+
+function heartbeat(
+  input: Omit<AgentHeartbeatMetadata, "budget"> & {
+    budget?: AgentHeartbeatMetadata["budget"];
+  },
+): AgentHeartbeatMetadata {
+  return { ...input, budget: input.budget ?? DEFAULT_BUDGET };
+}
+
+/**
+ * Heartbeat read-model overlay. This does NOT activate any runtime;
+ * it makes every shipped agent explicit about cadence, queue source,
+ * output states, and budget guardrails before future heartbeats can
+ * claim work.
+ */
+export const AGENT_HEARTBEATS: Readonly<Record<string, AgentHeartbeatMetadata>> =
+  Object.freeze({
+    viktor: heartbeat({
+      cadence: "event",
+      schedule: "Slack/manual sales requests; no autonomous send",
+      queueSource: "Slack sales threads + HubSpot B2B context",
+      outputStates: APPROVAL_OUTPUTS,
+      nextPhase: "B2B Revenue Watcher heartbeat queue",
+    }),
+    "faire-specialist": heartbeat({
+      cadence: "event",
+      schedule: "Operator-reviewed Faire queue + Slack approvals",
+      queueSource: "KV faire:invites + follow-up buckets",
+      outputStates: APPROVAL_OUTPUTS,
+    }),
+    "viktor-rene-capture": heartbeat({
+      cadence: "event",
+      schedule: "#finance decision replies",
+      queueSource: "Slack #finance thread events",
+      outputStates: TASK_OUTPUTS,
+    }),
+    "executive-brief": heartbeat({
+      cadence: "cron",
+      schedule: "Weekdays 08:00 PT + 17:00 PT",
+      queueSource: "Control-plane daily brief inputs",
+      outputStates: BRIEF_OUTPUTS,
+      budget: { monthlyUsdLimit: 50, maxRunsPerDay: 2 },
+    }),
+    "drift-audit-runner": heartbeat({
+      cadence: "cron",
+      schedule: "Sunday weekly drift audit",
+      queueSource: "Operating-memory sample + contracts",
+      outputStates: OBSERVER_OUTPUTS,
+      budget: { monthlyUsdLimit: 25, maxRunsPerDay: 1 },
+    }),
+    "compliance-specialist": heartbeat({
+      cadence: "cron",
+      schedule: "Daily compliance calendar check",
+      queueSource: "In-repo compliance registry; Notion DB pending",
+      outputStates: TASK_OUTPUTS,
+      nextPhase: "Replace fallback registry with Notion compliance DB",
+    }),
+    interviewer: heartbeat({
+      cadence: "manual",
+      schedule: "Pre-build planning pass inside coding session",
+      queueSource: "User-requested build prompts",
+      outputStates: ["no_action", "drafted", "failed_degraded"],
+    }),
+    "transcript-saver": heartbeat({
+      cadence: "event",
+      schedule: "Correction / decision capture requests",
+      queueSource: "Slack + session transcript snippets",
+      outputStates: TASK_OUTPUTS,
+    }),
+    "slack-corrections-drift-detector": heartbeat({
+      cadence: "manual",
+      schedule: "On-demand operating-memory drift probe",
+      queueSource: "Operating-memory entries",
+      outputStates: OBSERVER_OUTPUTS,
+    }),
+    booke: heartbeat({
+      cadence: "event",
+      schedule: "Booke third-party categorization queue",
+      queueSource: "Booke AI + QBO transaction feed",
+      outputStates: APPROVAL_OUTPUTS,
+      nextPhase: "Keep Rene approval boundary explicit",
+    }),
+    "finance-exception": heartbeat({
+      cadence: "cron",
+      schedule: "Daily finance exception digest",
+      queueSource: "Receipts, approvals, reconciliation, QBO health",
+      outputStates: BRIEF_OUTPUTS,
+      budget: { monthlyUsdLimit: 35, maxRunsPerDay: 1 },
+    }),
+    "reconciliation-specialist": heartbeat({
+      cadence: "cron",
+      schedule: "Daily Plaid/QBO pre-work; weekly marketplace payouts",
+      queueSource: "Plaid, QBO, Amazon, Shopify, Faire payout readers",
+      outputStates: TASK_OUTPUTS,
+    }),
+    ops: heartbeat({
+      cadence: "event",
+      schedule: "Ops route events + manual operator requests",
+      queueSource: "Vendor, PO, shipping, inventory queues",
+      outputStates: APPROVAL_OUTPUTS,
+    }),
+    "inventory-specialist": heartbeat({
+      cadence: "cron",
+      schedule: "Daily ATP / cover-day forecast",
+      queueSource: "Shopify inventory + supply-chain signals",
+      outputStates: APPROVAL_OUTPUTS,
+    }),
+    "sample-order-dispatch": heartbeat({
+      cadence: "event",
+      schedule: "Order/sample shipment events",
+      queueSource: "ShipStation + S-08 dispatcher queue",
+      outputStates: APPROVAL_OUTPUTS,
+    }),
+    "platform-specialist": heartbeat({
+      cadence: "cron",
+      schedule: "Daily connector readiness smoke",
+      queueSource: "Readiness env fingerprint + safe probes",
+      outputStates: OBSERVER_OUTPUTS,
+      budget: { monthlyUsdLimit: 15, maxRunsPerDay: 1 },
+    }),
+    "research-librarian": heartbeat({
+      cadence: "latent",
+      schedule: "Not activated — waits for R-1..R-7 sources",
+      queueSource: "No queue yet",
+      outputStates: LATENT_OUTPUTS,
+      nextPhase: "Wire research source decisions first",
+    }),
+    "r1-consumer": heartbeat({
+      cadence: "latent",
+      schedule: "Not activated — external tool decision pending",
+      queueSource: "Consumer research feed TBD",
+      outputStates: LATENT_OUTPUTS,
+    }),
+    "r2-market": heartbeat({
+      cadence: "latent",
+      schedule: "Not activated — external tool decision pending",
+      queueSource: "Market/category feed TBD",
+      outputStates: LATENT_OUTPUTS,
+    }),
+    "r3-competitive": heartbeat({
+      cadence: "latent",
+      schedule: "Not activated — external tool decision pending",
+      queueSource: "Competitor watch feed TBD",
+      outputStates: LATENT_OUTPUTS,
+    }),
+    "r4-channel": heartbeat({
+      cadence: "latent",
+      schedule: "Not activated — external tool decision pending",
+      queueSource: "Channel/retailer feed TBD",
+      outputStates: LATENT_OUTPUTS,
+    }),
+    "r5-regulatory": heartbeat({
+      cadence: "latent",
+      schedule: "Not activated — external tool decision pending",
+      queueSource: "Regulatory source feed TBD",
+      outputStates: LATENT_OUTPUTS,
+    }),
+    "r6-supply": heartbeat({
+      cadence: "latent",
+      schedule: "Not activated — external tool decision pending",
+      queueSource: "Ingredient/supply source feed TBD",
+      outputStates: LATENT_OUTPUTS,
+    }),
+    "r7-press": heartbeat({
+      cadence: "latent",
+      schedule: "Not activated — external tool decision pending",
+      queueSource: "Press/media source feed TBD",
+      outputStates: LATENT_OUTPUTS,
+    }),
+  });
 
 /** Lookup helper. */
 const AGENT_BY_ID = new Map(AGENT_REGISTRY.map((a) => [a.id, a] as const));

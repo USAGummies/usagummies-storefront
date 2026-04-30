@@ -22,9 +22,11 @@
  */
 
 import {
+  AGENT_HEARTBEATS,
   AGENT_REGISTRY,
   PACK_REGISTRY,
   type AgentEntry,
+  type AgentHeartbeatMetadata,
   type PackDef,
   type PackId,
 } from "./registry";
@@ -56,6 +58,12 @@ export interface AgentEntryView extends AgentEntry {
     class: "A" | "B" | "C" | "D" | "unknown";
     name?: string;
   }>;
+  /**
+   * Heartbeat read-model metadata. Null is a violation surfaced by
+   * `invariants.allHeartbeatMetadataPresent`; it does not activate a
+   * runtime by itself.
+   */
+  heartbeat: AgentHeartbeatMetadata | null;
 }
 
 export interface PackView {
@@ -129,6 +137,7 @@ export interface PacksView {
   invariants: {
     drewOwnsNothing: boolean;
     allSlugsResolve: boolean;
+    allHeartbeatMetadataPresent: boolean;
     noNewDivisions: boolean;
     noNewSlugs: boolean;
   };
@@ -148,6 +157,7 @@ function resolveAllSlugs(agent: AgentEntry): AgentEntryView {
   return {
     ...agent,
     resolvedSlugs: agent.approvalSlugs.map(resolveSlug),
+    heartbeat: AGENT_HEARTBEATS[agent.id] ?? null,
   };
 }
 
@@ -322,6 +332,7 @@ function checkInvariants(agents: AgentEntryView[]): PacksView["invariants"] {
   const allSlugsResolve = agents.every((a) =>
     a.resolvedSlugs.every((s) => s.class !== "unknown"),
   );
+  const allHeartbeatMetadataPresent = agents.every((a) => a.heartbeat !== null);
   // No new divisions — every agent's division is in the registered set.
   const allowedDivisions = new Set([
     "executive-control",
@@ -343,7 +354,13 @@ function checkInvariants(agents: AgentEntryView[]): PacksView["invariants"] {
   const noNewSlugs = agents.every((a) =>
     a.approvalSlugs.every((s) => registeredSlugSet.has(s)),
   );
-  return { drewOwnsNothing, allSlugsResolve, noNewDivisions, noNewSlugs };
+  return {
+    drewOwnsNothing,
+    allSlugsResolve,
+    allHeartbeatMetadataPresent,
+    noNewDivisions,
+    noNewSlugs,
+  };
 }
 
 // =========================================================================

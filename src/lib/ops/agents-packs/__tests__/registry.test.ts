@@ -16,11 +16,13 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  AGENT_HEARTBEATS,
   AGENT_REGISTRY,
   PACK_REGISTRY,
   getAgentById,
   getPackById,
 } from "../registry";
+import { HEARTBEAT_OUTPUT_STATES } from "@/lib/ops/agent-heartbeat/types";
 import {
   ACTION_REGISTRY,
   classify,
@@ -93,6 +95,44 @@ describe("Agent registry — no new divisions", () => {
     for (const a of AGENT_REGISTRY) {
       expect(REGISTERED_DIVISIONS.has(a.division)).toBe(true);
     }
+  });
+});
+
+// =========================================================================
+// Heartbeat metadata
+// =========================================================================
+
+describe("Agent registry — heartbeat metadata coverage", () => {
+  it("every agent has heartbeat metadata", () => {
+    const missing = AGENT_REGISTRY.filter((a) => !AGENT_HEARTBEATS[a.id]).map(
+      (a) => a.id,
+    );
+    expect(missing).toEqual([]);
+  });
+
+  it("heartbeat metadata does not invent agents", () => {
+    const registryIds = new Set(AGENT_REGISTRY.map((a) => a.id));
+    const orphanMetadata = Object.keys(AGENT_HEARTBEATS).filter(
+      (id) => !registryIds.has(id),
+    );
+    expect(orphanMetadata).toEqual([]);
+  });
+
+  it("heartbeat output states all come from the canonical heartbeat primitive", () => {
+    const allowed = new Set(HEARTBEAT_OUTPUT_STATES);
+    for (const [agentId, heartbeat] of Object.entries(AGENT_HEARTBEATS)) {
+      expect(heartbeat.outputStates.length, `${agentId} output states`).toBeGreaterThan(0);
+      for (const state of heartbeat.outputStates) {
+        expect(allowed.has(state), `${agentId} uses invalid output state ${state}`).toBe(true);
+      }
+    }
+  });
+
+  it("latent agents have latent cadence metadata", () => {
+    const mismatched = AGENT_REGISTRY.filter(
+      (a) => a.lifecycle === "latent" && AGENT_HEARTBEATS[a.id]?.cadence !== "latent",
+    ).map((a) => a.id);
+    expect(mismatched).toEqual([]);
   });
 });
 

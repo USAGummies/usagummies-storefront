@@ -380,6 +380,20 @@ Each row uses the schema:
   - Invalid budget numerics normalize to `null`, not fabricated values.
 - **Monday MVP:** 🟢 foundation-only. No cron, no LLM calls, no writes. Next phase is registry metadata + `/ops/agents/packs` heartbeat display.
 
+#### Phase 6.4 — Agent heartbeat metadata in packs (NEW)
+- **Why:** The pure heartbeat primitives need an operator-facing read-model before any runtime is activated. Phase 6.4 makes every existing agent explicit about cadence, queue source, allowed output states, and budget guardrails directly inside `/ops/agents/packs`.
+- **Architecture:**
+  - `AGENT_HEARTBEATS` in `src/lib/ops/agents-packs/registry.ts` is a static overlay keyed by existing `AGENT_REGISTRY` ids. It does not create or activate agents.
+  - `buildPacksView()` attaches `heartbeat` metadata to every `AgentEntryView` and exposes `invariants.allHeartbeatMetadataPresent`.
+  - `/ops/agents/packs` renders cadence, schedule, queue source, output states, budget, and next-phase notes per agent.
+- **Hard rules locked by tests:**
+  - Every registry agent has heartbeat metadata.
+  - Heartbeat metadata cannot invent orphan agent ids.
+  - Every output state comes from `HEARTBEAT_OUTPUT_STATES`.
+  - Latent agents must carry `cadence: "latent"`.
+  - Synthetic missing-metadata agents trip the read-model invariant.
+- **Monday MVP:** 🟢 read-only. No cron, no LLM calls, no queue claims, no external writes.
+
 #### Phase 7 — Receipt OCR extraction (prepare-for-review only) (NEW)
 - **Why:** `/ops/finance/review` already aggregates the receipt review queue, but Rene/Ben were doing field-by-field data entry by hand. Phase 7 attaches a *suggestion* to each captured receipt so reviewers see vendor/date/amount/currency/tax/last4/payment hints proposed before they fill in the canonical fields. Promotion remains 100% human — no auto-fill, no QBO write.
 - **Architecture:**

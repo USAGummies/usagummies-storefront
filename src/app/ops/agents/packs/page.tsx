@@ -190,6 +190,7 @@ function InvariantsBadge({ invariants }: { invariants: PacksView["invariants"] }
   const allGreen =
     invariants.drewOwnsNothing &&
     invariants.allSlugsResolve &&
+    invariants.allHeartbeatMetadataPresent &&
     invariants.noNewDivisions &&
     invariants.noNewSlugs;
   return (
@@ -204,6 +205,7 @@ function InvariantsBadge({ invariants }: { invariants: PacksView["invariants"] }
       <ul className="mt-1 ml-4 list-disc text-xs">
         <li>Drew owns nothing: {invariants.drewOwnsNothing ? "✓" : "✗"}</li>
         <li>All approval slugs resolve to taxonomy.ts: {invariants.allSlugsResolve ? "✓" : "✗"}</li>
+        <li>All agents have heartbeat metadata: {invariants.allHeartbeatMetadataPresent ? "✓" : "✗"}</li>
         <li>No new divisions introduced: {invariants.noNewDivisions ? "✓" : "✗"}</li>
         <li>No new approval slugs introduced: {invariants.noNewSlugs ? "✓" : "✗"}</li>
       </ul>
@@ -488,6 +490,48 @@ function AgentRow({ agent }: { agent: AgentEntryView }) {
           blocker: {agent.blocker}
         </div>
       ) : null}
+      {agent.heartbeat ? (
+        <div className="mt-1 rounded border border-blue-200 bg-blue-50 p-1 text-xs text-blue-950">
+          <div>
+            heartbeat:{" "}
+            <span className="font-mono">{agent.heartbeat.cadence}</span>
+            {" · "}
+            {agent.heartbeat.schedule}
+          </div>
+          <div>
+            queue:{" "}
+            <span className="font-mono">{agent.heartbeat.queueSource}</span>
+          </div>
+          <div>
+            states:{" "}
+            {agent.heartbeat.outputStates.map((s) => (
+              <span key={s} className="mr-1 font-mono text-[11px]">
+                {s}
+              </span>
+            ))}
+          </div>
+          <div>
+            budget:{" "}
+            <span className="font-mono">
+              {agent.heartbeat.budget.monthlyUsdLimit === null
+                ? "unbounded"
+                : `$${agent.heartbeat.budget.monthlyUsdLimit}/mo`}
+            </span>{" "}
+            · max runs/day:{" "}
+            <span className="font-mono">
+              {agent.heartbeat.budget.maxRunsPerDay ?? "unbounded"}
+            </span>
+          </div>
+          {agent.heartbeat.nextPhase ? (
+            <div>next: {agent.heartbeat.nextPhase}</div>
+          ) : null}
+        </div>
+      ) : (
+        <div className="mt-1 rounded border border-red-500 bg-red-50 p-1 text-xs text-red-900">
+          ⚠ missing heartbeat metadata — register cadence, queue source,
+          output states, and budget before activation.
+        </div>
+      )}
       <div className="mt-1 text-xs">
         contract:{" "}
         <span className="font-mono">{agent.contractPath}</span>
