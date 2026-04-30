@@ -121,11 +121,11 @@ export default function WholesalePage() {
           .wholesale-map svg .state path { fill: #efe9dc; }
           .wholesale-map svg .borders { stroke: #d6d0c3; stroke-width: 0.75; }
           .wholesale-map svg .dccircle { display: none; }
-          .wholesale-map svg .in,
-          .wholesale-map svg .wi,
-          .wholesale-map svg .wa,
-          .wholesale-map svg .wy,
-          .wholesale-map svg .pa { fill: var(--lp-red); }
+          .wholesale-map svg path.in,
+          .wholesale-map svg path.wi,
+          .wholesale-map svg path.wa,
+          .wholesale-map svg path.wy,
+          .wholesale-map svg path.pa { fill: var(--lp-red); }
         `}</style>
         <div className="mx-auto max-w-[1100px] px-5 py-14 sm:px-8 sm:py-16">
           <div className="text-center">
