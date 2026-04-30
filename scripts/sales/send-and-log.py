@@ -292,6 +292,9 @@ def main() -> int:
     ap.add_argument("--pipeline", default=DEFAULT_PIPELINE)
     ap.add_argument("--stage", default=DEFAULT_STAGE)
     ap.add_argument("--skip-apollo", action="store_true")
+    ap.add_argument("--reply", action="store_true",
+                    help="Reply mode: skip validator (the body is a conversational reply to an "
+                         "inbound thread, not a cold-pitch). Approval token still required.")
     ap.add_argument("--dry-run", action="store_true", help="Run validator + HubSpot dedup but do NOT send or log engagement")
     # 2026-04-30 incident: cold outreach went out with internal route-doctrine language leaked
     # into customer-facing pitch. Ben directive: "you don't get to just blast stuff out without
@@ -355,12 +358,15 @@ def main() -> int:
     print(f"[APPROVAL] Token: {args.approved_by}")
 
     # ------------------------------------------------------------- 1. Validator
-    print(f"[1/7] Validator gate: {args.email} / {args.company}", flush=True)
-    rc, out = run_validator(args.email, body_path, args.company, args.skip_apollo)
-    print(out)
-    if rc != 0:
-        print("VALIDATOR BLOCK — aborting send.", file=sys.stderr)
-        return 1
+    if args.reply:
+        print(f"[1/7] Validator gate: SKIPPED (--reply mode — conversational reply, not cold pitch)")
+    else:
+        print(f"[1/7] Validator gate: {args.email} / {args.company}", flush=True)
+        rc, out = run_validator(args.email, body_path, args.company, args.skip_apollo)
+        print(out)
+        if rc != 0:
+            print("VALIDATOR BLOCK — aborting send.", file=sys.stderr)
+            return 1
 
     # ------------------------------------------------------------- 2. Contact
     print(f"[2/7] find_or_create_contact({args.email})", flush=True)

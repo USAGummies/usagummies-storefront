@@ -45,16 +45,16 @@ export function StickyBuyBar() {
       aria-label="Order bar"
     >
       <div className="flex flex-col leading-tight">
-        <span className="lp-sticky-text">All-American Gummy Bears</span>
+        <span className="lp-sticky-text">Buy 4, Get 1 FREE</span>
         <span className="lp-label text-[0.62rem] text-[var(--lp-cream)]/80">
-          $5.99 · Free shipping · Dye-Free
+          $23.96 · 5-Pack · Free shipping
         </span>
       </div>
       <Link
-        href="/go/checkout?qty=1&utm_source=lp&utm_medium=sticky"
-        aria-label="Order a bag for $5.99"
+        href="/go/checkout?qty=5&utm_source=lp&utm_medium=sticky"
+        aria-label="Buy 4 get 1 free — 5-pack for $23.96 with free shipping"
       >
-        Order — $5.99
+        $23.96 →
       </Link>
     </div>
   );

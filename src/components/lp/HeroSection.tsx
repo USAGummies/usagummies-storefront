@@ -93,32 +93,41 @@ export function HeroSection({ review }: { review?: ReviewAggregate } = {}) {
               price + qty + BUY NOW button render BEFORE the hero image. The
               hero image takes 1-3s to paint on mobile networks; we don't
               want that to block the conversion path. Hidden on desktop where
-              the buy widget already lives in the right column. */}
+              the buy widget already lives in the right column.
+              2026-04-30 — id="buy-section" anchor target for the now-clickable
+              product image (Clarity heatmap showed 5.7% of mobile clicks land
+              on the static image, expecting it to do something). */}
           <div
+            id="buy-section"
             data-reveal="0"
             className="relative order-[-2] rounded-sm border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-3 shadow-[6px_6px_0_var(--lp-red)] sm:p-5 md:hidden"
           >
             <BagSlider variant="full" defaultQty={5} />
           </div>
 
-          {/* MOBILE-ONLY product photo — sits BETWEEN the buy widget
-              (-order-2) and the copy column (default order). Height-capped
-              200/260px (was 360x360 square). */}
-          <figure
-            className="relative -order-1 mx-auto w-full max-w-[260px] overflow-hidden border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] sm:max-w-[320px] md:hidden"
+          {/* MOBILE-ONLY product photo — clickable, scrolls back up to the
+              buy widget. Heatmap data (1,974 mobile views, 9 clicks on this
+              image) confirmed users TAP the image expecting interaction. */}
+          <a
+            href="#buy-section"
+            aria-label="Buy now — see pricing options"
+            className="relative -order-1 mx-auto block w-full max-w-[260px] overflow-hidden border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] transition-transform hover:scale-[1.02] sm:max-w-[320px] md:hidden"
             style={{ boxShadow: "6px 6px 0 var(--lp-red)" }}
           >
             <div className="relative h-[200px] w-full sm:h-[240px]">
               <Image
                 src="/brand/hero-pack-icon.png"
-                alt="USA Gummies — All American Gummy Bears 7.5 oz bag"
+                alt="USA Gummies — All American Gummy Bears 7.5 oz bag (tap to buy)"
                 fill
                 priority
                 sizes="(max-width: 640px) 260px, 320px"
                 className="object-contain p-2"
               />
             </div>
-          </figure>
+            <span className="absolute bottom-2 right-2 rounded-full bg-[var(--lp-red)] px-3 py-1 text-[0.7rem] font-bold uppercase tracking-wider text-white shadow-md">
+              Tap to Buy →
+            </span>
+          </a>
 
           {/* Copy column */}
           <div className="relative">
@@ -226,26 +235,33 @@ export function HeroSection({ review }: { review?: ReviewAggregate } = {}) {
             </ul>
           </div>
 
-          {/* Desktop product hero column — unchanged, only renders ≥md */}
+          {/* Desktop product hero column — unchanged, only renders ≥md.
+              2026-04-30 — image now wraps an in-page anchor scrolling to the
+              desktop slider so the dead-click problem from /shop heatmap
+              (10% of clicks landed on static image elements) gets fixed
+              on desktop too. */}
           <div className="relative hidden flex-col items-end gap-5 md:flex">
-            <figure
+            <a
+              href="#buy-section-desktop"
+              aria-label="Buy now — see pricing options"
               data-reveal="3"
-              className="relative w-full max-w-[480px] overflow-hidden border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)]"
+              className="relative block w-full max-w-[480px] overflow-hidden border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] transition-transform hover:scale-[1.01]"
               style={{ boxShadow: "8px 8px 0 var(--lp-red)" }}
             >
               <div className="relative aspect-square w-full">
                 <Image
                   src="/brand/hero-pack-icon.png"
-                  alt="USA Gummies — All American Gummy Bears 7.5 oz bag"
+                  alt="USA Gummies — All American Gummy Bears 7.5 oz bag (tap to buy)"
                   fill
                   priority
                   sizes="(max-width: 1200px) 45vw, 480px"
                   className="object-contain p-3"
                 />
               </div>
-            </figure>
+            </a>
 
             <div
+              id="buy-section-desktop"
               data-reveal="3"
               className="relative w-full max-w-[480px] rounded-sm border-[3px] border-[var(--lp-ink)] bg-[var(--lp-off-white)] p-4 shadow-[6px_6px_0_var(--lp-red)] sm:p-6"
             >
