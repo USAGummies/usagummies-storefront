@@ -28,9 +28,13 @@ export const dynamic = "force-dynamic";
 
 // Floors per carrier. Overridable via env so Ben can tune without a
 // redeploy. Values align with /contracts/integrations/shipstation.md §11.
+// Per Ben 2026-04-30 PM: dropped UPS floor from $150 → $100. "We don't want
+// tons of cash just sitting in shipping queue waiting for use. We want cash
+// in the bank." Refill amounts are set in ShipStation UI directly (not via
+// API) — operator follows /contracts/integrations/shipstation.md §11.
 const DEFAULT_FLOORS: Record<string, number> = {
   stamps_com: 100,
-  ups_walleted: 150,
+  ups_walleted: 100,
   fedex_walleted: 100,
 };
 

@@ -134,7 +134,7 @@ ShipStation's connected carriers (`stamps_com`, `ups_walleted`, `fedex_walleted`
    - Trigger: balance < `$100`
    - Refill amount: `$200`
    - Funding source: BofA checking ending 7020 (the business account — **never** the emergency debit card).
-2. Repeat for UPS by ShipStation (trigger `$150`, refill `$300`) and FedEx by ShipStation (trigger `$100`, refill `$200`) once those carriers are used often enough to justify.
+2. Repeat for UPS by ShipStation (trigger `$100`, refill `$200`) and FedEx by ShipStation (trigger `$100`, refill `$200`) once those carriers are used often enough to justify. **2026-04-30 PM:** Ben dropped UPS trigger from $150 → $100 to keep cash in the bank rather than sitting in the wallet queue. Mirrored in code at `src/app/api/ops/shipstation/wallet-check/route.ts` `DEFAULT_FLOORS`.
 
 **Code-side enforcement (BUILD #2 preflight):** every label buy calls `preflightWalletCheck()` which refuses the purchase if balance < cost × 1.2. This prevents the exact 2026-04-20 failure even if auto-reload hasn't fired yet (Stamps.com reload can take ~15 min).
 
