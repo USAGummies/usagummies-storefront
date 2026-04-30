@@ -289,6 +289,102 @@ USA Gummies + Made-in-USA + dye-free + register-side impulse SKU = perfect fit f
 
 ---
 
+## 🐋🛣️ Hunt the Whales, Build the Routes Behind — STRATEGIC DOCTRINE (LOCKED 2026-04-29 PM, Ben directive)
+
+**Verbatim 1:** _"we need to be focused on building out the routes, we still hunt the wales, but the bread and butter is the routes, places that once they order once, we just need a single reorder to run the route and restock everyone."_
+
+**Verbatim 2 (clarification):** _"so we hunt for the wales and build the routes behind. the goal is to sell 3 pallets to someone, anyone, and then fill in the routes from there."_
+
+### The thesis (the actual mechanic)
+
+The whale and the route are **on the same truck**. They are not separate timelines. They are sequential phases of the same operational unit:
+
+```
+Step 1: HUNT A WHALE → land a 3-pallet sale to ANYONE (whale or aggregator)
+Step 2: 3 pallets = 2,700 bags (~$45K wholesale) = anchor delivery on a 17-pallet truck
+Step 3: ROUTE FILLS IN BEHIND → fill the remaining 14 pallets with small/mid accounts along the same drive
+Step 4: Truck rolls. Whale gets the goods. Every route account on the way gets the goods.
+Step 5: Per-pallet freight cost approaches zero — the whale pays for the truck; the route runs free.
+Step 6: REORDER CYCLE → every 6-8 weeks, restock the route + introduce new SKUs face-to-face.
+```
+
+**The 3-pallet sale is the unlock.** Without a whale, there's no truck. Without a truck, there's no route economics. Without route economics, every small account is a $200 LTL freight problem.
+
+**With a whale = truck. With a truck = free freight for everyone on the route. With free freight = every route account is profitable from order #1.**
+
+### Why this changes the priority stack
+
+| Tier | Activity | Why |
+|---|---|---|
+| **Tier 0 — HUNT** | Land a 3-pallet sale to a whale or aggregator on a target route | Without this, the truck doesn't roll. Without the truck, route economics break. |
+| **Tier 1 — ROUTE-FILL** | Activate every email-having + walk-in account along the truck's route | Free freight means ANY size order is profitable. Don't pre-qualify by order size. |
+| **Tier 2 — REORDER CADENCE** | Every 6-8 weeks per active route, hit every account, take reorders, introduce ONE new SKU per cycle | Predictable revenue + product-introduction velocity that bypasses cold sales |
+| **Tier 3 — DENSIFY** | Each restock visit, ask each owner "who's the other shop down the street" → add 1-2 new accounts/visit at zero acquisition cost | Route compounds. Density grows over time. Whale pays for the discovery cost. |
+
+### Whale vs Route — same truck, different role
+
+| Role | Examples | Function |
+|---|---|---|
+| **The Whale** (3-pallet anchor on the truck) | Buc-ee's (90+ stores), HEB, Eastern National (150+ NPS), Kitty Hawk Kites (10 doors), Magnolia Market, Brookgreen Gardens, Gay Dolphin, Patriots Point, ARAMARK (Lake Powell + Davis Dam + Lake Mead) | Locks the truck schedule. Justifies the drive. Pays for freight. **Without this, no route.** |
+| **The Route** (14 pallets behind the whale) | Cannon Beach + Seaside walking cluster (10+ shops), Tybee Tybrisa St (8 shops), Murrells Inlet Hwy 17 BUS (5 shops), West Yellowstone (19 shops), Hilton Head Coligny + Harbour Town (8 shops), TX/OK/MO independent truck stops along I-10 | Fills the truck's empty space. First order = "free" because freight is paid. Reorder cycle is the bread and butter. |
+
+**Doctrine:** **Hunt the whale. Build the route behind.** Without the whale, the route can't run. Without the route, the whale is a one-shot win. Together = compounding sales engine on every truck cycle.
+
+### The pitch for the whale (locked language)
+
+When pitching a whale at 3+ pallets, lead with the freight economics:
+
+> _"At 3+ pallets we run the truck ourselves from our WA warehouse. That means freight is on us — and any other accounts we've signed up along the route get their delivery on the same truck. So your order anchors a profitable run, and we can introduce new products to you and the rest of the route every 6-8 weeks face-to-face. No middleman, no broker margin, no LTL freight surcharges."_
+
+Pricing reference: `/contracts/pricing-route-governance.md` §6 — B5 Pallet @ $3.00/bag, buyer pays freight. **At 3+ pallets we waive freight** because the truck is justified.
+
+### Route-building signals (in research output)
+
+When evaluating a Viktor research drop or a walk-in cluster, score it by **route potential** not just account count:
+
+| Signal | Route value |
+|---|---|
+| 5+ shops on a single walking strip | ⭐⭐⭐ Tier 1 route — bundle in one visit |
+| 10+ shops in one tourist town | ⭐⭐⭐ Anchor route — schedule recurring restocks |
+| Multiple multi-location operators (Cotton Gin, Farmer's Daughter, Christmas Mouse) | ⭐⭐⭐ Force-multiplier — one yes opens many doors |
+| Independent candy / general store / gift shop with food category | ⭐⭐⭐ Direct fit, owner=buyer, fast yes |
+| Independent truck stop with c-store | ⭐⭐⭐ Direct fit, owner=buyer, drivers buy candy hard |
+| Single-anchor shop without nearby cluster | ⭐ Handle as one-off, lower priority |
+| NPS coop / multi-park concessioner | ⭐⭐ Whale — different timeline |
+| Big-chain corporate buyer (HEB, Buc-ee's, Caesars) | ⭐⭐ Whale — different timeline |
+
+### Active routes — built tonight (2026-04-29)
+
+These are the route-density clusters that are already in HubSpot from Batches 5-11 and ready for restock-cycle thinking:
+
+| Route | Anchor | Account count | Status |
+|---|---|---|---|
+| **West Yellowstone Gateway** (Batch 5) | Eagle's Store, Black Bear Trading Post, 19 shops | 19 | All in Contacted stage; trip 5/11-17 |
+| **Moab Main St + NPS** (Batch 7) | CNHA, Cowboys & Indians, Sorrel River + 13 walk-in | 16 | Mixed; 3 sent + walk-ins flagged |
+| **Texas — Galveston Strand + Fredericksburg + FW Stockyards + W. TX** (Batch 8) | Multi-cluster | 30+ | Mixed; sends to date are spread |
+| **Outer Banks NC** (Batch 9 Drop 1) | Kitty Hawk Kites + Cotton Gin + Forbes Candies + 18 shops | 21 | All sent; trip-ready |
+| **Myrtle Beach Grand Strand** (Batch 9 Drop 2) | Gay Dolphin + Brookgreen + Pelicans + 15 shops | 18 | All sent + walk-ins; trip-ready |
+| **Hilton Head + Savannah River St + Tybee** (Batch 9 Drop 3) | Savannah Bee + Byrd + Paris Market + 21 shops | 24 | Top-15 sent; walk-ins flagged |
+| **Portland + Oregon Coast** (Batch 11.1) ⭐ HOME LANE | Lan Su + Columbia Gorge Discovery + OWF + Cannon Beach cluster + Lincoln City | 55 | 6 sent; 49 walk-ins flagged |
+| **TX/OK/MO Independent Truck Stops** (Batch 10.1) | NATSN members + Big Apple + Midway + Gore's | 48 | 2 sent; 46 walk-ins/calls flagged |
+
+### Operating cadence
+
+- **Route research:** Viktor produces 50-100 named-buyer prospects per drop, clustered by walking-distance shop strips so trip planning maps cleanly. **Cluster density is the priority** — a 100-prospect drop spread across a state is less useful than a 25-prospect drop on one main street.
+- **Route activation:** First-touch outreach via `scripts/sales/send-and-log.py` to every email-having prospect in the cluster. Walk-in flags get logged in HubSpot with phone + address for the in-person sweep.
+- **Route restock:** Every 6-8 weeks per active route. One driving day. Hit every account, take reorders, introduce one new SKU per cycle.
+- **Route expansion:** Each restock visit, ask each owner for "the other shop down the street" — adds 1-2 new accounts per visit at zero acquisition cost.
+
+### Doctrinal implication for Viktor's research
+
+When briefing Viktor on new regions, explicitly request:
+1. **Density target:** 25+ accounts in a single walkable cluster (vs 10 accounts spread across a county).
+2. **Multi-location operators flagged ⭐⭐⭐:** Single buyers controlling 3+ doors.
+3. **Walk-in clusters mapped:** Sequential walking distances annotated, ready for a half-day route walk.
+4. **Reorder economics noted:** Days/year traffic level + season — drives reorder cycle planning.
+
+---
+
 ## Tier 3 — Expansion universe
 
 Every gateway town in the US (NPS, NM, NHP, state-park-major, heritage destinations). Estimated 80-150 towns total. Long-tail expansion as bandwidth allows.
