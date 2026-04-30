@@ -23,6 +23,7 @@
 import type { ApprovalRequest, AuditLogEntry } from "./types";
 import type { PausedAgentRecord } from "./enforcement";
 import type { SalesCommandSlice } from "@/lib/ops/sales-command-center";
+import type { SampleQueueHealth } from "@/lib/sales/sample-queue";
 import type { StaleBuyerSummary } from "@/lib/sales/stale-buyer";
 
 export type BriefKind = "morning" | "eod";
@@ -149,6 +150,14 @@ export interface BriefInput {
    * surface for stale-buyer follow-up.
    */
   staleBuyers?: StaleBuyerSummary;
+  /**
+   * Morning-only: Phase D2 sample-queue health snapshot. Surfaces the
+   * complementary view to `staleBuyers` — the "awaiting ship" sample
+   * requests Drew/Ben need to pack and the active "shipped, waiting
+   * for response" funnel size + aging tail. Quiet-collapses when both
+   * counts are zero.
+   */
+  sampleQueue?: SampleQueueHealth;
   /**
    * Morning-only: dispatch throughput in the previous 24h. Populated
    * by the daily-brief route from `buildDispatchBoardRows` +
@@ -467,6 +476,20 @@ export function composeDailyBrief(input: BriefInput): BriefOutput {
       blocks.push({
         type: "section",
         text: { type: "mrkdwn", text: staleText },
+      });
+    }
+  }
+
+  // ---- Sample queue health (Phase D2, morning only) ----
+  // Awaiting-ship + shipped-awaiting-response counts. Complementary
+  // to stale-buyers — surfaces the sample funnel pulse without
+  // duplicating D1's per-deal callouts.
+  if (input.kind === "morning" && input.sampleQueue) {
+    const sqText = renderSampleQueueMarkdown(input.sampleQueue);
+    if (sqText) {
+      blocks.push({
+        type: "section",
+        text: { type: "mrkdwn", text: sqText },
       });
     }
   }
@@ -882,6 +905,48 @@ export function renderStaleBuyersMarkdown(slice: StaleBuyerSummary): string {
       .map((s) => `${s.stageName} ${s.count}`)
       .join(", ");
     lines.push(`_Per-stage: ${perStage}_`);
+  }
+  return lines.join("\n");
+}
+
+/**
+ * Phase D2 — render the sample-queue-health slice.
+ *
+ * Quiet-collapses (returns "") when there are zero awaiting-ship
+ * and zero shipped-awaiting-response deals.
+ *
+ * Layout:
+ *   *Sample queue:* awaitingShip · awaitingShipBehind behind · shippedAwaitingResponse waiting on response
+ *   _Oldest requested: Xd · Oldest shipped: Yd_
+ */
+export function renderSampleQueueMarkdown(slice: SampleQueueHealth): string {
+  if (slice.awaitingShip === 0 && slice.shippedAwaitingResponse === 0) return "";
+
+  const fmtDays = (n: number): string => (Number.isFinite(n) ? `${n}d` : "—");
+  const lines: string[] = [];
+  const headerParts: string[] = [];
+  if (slice.awaitingShip > 0) {
+    const behind =
+      slice.awaitingShipBehind > 0
+        ? ` · :rotating_light: ${slice.awaitingShipBehind} > ${slice.behindThresholdDays}d`
+        : "";
+    headerParts.push(`${slice.awaitingShip} awaiting ship${behind}`);
+  }
+  if (slice.shippedAwaitingResponse > 0) {
+    headerParts.push(`${slice.shippedAwaitingResponse} shipped, waiting on buyer`);
+  }
+  lines.push(`*Sample queue:* ${headerParts.join(" · ")}`);
+
+  // Aging tail line — only render when at least one bucket is non-zero.
+  const tailParts: string[] = [];
+  if (slice.awaitingShip > 0) {
+    tailParts.push(`Oldest requested: ${fmtDays(slice.oldestRequestedDays)}`);
+  }
+  if (slice.shippedAwaitingResponse > 0) {
+    tailParts.push(`Oldest shipped: ${fmtDays(slice.oldestShippedDays)}`);
+  }
+  if (tailParts.length > 0) {
+    lines.push(`_${tailParts.join(" · ")}_`);
   }
   return lines.join("\n");
 }

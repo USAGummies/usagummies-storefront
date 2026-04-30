@@ -11,9 +11,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   composeDailyBrief,
+  renderSampleQueueMarkdown,
   renderStaleBuyersMarkdown,
   type BriefInput,
 } from "@/lib/ops/control-plane/daily-brief";
+import type { SampleQueueHealth } from "@/lib/sales/sample-queue";
 import type { StaleBuyerSummary } from "@/lib/sales/stale-buyer";
 
 const NOW = new Date("2026-04-29T15:00:00.000Z");
@@ -173,5 +175,91 @@ describe("composeDailyBrief — staleBuyers slice rendering", () => {
     });
     const json = JSON.stringify(out.blocks);
     expect(json).not.toContain("Stale buyers");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase D2 — sample queue health
+// ---------------------------------------------------------------------------
+
+function sampleQueue(overrides: Partial<SampleQueueHealth> = {}): SampleQueueHealth {
+  return {
+    asOf: NOW.toISOString(),
+    awaitingShip: 2,
+    awaitingShipBehind: 1,
+    shippedAwaitingResponse: 4,
+    oldestRequestedDays: 5,
+    oldestShippedDays: 12,
+    behindThresholdDays: 3,
+    source: { system: "hubspot", retrievedAt: NOW.toISOString() },
+    ...overrides,
+  };
+}
+
+describe("renderSampleQueueMarkdown — D2 formatting", () => {
+  it("returns empty string when both buckets are zero (quiet-collapse)", () => {
+    const text = renderSampleQueueMarkdown(
+      sampleQueue({ awaitingShip: 0, shippedAwaitingResponse: 0 }),
+    );
+    expect(text).toBe("");
+  });
+
+  it("renders both buckets with the rotating-light flag for behind-queue", () => {
+    const text = renderSampleQueueMarkdown(sampleQueue());
+    expect(text).toContain("2 awaiting ship");
+    expect(text).toContain(":rotating_light: 1 > 3d");
+    expect(text).toContain("4 shipped, waiting on buyer");
+    expect(text).toContain("Oldest requested: 5d");
+    expect(text).toContain("Oldest shipped: 12d");
+  });
+
+  it("omits awaiting-ship section when count is zero", () => {
+    const text = renderSampleQueueMarkdown(
+      sampleQueue({ awaitingShip: 0, awaitingShipBehind: 0, oldestRequestedDays: Infinity }),
+    );
+    expect(text).not.toContain("awaiting ship");
+    expect(text).toContain("4 shipped, waiting on buyer");
+    expect(text).not.toContain("Oldest requested");
+  });
+
+  it("renders '—' when oldestShippedDays is Infinity (data hygiene)", () => {
+    const text = renderSampleQueueMarkdown(
+      sampleQueue({ shippedAwaitingResponse: 1, oldestShippedDays: Infinity }),
+    );
+    expect(text).toContain("Oldest shipped: —");
+  });
+});
+
+describe("composeDailyBrief — sampleQueue slice rendering", () => {
+  it("renders the sample-queue section in morning brief when non-zero", () => {
+    const out = composeDailyBrief({ ...baseInput(), sampleQueue: sampleQueue() });
+    const json = JSON.stringify(out.blocks);
+    expect(json).toContain("Sample queue:");
+    expect(json).toContain("awaiting ship");
+  });
+
+  it("OMITS the section when sampleQueue is undefined", () => {
+    const out = composeDailyBrief(baseInput());
+    const json = JSON.stringify(out.blocks);
+    expect(json).not.toContain("Sample queue:");
+  });
+
+  it("OMITS the section when both buckets are zero (quiet-collapse)", () => {
+    const out = composeDailyBrief({
+      ...baseInput(),
+      sampleQueue: sampleQueue({ awaitingShip: 0, shippedAwaitingResponse: 0 }),
+    });
+    const json = JSON.stringify(out.blocks);
+    expect(json).not.toContain("Sample queue:");
+  });
+
+  it("OMITS the section on EOD even when slice is provided", () => {
+    const out = composeDailyBrief({
+      ...baseInput(),
+      kind: "eod",
+      sampleQueue: sampleQueue(),
+    });
+    const json = JSON.stringify(out.blocks);
+    expect(json).not.toContain("Sample queue:");
   });
 });

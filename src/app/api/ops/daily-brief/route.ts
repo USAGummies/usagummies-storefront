@@ -59,6 +59,10 @@ import {
   type HubSpotDealForStaleness,
   type StaleBuyerSummary,
 } from "@/lib/sales/stale-buyer";
+import {
+  computeSampleQueueHealth,
+  type SampleQueueHealth,
+} from "@/lib/sales/sample-queue";
 import { listDivisions } from "@/lib/ops/control-plane/divisions";
 import { getChannel } from "@/lib/ops/control-plane/channels";
 import {
@@ -323,12 +327,11 @@ async function composeAndPost(req: Request): Promise<Response> {
     }
   }
 
-  // Phase D1 + D6 — stale-buyer detection. Pulls every active B2B
-  // wholesale deal via listRecentDeals(), maps to the staleness
-  // schema, summarizes, and surfaces the top-N stalest in the
-  // morning brief. Failures degrade gracefully — the brief still
-  // ships without this slice.
+  // Phase D1 + D2 + D6 — stale-buyer detection + sample-queue health.
+  // Single listRecentDeals() pull feeds both summaries; both surfaces
+  // are morning-only and fail-soft on HubSpot errors.
   let staleBuyers: StaleBuyerSummary | undefined;
+  let sampleQueue: SampleQueueHealth | undefined;
   if (kind === "morning") {
     try {
       const deals = await listRecentDeals({ limit: 200 });
@@ -347,9 +350,10 @@ async function composeAndPost(req: Request): Promise<Response> {
         primaryCompanyName: null,
       }));
       staleBuyers = summarizeStaleBuyers(adapted, now, retrievedAt);
+      sampleQueue = computeSampleQueueHealth(adapted, now, retrievedAt);
     } catch (err) {
       degradations.push(
-        `stale-buyers: ${err instanceof Error ? err.message : String(err)}`,
+        `stale-buyers/sample-queue: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
   }
@@ -504,6 +508,7 @@ async function composeAndPost(req: Request): Promise<Response> {
     fulfillmentToday,
     salesCommand,
     staleBuyers,
+    sampleQueue,
     dispatch,
     signals,
     degradations,
