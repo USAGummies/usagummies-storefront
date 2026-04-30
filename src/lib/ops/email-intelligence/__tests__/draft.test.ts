@@ -67,6 +67,69 @@ describe("email-intelligence/draft generator", () => {
     expect(reply.body).toContain("Shipping address");
   });
 
+  // 2026-04-30 incident regression — the old sample-request body contained
+  // "1-pack, 5-pack, or master case" SKU language that doesn't map to any
+  // canonical contract (outreach-pitch-spec §6 + wholesale-pricing §2 use
+  // master carton + pallet, not 1-pack/5-pack/master case). When the wrong
+  // template fired at Eric Miller, the buyer got nonsensical copy. Lock
+  // the new body shape so retired SKU language can't sneak back in.
+  it("sample-request body does NOT contain retired '1-pack' / '5-pack' / 'master case' SKU language", () => {
+    const reply = generateDraftReply(
+      env({
+        from: "Buyer <buyer@store.com>",
+        subject: "Sample request",
+      }),
+      C("sample_request"),
+    );
+    const body = reply.body.toLowerCase();
+    expect(body).not.toContain("1-pack");
+    expect(body).not.toContain("5-pack");
+    expect(body).not.toContain("master case");
+  });
+
+  it("sample-request body uses canonical SKU vocabulary (single bag / inner case = 6 bags)", () => {
+    const reply = generateDraftReply(
+      env({
+        from: "Buyer <buyer@store.com>",
+        subject: "Sample request",
+      }),
+      C("sample_request"),
+    );
+    expect(reply.body).toContain("7.5 oz bag");
+    expect(reply.body).toContain("inner case (6 bags)");
+  });
+
+  // b2b_sales template was rewritten alongside the sample_request fix.
+  // Lock the canonical wholesale tier vocabulary from outreach-pitch-spec §6
+  // so the ambiguous "6-pack" wording can't sneak back in.
+  it("b2b_sales body references master carton + pallet wholesale tiers, not '6-pack'", () => {
+    const reply = generateDraftReply(
+      env({
+        from: "Buyer <buyer@store.com>",
+        subject: "Wholesale pricing inquiry",
+      }),
+      C("b2b_sales"),
+    );
+    const body = reply.body.toLowerCase();
+    expect(body).not.toContain("6-pack");
+    expect(body).toContain("master carton");
+    expect(body).toContain("pallet");
+  });
+
+  it("b2b_sales body references the locked wholesale prices from outreach-pitch-spec §6", () => {
+    const reply = generateDraftReply(
+      env({
+        from: "Buyer <buyer@store.com>",
+        subject: "Wholesale pricing inquiry",
+      }),
+      C("b2b_sales"),
+    );
+    expect(reply.body).toContain("$3.49/bag");
+    expect(reply.body).toContain("$3.25/bag");
+    expect(reply.body).toContain("$3.00/bag");
+    expect(reply.body).toContain("3+ pallet");
+  });
+
   it("returns no draft for receipts / junk / marketing PR", () => {
     for (const cat of ["receipt_document", "junk_fyi", "marketing_pr"] as const) {
       const reply = generateDraftReply(env({}), C(cat));

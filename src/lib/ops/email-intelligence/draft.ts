@@ -124,6 +124,14 @@ export function generateDraftReply(
     }
 
     case "sample_request": {
+      // 2026-04-30 incident rewrite — the prior body referenced retired
+      // "1-pack / 5-pack / master case" SKU language that doesn't exist
+      // in our canonical pricing grid (contracts/outreach-pitch-spec.md
+      // §6 + contracts/wholesale-pricing.md §2). Replaced with the
+      // current SKU vocabulary: single 7.5 oz bag for a tasting sample,
+      // or an inner case (6 bags) for a team review. Master carton +
+      // pallet pricing is a separate B2B-sales conversation, not a
+      // sample drop.
       const body = [
         `Hi ${first},`,
         "",
@@ -132,7 +140,7 @@ export function generateDraftReply(
         "Could you confirm:",
         "  • Shipping address (incl. attention/recipient name)",
         "  • Best phone number for the carrier",
-        "  • Whether you'd like the 1-pack, 5-pack, or master case",
+        "  • How many bags works for your team — a single 7.5 oz bag for tasting, or an inner case (6 bags) for a wider team review",
         "",
         "I'll get those out the same day they're confirmed.",
         SIGNATURE,
@@ -183,6 +191,13 @@ export function generateDraftReply(
     }
 
     case "b2b_sales": {
+      // 2026-04-30 incident-driven cleanup — the prior body said
+      // "$3.49/bag, $20.94/case (6-pack), 36-bag master carton" which
+      // was technically math-correct but used the ambiguous "6-pack"
+      // wording that doesn't appear in canonical contracts. Replaced
+      // with the canonical inner-case + master-carton vocabulary from
+      // contracts/outreach-pitch-spec.md §5 + §6 so buyers don't get
+      // confused about what "6-pack" means.
       const body = [
         `Hi ${first},`,
         "",
@@ -190,8 +205,8 @@ export function generateDraftReply(
         "",
         "  • All American Gummy Bears, 7.5 oz / 213 g, dye-free, made in the USA",
         "  • UPC 1-99284-62470-2",
-        "  • Wholesale: $3.49/bag, $20.94/case (6-pack), 36-bag master carton",
-        "  • Lead time: ~5 business days from PO",
+        "  • Wholesale: $3.49/bag landed master carton (36 bags) · $3.25/bag pallet landed (25 master cartons / 900 bags) · $3.00/bag at 3+ pallet free-shipping tier",
+        "  • Lead time: ~5 business days from PO; in-stock master cartons ship in 2–3 business days",
         "",
         "Happy to send a sample pack or jump on a 15-minute call. What's easiest on your end?",
         SIGNATURE,

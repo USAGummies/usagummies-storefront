@@ -77,6 +77,20 @@ const RECEIPT_DOC_REGEX =
 const AP_FINANCE_REGEX =
   /\b(W-?9|ACH|wire instruction|new account setup|vendor (?:setup|onboarding|application)|payment terms|net ?\d+|tax form|EIN|remit ?to|accounts payable|AP department)\b/i;
 const SAMPLE_DECLINE_REGEX = /\b(no thanks|not interested|unsubscribe|no longer)\b/i;
+// 2026-04-30 incident: Eric Miller's "samples arrived, actively reviewing" reply
+// matched SAMPLE_REQUEST_REGEX on the bare word "samples" and triggered a stale
+// outbound template. This regex is the AFTER-FACT exclusion: phrases that mean
+// the buyer ALREADY HAS the samples (or is mid-review) so a "happy to send
+// samples" reply is wrong and looks broken.
+//
+// Phrases tested against real-world replies:
+//   "samples arrived" / "samples received" / "got the samples"
+//   "package arrived" / "received the box" / "received your shipment"
+//   "we received" / "we got" / "they got here"
+//   "actively reviewing" / "in review" / "team is reviewing" / "currently reviewing"
+//   "still tasting" / "trying them out" / "sharing with the team"
+const SAMPLE_RECEIVED_REGEX =
+  /\b(samples? (?:arrived|received|are here|came in|landed|delivered)|received the samples?|got the samples?|we received|we got|received your shipment|received the (?:package|box)|(?:actively|currently|still) (?:reviewing|tasting|trying)|(?:team|crew) (?:is|are) reviewing|in review|trying them out|sharing with the team)\b/i;
 const JUNK_NEWSLETTER_REGEX =
   /\b(newsletter|digest|daily roundup|weekly update|industry news|promotional|advertisement|don'?t miss|deal of the (?:day|week))\b/i;
 const B2B_SALES_REGEX =
@@ -176,12 +190,25 @@ function applyRules(env: EmailEnvelope): Classification | null {
     };
   }
 
-  // 6. Sample request — but be careful about decline phrases.
-  if (SAMPLE_REQUEST_REGEX.test(text) && !SAMPLE_DECLINE_REGEX.test(text)) {
+  // 6. Sample request — guarded by TWO exclusion regexes:
+  //   • SAMPLE_DECLINE_REGEX  — buyer is declining ("no thanks", "unsubscribe")
+  //   • SAMPLE_RECEIVED_REGEX — buyer ALREADY received samples and is reviewing.
+  //                             Added 2026-04-30 after the Eric Miller incident:
+  //                             "samples arrived, actively reviewing" was
+  //                             classifying as `sample_request` and firing a
+  //                             "happy to send samples" template. The classifier
+  //                             must not generate a sample-offer draft when the
+  //                             buyer's reply means the samples are already in
+  //                             their hands.
+  if (
+    SAMPLE_REQUEST_REGEX.test(text) &&
+    !SAMPLE_DECLINE_REGEX.test(text) &&
+    !SAMPLE_RECEIVED_REGEX.test(text)
+  ) {
     return {
       category: "sample_request",
       confidence: 0.88,
-      reason: "Sample-request keywords without decline phrases",
+      reason: "Sample-request keywords without decline or 'already received' phrases",
       ruleId: "sample-request",
     };
   }

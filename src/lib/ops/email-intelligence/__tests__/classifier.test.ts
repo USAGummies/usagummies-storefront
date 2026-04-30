@@ -86,6 +86,72 @@ describe("email-intelligence/classifier", () => {
     expect(declined.category).not.toBe("sample_request");
   });
 
+  // 2026-04-30 incident regression tests. The prior classifier matched the
+  // bare word "samples" anywhere in the email — an inbound reply saying
+  // "samples arrived, actively reviewing" misclassified as sample_request
+  // and triggered a "happy to send samples" outbound (Eric Miller / Event
+  // Network). The SAMPLE_RECEIVED_REGEX exclusion is the structural fix.
+  // Each phrase below was observed in real-world inbound replies; they all
+  // mean the buyer ALREADY has the samples and a "happy to send" reply
+  // would be wrong.
+  describe("samples-already-received exclusion (incident regression)", () => {
+    const RECEIVED_PHRASES = [
+      "Samples arrived, my team is actively reviewing",
+      "We received the samples. Will share thoughts soon.",
+      "Got the samples — sharing with the team this week",
+      "Package arrived this morning, currently reviewing",
+      "Received the box, thanks!",
+      "We received your shipment yesterday",
+      "Still tasting the samples",
+      "Trying them out now",
+      "Sharing with the team for a tasting next week",
+      "Team is reviewing the samples now",
+      "Currently reviewing your samples",
+      "Crew is reviewing — feedback soon",
+      "Samples are here. Loved the lemon.",
+      "Samples landed yesterday",
+      "Samples came in today",
+      "Samples delivered to the office",
+    ];
+
+    for (const phrase of RECEIVED_PHRASES) {
+      it(`does NOT classify "${phrase}" as sample_request`, () => {
+        const c = classifyEmail(
+          env({
+            from: "buyer@retailer.com",
+            subject: "Re: USA Gummies samples",
+            snippet: phrase,
+          }),
+        );
+        expect(c.category).not.toBe("sample_request");
+      });
+    }
+
+    it("real-world Eric-Miller-shaped phrasing does NOT classify as sample_request", () => {
+      const c = classifyEmail(
+        env({
+          from: "Eric Miller <eric@eventnetwork.com>",
+          subject: "Re: USA Gummies sample request — Event Network",
+          snippet:
+            "Hi Ben — confirming the samples arrived at 9645 Granite Ridge yesterday. " +
+            "My team is actively reviewing. Will circle back next week.",
+        }),
+      );
+      expect(c.category).not.toBe("sample_request");
+    });
+
+    it("still classifies an actual sample REQUEST correctly when received-phrasing is absent", () => {
+      const c = classifyEmail(
+        env({
+          from: "newbuyer@retailer.com",
+          subject: "Sample request",
+          snippet: "Could you send a sample pack our way?",
+        }),
+      );
+      expect(c.category).toBe("sample_request");
+    });
+  });
+
   it("classifies wholesale/retailer pitches as b2b_sales", () => {
     const c = classifyEmail(
       env({
