@@ -218,6 +218,8 @@ Shipped in this change:
 - Grouped cards for read tools, approval-request tools, and prohibited tools.
 - Browser-session probe of `GET /api/ops/openai-workspace-tools/mcp`.
 - `ops.agent.packs` and `ops.operating-memory.search` are ready registry entries with backing routes.
+- `ops.sales.tour-playbook` is a ready read-only registry entry backed by `/api/ops/sales/tour`.
+- `contracts/agent-heartbeat.md` and `src/lib/ops/agent-heartbeat/*` are the first repo-native heartbeat primitive layer. They define context, idempotency keys, allowed output states, and run-record completion only; no LLM execution or external writes are wired.
 
 Acceptance:
 

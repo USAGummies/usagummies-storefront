@@ -365,6 +365,21 @@ Each row uses the schema:
   - **Context-only in Sales Command.** Tour counts do not create action pressure by themselves; they surface as planning context and blockers only when the reader errors/not-wired.
 - **Monday MVP:** 🟢 — Ben has one internal tour cockpit and ChatGPT has a safe read surface for answering "who do I need to hit on this route?" without any path to send or mutate CRM.
 
+#### Phase 6.3 — Agent heartbeat primitives (NEW)
+- **Why:** The 2026-04-29 Notion AI-agent operating notes point to heartbeat-driven, approval-gated agents: each agent needs identity, queue, cadence, budget, approval boundary, output state, and audit record. Phase 6.3 starts with pure primitives only so the repo can adopt the pattern without activating autonomous execution.
+- **Architecture:**
+  - `contracts/agent-heartbeat.md` defines the boot checklist, allowed output states, and guardrails.
+  - `src/lib/ops/agent-heartbeat/types.ts` defines the contract/context/run-record shapes and locks the output-state registry.
+  - `context.ts` builds deterministic heartbeat context from caller-supplied time and derives stable idempotency keys.
+  - `run-record.ts` completes a run into a structured record and fails closed on unknown output states or approval slugs outside the agent contract allowlist.
+- **Hard rules locked by tests:**
+  - No external side-effect imports (`@vercel/kv`, Gmail, HubSpot, QBO, Shopify, Slack, fetch).
+  - Unknown output state (`sent_email`) is rejected.
+  - Approval slugs not listed in the agent contract are rejected.
+  - Invalid/missing identity fields fail closed.
+  - Invalid budget numerics normalize to `null`, not fabricated values.
+- **Monday MVP:** 🟢 foundation-only. No cron, no LLM calls, no writes. Next phase is registry metadata + `/ops/agents/packs` heartbeat display.
+
 #### Phase 7 — Receipt OCR extraction (prepare-for-review only) (NEW)
 - **Why:** `/ops/finance/review` already aggregates the receipt review queue, but Rene/Ben were doing field-by-field data entry by hand. Phase 7 attaches a *suggestion* to each captured receipt so reviewers see vendor/date/amount/currency/tax/last4/payment hints proposed before they fill in the canonical fields. Promotion remains 100% human — no auto-fill, no QBO write.
 - **Architecture:**
