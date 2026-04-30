@@ -167,6 +167,75 @@ export async function findContactByEmail(email: string): Promise<string | null> 
   return res.data.results[0].id;
 }
 
+/**
+ * Fetch a single HubSpot contact by id with the requested properties
+ * (defaults to the Phase D5 enrichable property set). Used by the
+ * Apollo enrichment flow to read existing contact state before
+ * computing the enrichment diff.
+ */
+export async function getContactById(
+  contactId: string,
+  properties: readonly string[] = [
+    "email",
+    "firstname",
+    "lastname",
+    "jobtitle",
+    "phone",
+    "company",
+    "city",
+    "state",
+  ],
+): Promise<{ id: string; properties: Record<string, string | null> } | null> {
+  if (!contactId.trim()) return null;
+  const propsStr = properties.join(",");
+  const res = await hsRequest<{
+    id: string;
+    properties?: Record<string, string | null>;
+  }>(
+    "GET",
+    `/crm/v3/objects/contacts/${encodeURIComponent(contactId)}?properties=${encodeURIComponent(propsStr)}`,
+  );
+  if (!res.ok || !res.data) return null;
+  return { id: res.data.id, properties: res.data.properties ?? {} };
+}
+
+/**
+ * List recently-created/modified HubSpot contacts with the Phase D5
+ * enrichable property set. Used by the D5 v0.2 bulk enrichment sweep
+ * to find contacts that may need filling.
+ */
+export async function listRecentContacts(opts: {
+  limit?: number;
+  properties?: readonly string[];
+} = {}): Promise<Array<{ id: string; properties: Record<string, string | null> }>> {
+  if (!isHubSpotConfigured()) return [];
+  const limit = Math.max(1, Math.min(200, opts.limit ?? 100));
+  const properties = (
+    opts.properties ?? [
+      "email",
+      "firstname",
+      "lastname",
+      "jobtitle",
+      "phone",
+      "company",
+      "city",
+      "state",
+      "hs_lastmodifieddate",
+    ]
+  ).join(",");
+  const res = await hsRequest<{
+    results?: Array<{ id: string; properties?: Record<string, string | null> }>;
+  }>(
+    "GET",
+    `/crm/v3/objects/contacts?limit=${limit}&properties=${encodeURIComponent(properties)}&archived=false`,
+  );
+  if (!res.ok || !res.data?.results) return [];
+  return res.data.results.map((r) => ({
+    id: r.id,
+    properties: r.properties ?? {},
+  }));
+}
+
 export type HubSpotReadResult<T> =
   | { ok: true; value: T }
   | { ok: false; reason: string };

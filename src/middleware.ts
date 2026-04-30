@@ -75,6 +75,7 @@ const SELF_AUTHENTICATED_PREFIXES = [
   "/api/ops/operating-memory/", // OPERATING MEMORY — P0-1 drift detector + P0-3 transcript saver (recent fetch). isCronAuthorized() bearer CRON_SECRET. Added 2026-04-29 — was inadvertently 401-blocked at the middleware layer despite correct in-route auth.
   "/api/ops/transcript/", // TRANSCRIPT CAPTURE — P0-3 operating-memory transcript saver. POST /capture is the canonical write surface. isCronAuthorized() bearer CRON_SECRET. Added 2026-04-29 — same allowlist gap as operating-memory above.
   "/api/ops/sales-tour/", // SALES-TOUR — booth-visit field workflow for May 11–17 trip (`/contracts/sales-tour-field-workflow.md` v0.1). isAuthorized() (session OR Bearer CRON_SECRET). POST /booth is the entry; GET /booth is a readiness probe.
+  "/api/ops/sales/apollo-enrich/", // APOLLO ENRICHMENT — Phase D5 v0.2 lead.enrichment.write (Class A) per /contracts/approval-taxonomy.md v1.6. GET/POST [contactId] = single-contact; POST sweep = bulk recent contacts (rate-limited). isAuthorized() session OR Bearer CRON_SECRET.
 ];
 
 function isSelfAuthenticated(pathname: string): boolean {
