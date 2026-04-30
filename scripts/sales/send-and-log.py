@@ -133,23 +133,28 @@ def find_or_create_contact(
 def find_or_create_deal(
     company: str, dealname_for_new: str, pipeline: str, stage: str
 ) -> tuple[str, bool]:
-    """Returns (deal_id, was_existing). Searches by brand token."""
-    token = "".join(ch for ch in company.split()[0] if ch.isalnum() or ch in "'-")
-    if len(token) < 3:
-        # Fallback — use the whole company name string
-        token = company
+    """Returns (deal_id, was_existing). Searches by ALL words in the company name
+    (AND, not OR) to avoid brand-token collisions like 'Christmas Shop' matching
+    'Christmas Mouse', or 'Garden City' matching 'Idaho Botanical Garden'.
+    Each word is a separate filter, all in the same filterGroup = AND.
+    Common stop-words ('the', 'and', 'of', etc.) are dropped."""
+    STOP = {"the", "a", "an", "of", "and", "or", "for", "in", "on", "at", "&"}
+    # HubSpot CONTAINS_TOKEN tokenizes the SEARCH VALUE on internal token rules
+    # (hyphens/apostrophes are separators), so we pass each whitespace-split
+    # word as-is. "Buc-ee's" becomes ["Buc","ee","s"] internally and matches
+    # any deal containing all three. Multiple words = AND across filters,
+    # which prevents collisions like "Christmas Shop" matching "Christmas Mouse".
+    raw_words = [w.strip(".,;:!?\"'") for w in company.split()]
+    tokens = [w for w in raw_words if len(w) >= 2 and w.lower() not in STOP]
+    if not tokens:
+        tokens = [company]
+    filters = [{"propertyName": "dealname", "operator": "CONTAINS_TOKEN", "value": t} for t in tokens]
+    filters.append({"propertyName": "pipeline", "operator": "EQ", "value": pipeline})
     res = hs_request(
         "POST",
         "/crm/v3/objects/deals/search",
         {
-            "filterGroups": [
-                {
-                    "filters": [
-                        {"propertyName": "dealname", "operator": "CONTAINS_TOKEN", "value": token},
-                        {"propertyName": "pipeline", "operator": "EQ", "value": pipeline},
-                    ]
-                }
-            ],
+            "filterGroups": [{"filters": filters}],
             "properties": ["dealname", "dealstage", "createdate"],
             "sorts": [{"propertyName": "createdate", "direction": "ASCENDING"}],
             "limit": 25,
