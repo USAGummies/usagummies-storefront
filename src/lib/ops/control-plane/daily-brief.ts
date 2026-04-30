@@ -23,6 +23,7 @@
 import type { ApprovalRequest, AuditLogEntry } from "./types";
 import type { PausedAgentRecord } from "./enforcement";
 import type { SalesCommandSlice } from "@/lib/ops/sales-command-center";
+import type { ReorderFollowUpSummary } from "@/lib/sales/reorder-followup";
 import type { SampleQueueHealth } from "@/lib/sales/sample-queue";
 import type { StaleBuyerSummary } from "@/lib/sales/stale-buyer";
 
@@ -158,6 +159,13 @@ export interface BriefInput {
    * counts are zero.
    */
   sampleQueue?: SampleQueueHealth;
+  /**
+   * Morning-only: Phase D4 reorder follow-up. Channel-aware reorder
+   * candidates: Amazon FBM 60d, wholesale (B2B Shipped) 90d, Shopify
+   * DTC 90d (D4 v0.2 — placeholder slot). Quiet-collapses when no
+   * candidates across any channel.
+   */
+  reorderFollowUps?: ReorderFollowUpSummary;
   /**
    * Morning-only: dispatch throughput in the previous 24h. Populated
    * by the daily-brief route from `buildDispatchBoardRows` +
@@ -490,6 +498,19 @@ export function composeDailyBrief(input: BriefInput): BriefOutput {
       blocks.push({
         type: "section",
         text: { type: "mrkdwn", text: sqText },
+      });
+    }
+  }
+
+  // ---- Reorder follow-ups (Phase D4, morning only) ----
+  // Amazon FBM 60d + wholesale 90d (Shopify DTC 90d in v0.2).
+  // Quiet-collapses when no candidates across any channel.
+  if (input.kind === "morning" && input.reorderFollowUps) {
+    const reorderText = renderReorderFollowUpsMarkdown(input.reorderFollowUps);
+    if (reorderText) {
+      blocks.push({
+        type: "section",
+        text: { type: "mrkdwn", text: reorderText },
       });
     }
   }
@@ -947,6 +968,38 @@ export function renderSampleQueueMarkdown(slice: SampleQueueHealth): string {
   }
   if (tailParts.length > 0) {
     lines.push(`_${tailParts.join(" · ")}_`);
+  }
+  return lines.join("\n");
+}
+
+/**
+ * Phase D4 — render the reorder-follow-ups slice.
+ *
+ * Quiet-collapses (returns "") when topCandidates is empty.
+ *
+ * Layout:
+ *   *Reorder follow-ups — N candidate(s) past channel windows*
+ *   • `wholesale` 92d — Mike Hippler / Thanksgiving Point — Move to Reorder stage + send check-in email
+ *   • `amazon-fbm` 75d — Amy Catalano (WILOUGHBY HLS, OH) — Send Amazon FBM repeat-buyer thank-you...
+ *   _Per-channel: wholesale 2 (90d), amazon-fbm 5 (60d)_
+ */
+export function renderReorderFollowUpsMarkdown(slice: ReorderFollowUpSummary): string {
+  if (slice.topCandidates.length === 0) return "";
+  const lines: string[] = [];
+  lines.push(
+    `*Reorder follow-ups — ${slice.total} candidate(s) past channel windows*`,
+  );
+  for (const c of slice.topCandidates) {
+    const extra = c.meta.extra ? ` (${c.meta.extra})` : "";
+    lines.push(
+      `• \`${c.channel}\` — ${c.daysSinceLastOrder}d — ${c.displayName}${extra} — _${c.nextAction}_`,
+    );
+  }
+  if (slice.byChannel.length > 0) {
+    const perChannel = slice.byChannel
+      .map((b) => `${b.channel} ${b.count} (${b.windowDays}d)`)
+      .join(", ");
+    lines.push(`_Per-channel: ${perChannel}_`);
   }
   return lines.join("\n");
 }

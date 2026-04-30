@@ -11,10 +11,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   composeDailyBrief,
+  renderReorderFollowUpsMarkdown,
   renderSampleQueueMarkdown,
   renderStaleBuyersMarkdown,
   type BriefInput,
 } from "@/lib/ops/control-plane/daily-brief";
+import type { ReorderFollowUpSummary } from "@/lib/sales/reorder-followup";
 import type { SampleQueueHealth } from "@/lib/sales/sample-queue";
 import type { StaleBuyerSummary } from "@/lib/sales/stale-buyer";
 
@@ -261,5 +263,120 @@ describe("composeDailyBrief — sampleQueue slice rendering", () => {
     });
     const json = JSON.stringify(out.blocks);
     expect(json).not.toContain("Sample queue:");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase D4 — reorder follow-ups
+// ---------------------------------------------------------------------------
+
+function reorderSummary(overrides: Partial<ReorderFollowUpSummary> = {}): ReorderFollowUpSummary {
+  return {
+    asOf: NOW.toISOString(),
+    topCandidates: [
+      {
+        channel: "wholesale",
+        id: "hubspot-deal:d1",
+        displayName: "Thanksgiving Point",
+        daysSinceLastOrder: 105,
+        windowDays: 90,
+        nextAction: "Move to Reorder stage + send check-in email",
+        meta: { priorOrders: 1, lastOrderAt: NOW.toISOString(), extra: "Shipped → reorder window" },
+      },
+      {
+        channel: "amazon-fbm",
+        id: "amazon:amy-44094",
+        displayName: "Amy Catalano",
+        daysSinceLastOrder: 88,
+        windowDays: 60,
+        nextAction: "Send Amazon FBM first-time-buyer reorder offer",
+        meta: { priorOrders: 1, extra: "WILOUGHBY HLS, OH" },
+      },
+    ],
+    byChannel: [
+      { channel: "wholesale", count: 1, windowDays: 90 },
+      { channel: "amazon-fbm", count: 1, windowDays: 60 },
+    ],
+    total: 2,
+    sources: [
+      { system: "amazon-fbm-registry", retrievedAt: NOW.toISOString() },
+      { system: "hubspot", retrievedAt: NOW.toISOString() },
+    ],
+    ...overrides,
+  };
+}
+
+describe("renderReorderFollowUpsMarkdown — D4 formatting", () => {
+  it("returns empty string when topCandidates is empty (quiet-collapse)", () => {
+    const text = renderReorderFollowUpsMarkdown(
+      reorderSummary({ topCandidates: [], byChannel: [], total: 0 }),
+    );
+    expect(text).toBe("");
+  });
+
+  it("renders header + bullets + per-channel footer", () => {
+    const text = renderReorderFollowUpsMarkdown(reorderSummary());
+    expect(text).toContain("Reorder follow-ups — 2 candidate(s)");
+    expect(text).toContain("`wholesale` — 105d — Thanksgiving Point");
+    expect(text).toContain("Shipped → reorder window");
+    expect(text).toContain("`amazon-fbm` — 88d — Amy Catalano");
+    expect(text).toContain("WILOUGHBY HLS, OH");
+    expect(text).toContain("Per-channel: wholesale 1 (90d), amazon-fbm 1 (60d)");
+  });
+
+  it("omits the (extra) parens when meta.extra is empty", () => {
+    const text = renderReorderFollowUpsMarkdown(
+      reorderSummary({
+        topCandidates: [
+          {
+            channel: "wholesale",
+            id: "hubspot-deal:d1",
+            displayName: "Foo Co",
+            daysSinceLastOrder: 100,
+            windowDays: 90,
+            nextAction: "Reach out",
+            meta: { priorOrders: 1 },
+          },
+        ],
+        byChannel: [{ channel: "wholesale", count: 1, windowDays: 90 }],
+        total: 1,
+      }),
+    );
+    expect(text).toContain("`wholesale` — 100d — Foo Co —");
+    expect(text).not.toMatch(/Foo Co \(/);
+  });
+});
+
+describe("composeDailyBrief — reorderFollowUps slice rendering", () => {
+  it("renders the section in morning brief when non-empty", () => {
+    const out = composeDailyBrief({ ...baseInput(), reorderFollowUps: reorderSummary() });
+    const json = JSON.stringify(out.blocks);
+    expect(json).toContain("Reorder follow-ups");
+    expect(json).toContain("Thanksgiving Point");
+  });
+
+  it("OMITS the section when reorderFollowUps is undefined", () => {
+    const out = composeDailyBrief(baseInput());
+    const json = JSON.stringify(out.blocks);
+    expect(json).not.toContain("Reorder follow-ups");
+  });
+
+  it("OMITS the section when topCandidates is empty (quiet-collapse)", () => {
+    const out = composeDailyBrief({
+      ...baseInput(),
+      reorderFollowUps: reorderSummary({ topCandidates: [], byChannel: [], total: 0 }),
+    });
+    const json = JSON.stringify(out.blocks);
+    expect(json).not.toContain("Reorder follow-ups");
+  });
+
+  it("OMITS the section on EOD even when slice is provided", () => {
+    const out = composeDailyBrief({
+      ...baseInput(),
+      kind: "eod",
+      reorderFollowUps: reorderSummary(),
+    });
+    const json = JSON.stringify(out.blocks);
+    expect(json).not.toContain("Reorder follow-ups");
   });
 });

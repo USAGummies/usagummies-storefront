@@ -63,6 +63,13 @@ import {
   computeSampleQueueHealth,
   type SampleQueueHealth,
 } from "@/lib/sales/sample-queue";
+import {
+  classifyAmazonReorderCandidates,
+  classifyWholesaleReorderCandidates,
+  summarizeReorderFollowUps,
+  type ReorderFollowUpSummary,
+} from "@/lib/sales/reorder-followup";
+import { listAmazonCustomers } from "@/lib/ops/amazon-customers";
 import { listDivisions } from "@/lib/ops/control-plane/divisions";
 import { getChannel } from "@/lib/ops/control-plane/channels";
 import {
@@ -332,6 +339,7 @@ async function composeAndPost(req: Request): Promise<Response> {
   // are morning-only and fail-soft on HubSpot errors.
   let staleBuyers: StaleBuyerSummary | undefined;
   let sampleQueue: SampleQueueHealth | undefined;
+  let reorderFollowUps: ReorderFollowUpSummary | undefined;
   if (kind === "morning") {
     try {
       const deals = await listRecentDeals({ limit: 200 });
@@ -351,6 +359,41 @@ async function composeAndPost(req: Request): Promise<Response> {
       }));
       staleBuyers = summarizeStaleBuyers(adapted, now, retrievedAt);
       sampleQueue = computeSampleQueueHealth(adapted, now, retrievedAt);
+
+      // Phase D4 — reorder follow-ups. Reuses the same `adapted`
+      // wholesale deals; pulls Amazon customers separately.
+      try {
+        const amazonCustomers = await listAmazonCustomers({ limit: 500 });
+        const amazonRetrievedAt = new Date().toISOString();
+        const amazonCandidates = classifyAmazonReorderCandidates(
+          amazonCustomers.map((c) => ({
+            fingerprint: c.fingerprint,
+            shipToName: c.shipToName,
+            shipToCity: c.shipToCity,
+            shipToState: c.shipToState,
+            lastSeenAt: c.lastSeenAt,
+            orderCount: c.orderCount,
+          })),
+          now,
+        );
+        const wholesaleCandidates = classifyWholesaleReorderCandidates(
+          adapted,
+          now,
+        );
+        reorderFollowUps = summarizeReorderFollowUps({
+          amazonCandidates,
+          wholesaleCandidates,
+          now,
+          sources: [
+            { system: "amazon-fbm-registry", retrievedAt: amazonRetrievedAt },
+            { system: "hubspot", retrievedAt },
+          ],
+        });
+      } catch (err) {
+        degradations.push(
+          `reorder-followups: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
     } catch (err) {
       degradations.push(
         `stale-buyers/sample-queue: ${err instanceof Error ? err.message : String(err)}`,
@@ -509,6 +552,7 @@ async function composeAndPost(req: Request): Promise<Response> {
     salesCommand,
     staleBuyers,
     sampleQueue,
+    reorderFollowUps,
     dispatch,
     signals,
     degradations,
