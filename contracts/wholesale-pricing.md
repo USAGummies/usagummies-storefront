@@ -1,8 +1,8 @@
 # Wholesale Pricing — LOCKED
 
 **Status:** CANONICAL
-**Source:** Ben + Rene call recap 2026-04-27 §2 + §5 + §6 (v1.0); Rene + Viktor `#financials` thread 2026-04-28 batch-SKU session ratified by Ben (v2.0); Cindy/Redstone FOB-quote drift reconciliation 2026-04-28 PM ratified by Ben "option a" (v2.1); Rene's promo-bag CoA mapping doctrine 2026-04-28 PM (v2.2 first half); Ben's payment-methods + signature-title locks 2026-04-28 PM (v2.2 second half — §13 + §14).
-**Version:** 2.2 — 2026-04-28 PM
+**Source:** Ben + Rene call recap 2026-04-27 §2 + §5 + §6 (v1.0); Rene + Viktor `#financials` thread 2026-04-28 batch-SKU session ratified by Ben (v2.0); Cindy/Redstone FOB-quote drift reconciliation 2026-04-28 PM ratified by Ben "option a" (v2.1); Rene's promo-bag CoA mapping doctrine 2026-04-28 PM (v2.2 first half); Ben's payment-methods + signature-title locks 2026-04-28 PM (v2.2 second half — §13 + §14); 3-vendor B0001 reconciliation 2026-04-30 PM, Ben approved Class C `pricing.change` to lock COGS at verified $1.79/bag (v2.3).
+**Version:** 2.3 — 2026-04-30 PM
 **Replaces:** any ad hoc pricing scattered across previous outreach scripts. This is the single source of truth.
 **Pairs with:** [`/contracts/pricing-route-governance.md`](pricing-route-governance.md) — the route-economics + deal-check + escalation-clause governance layer that overlays this SKU/tier grid. For non-standard wholesale offers, landed delivery pricing, route-anchor vs route-fill logic, and Ben↔Rene partner communication, follow that doctrine.
 **Reconciliation in flight:** [`/contracts/proposals/pricing-grid-v2.3-route-reconciliation.md`](proposals/pricing-grid-v2.3-route-reconciliation.md) — six-class taxonomy proposal resolving the open reconciliations between v2.2 and the route-governance v1.0 numbers ($2.00 pickup floor, $3.00 landed route-anchor). Awaiting Ben + Rene Class C `pricing.change` ratification; on ratification, this contract graduates to v2.3.
@@ -28,20 +28,28 @@ Rene + Viktor designed the operational naming + invoice-presentation layer in `#
 
 **Coding rule:** Claude Code MUST NOT create new "case" / "master carton" / "pallet" inventory SKUs. Order types are pricing/order abstractions; they decrement bag inventory.
 
-### Operating COGS (LOCKED 2026-04-29 PM)
+### Operating COGS (LOCKED 2026-04-30 PM — Class C `pricing.change` ratified)
 
-**$1.77 / bag** — final operating COGS for all margin / pricing / forecasting models.
+**$1.79 / bag** — final operating COGS for all margin / pricing / forecasting models.
 
-| Layer | Source | Per-bag |
-|---|---|---|
-| Manufacturing | Powers Confections | $1.52 |
-| Primary packaging (film/label) | Belmark (included above) | (in $1.52) |
-| Secondary packaging | Uline (master carton + inner cases + strip clips + S-hooks) | $0.25 |
-| **TOTAL operating COGS** | | **$1.77** |
+| Layer | Source | Per-bag | Verification |
+|---|---|---|---|
+| Albanese gummies (raw) | Albanese Confectionary Group | $1.037 | BoA 7020 outflow 2026-03-17 = $55,244.50 / 53,280 bags = $1.037/bag |
+| Belmark film (primary packaging) | Belmark, Inc | $0.131 | BoA 7020 outflow 2026-03-18 = $6,989.66 / 53,280 bags = $0.131/bag |
+| Powers labor + cartons (assembly) | Powers Inc. | $0.376 | BoA 7020 outflow 2026-03-31 = $10,020.25 / 26,640 bags Run 1 = $0.376/bag |
+| **Factory subtotal** | | **$1.544** | |
+| Secondary packaging | Uline (master carton + inner cases + strip clips + S-hooks) | $0.25 | Per-master-carton Uline build below |
+| **TOTAL operating COGS** | | **$1.794 → $1.79** | |
 
 Per-master-carton Uline build: $2.68 (S-12605) + 6 × $0.61 (S-4315) + 6 × $0.32 (S-12559) + 6 × $0.10 (S-20269) = **$8.84 / 36 bags = ~$0.25 / bag**.
 
-Locked by Ben 2026-04-29 PM. Any margin/pricing model that uses a different COGS number is a doctrine violation.
+**Sources for the factory-side numbers:** QBO purchases query 2026-04-30 (vendors 32/33/34) cross-referenced against Gmail invoices (Albanese INV23-206741, Belmark Invoice #2084578 / PO# EM031626 / Quote Q1250326, Powers SO_0284052CM_20260409) and Greg Kroetch's pricing memo 2026-03-25 (Powers labor $0.35/bag + carton $0.85/case). See `#financials` thread `1777266794.573699` 2026-04-30 PM for the full reconciliation.
+
+**Class C `pricing.change` history:**
+- *2026-04-29 PM (v2.2 → originally locked at $1.77):* Ben locked the placeholder breakdown ($1.52 factory + $0.25 Uline). Factory $1.52 was an estimate — final invoices not yet reconciled.
+- *2026-04-30 PM (v2.2 → v2.3):* Reconciled factory side against actual paid invoices. Verified $1.544 (vs $1.52 placeholder, $0.024 understated). Ben approved 2026-04-30 in `#financials` thread `1777266794.573699`. Awaiting Rene's :white_check_mark: ratification for full Class C audit trail completion. **Use $1.79/bag for all forward analysis.**
+
+Any margin/pricing model that uses a different COGS number is a doctrine violation.
 
 ---
 

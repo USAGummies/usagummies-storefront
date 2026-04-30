@@ -10,7 +10,7 @@
 ## 0. Hard rules
 
 1. **Every dollar figure cites a source** per `/CLAUDE.md` "Financial Data Integrity" + `/contracts/governance.md` §1 #2. Cells without a citation are flagged `[needs QBO actual]` / `[needs live channel pull]` rather than fabricated.
-2. **COGS is $1.77/bag** (LOCKED 2026-04-29 PM per `/CLAUDE.md`). Powers manufacturing $1.52 + Uline secondary $0.25 = $1.77. *Note:* `src/lib/ops/pro-forma.ts:116` still has stale `cogsPerBag: 1.75` ("Albanese + Dutch Valley") — Ben to refresh in next pro-forma bump; this doc uses the locked $1.77.
+2. **COGS is $1.79/bag** (LOCKED 2026-04-29 PM per `/CLAUDE.md`). Powers manufacturing $1.52 + Uline secondary $0.25 = $1.79. *Note:* `src/lib/ops/pro-forma.ts:116` still has stale `cogsPerBag: 1.75` ("Albanese + Dutch Valley") — Ben to refresh in next pro-forma bump; this doc uses the locked $1.79.
 3. **Channel fees are sourced from each channel's published rate card.** Linked inline.
 4. **Shipping costs cite real auto-ship label data** (`#shipping` channel `#ops-audit` audit log) where available.
 
@@ -29,10 +29,10 @@ The math format: `Revenue − Channel Fees − COGS − Shipping = Gross Margin 
 | FBA fulfillment fee (Small Standard) | −$3.06 | [source: Amazon FBA fee 2026 — confirm size class via `/api/ops/amazon/settlements?action=fees`] |
 | Inbound shipping to FBA (blended per unit) | −$0.30 | [needs QBO actual — Uline+freight to Amazon receiving, divided by units shipped in] |
 | Storage (allocated monthly per unit) | −$0.05 | [needs QBO actual — Amazon monthly storage / units on hand] |
-| Operating COGS | −$1.77 | LOCKED 2026-04-29 |
+| Operating COGS | −$1.79 | LOCKED 2026-04-29 |
 | **Gross margin per bag** | **≈ $0.33** | **≈ 5.5% GM** |
 
-**Pro forma v23 had `fbaFees: 3.71` (combined ref + FBA) → `gpPerUnit: 0.53`.** This breakdown is more granular and uses the $1.77 COGS, so the GP/unit comes lower (~$0.33) — a more honest baseline.
+**Pro forma v23 had `fbaFees: 3.71` (combined ref + FBA) → `gpPerUnit: 0.53`.** This breakdown is more granular and uses the $1.79 COGS, so the GP/unit comes lower (~$0.33) — a more honest baseline.
 
 ### 1.2 Amazon FBM (we ship from our warehouse)
 
@@ -42,7 +42,7 @@ The math format: `Revenue − Channel Fees − COGS − Shipping = Gross Margin 
 | Referral fee (8%) | −$0.48 | Same as FBA |
 | FBA fulfillment fee | $0.00 | We fulfill, not Amazon |
 | USPS Ground Advantage label (1-bag mailer) | −$6.74–$6.95 | [source: `#shipping` audit log 2026-04-26..29 actual labels] |
-| Operating COGS | −$1.77 | LOCKED 2026-04-29 |
+| Operating COGS | −$1.79 | LOCKED 2026-04-29 |
 | **Gross margin per bag** | **≈ −$2.95 to −$3.16** | **NEGATIVE — single-bag FBM at $5.99 LOSES money on shipping** |
 
 **⚠ FLAG FOR BEN:** Amazon FBM single-bag orders at $5.99 retail with $6.74+ USPS labels are loss-making. Either (a) buyer-paid shipping is a separate Amazon line (not in the $5.99 — confirm in Seller Central), (b) the FBM offer is priced higher than $5.99, or (c) we should pause Amazon FBM single-bag offers. The recent live FBM orders in `#shipping` (Wonderland RV Park, Amy Catalano, Thomas Shimizu) need P&L verification. **Rene + Ben action item.**
@@ -54,7 +54,7 @@ The math format: `Revenue − Channel Fees − COGS − Shipping = Gross Margin 
 | Gross revenue (sell price) | $5.99 | [source: `/contracts/outreach-pitch-spec.md` MSRP $5.99 single bag] |
 | Shopify Payments fee (2.9% + $0.30) | −$0.47 | (2.9% × $5.99) + $0.30 = $0.47 [source: shopify.com/pricing] |
 | USPS Ground Advantage label | −$6.74–$6.95 | [source: `#shipping` audit log Shopify FBM labels — Mike Prior 2026-04-29 = $6.95] |
-| Operating COGS | −$1.77 | LOCKED 2026-04-29 |
+| Operating COGS | −$1.79 | LOCKED 2026-04-29 |
 | **Gross margin per bag** | **≈ −$2.99 to −$3.20** | **NEGATIVE on free-shipping single-bag** |
 
 **⚠ FLAG:** Same shipping-loss issue as Amazon FBM. Shopify DTC single-bag at $5.99 with free shipping is structurally unprofitable. Per `/contracts/outreach-pitch-spec.md` §6 we offer free shipping at 5+ bags (the pricing-ladder threshold). **Single-bag DTC needs either a higher price or a $5–7 shipping line on the cart.**
@@ -66,7 +66,7 @@ The math format: `Revenue − Channel Fees − COGS − Shipping = Gross Margin 
 | Gross revenue | $25.00 | [source: `/contracts/outreach-pitch-spec.md` 5-bag bundle entry] |
 | Shopify Payments fee (2.9% + $0.30) | −$1.03 | (2.9% × $25.00) + $0.30 |
 | USPS Ground Advantage label (5-bag box) | −$8.00–$10.00 | [needs `#shipping` audit log — pull a recent 5-bag DTC label] |
-| Operating COGS (5 × $1.77) | −$8.85 | LOCKED 2026-04-29 |
+| Operating COGS (5 × $1.79) | −$8.85 | LOCKED 2026-04-29 |
 | **Gross margin** | **≈ $5.12–$7.12** | **≈ $1.02–$1.42 per bag · ~20–28% GM** |
 
 ### 1.5 Shopify DTC (10-bag bundle)
@@ -76,7 +76,7 @@ The math format: `Revenue − Channel Fees − COGS − Shipping = Gross Margin 
 | Gross revenue | $50.00 | [source: 10-bag bundle entry] |
 | Shopify Payments fee | −$1.75 | (2.9% × $50.00) + $0.30 |
 | USPS Priority Mail label | −$10.00–$13.00 | [needs `#shipping` audit log — pull a recent 10-bag DTC label] |
-| Operating COGS (10 × $1.77) | −$17.70 | LOCKED 2026-04-29 |
+| Operating COGS (10 × $1.79) | −$17.70 | LOCKED 2026-04-29 |
 | **Gross margin** | **≈ $17.55–$20.55** | **≈ $1.76–$2.06 per bag · ~35–41% GM** |
 
 ### 1.6 Faire — Direct invite (commission-free path)
@@ -87,7 +87,7 @@ Faire Direct is the 0%-commission program for sellers who invite their own custo
 |---|---:|---|
 | Gross revenue | $2.49 | [source: `/contracts/distributor-pricing-commitments.md` §1 sell-sheet] |
 | Faire commission (Direct = 0%) | $0.00 | [source: faire.com/seller direct-invite program] |
-| Operating COGS | −$1.77 | LOCKED 2026-04-29 |
+| Operating COGS | −$1.79 | LOCKED 2026-04-29 |
 | Per-bag freight allocation (when delivered) | −$0.20–$0.40 | [source: `/contracts/sales-tour-field-workflow.md` regional table — 1-pallet drive cost ÷ 900 bags ≈ $0.07–$0.50 depending on state] |
 | **Gross margin per bag** | **≈ $0.32–$0.52** | **≈ 13–21% GM** |
 
@@ -97,7 +97,7 @@ Faire Direct is the 0%-commission program for sellers who invite their own custo
 |---|---:|---|
 | Gross revenue | $2.10 | [source: `/contracts/distributor-pricing-commitments.md` §2 Option-B] |
 | Faire commission | $0.00 | (Direct invite path) |
-| Operating COGS | −$1.77 | LOCKED 2026-04-29 |
+| Operating COGS | −$1.79 | LOCKED 2026-04-29 |
 | Per-bag freight (delivered) | −$0.20–$0.40 | Same as 1.6 |
 | **Gross margin per bag** | **≈ −$0.07 to $0.13** | **≈ −3% to 6% GM — *thin margin floor*** |
 
@@ -108,7 +108,7 @@ Faire Direct is the 0%-commission program for sellers who invite their own custo
 | Line | Per bag ($3.49 landed master carton, 36 bags) | Notes / Source |
 |---|---:|---|
 | Gross revenue | $3.49 | [source: `/contracts/wholesale-pricing.md` v2.2 §2 B2] |
-| Operating COGS | −$1.77 | LOCKED 2026-04-29 |
+| Operating COGS | −$1.79 | LOCKED 2026-04-29 |
 | Per-bag freight (master carton landed, drive economics) | −$0.10–$0.30 | [source: founder-drive economics from `/contracts/wholesale-pricing.md` §3] |
 | **Gross margin per bag** | **≈ $1.42–$1.62** | **≈ 41–46% GM** |
 
@@ -117,7 +117,7 @@ Faire Direct is the 0%-commission program for sellers who invite their own custo
 | Line | Per bag ($3.25 + buyer freight, 36 bags) | Notes / Source |
 |---|---:|---|
 | Gross revenue | $3.25 | [source: `wholesale-pricing.md` v2.2 §2 B3] |
-| Operating COGS | −$1.77 | LOCKED 2026-04-29 |
+| Operating COGS | −$1.79 | LOCKED 2026-04-29 |
 | Per-bag freight | $0.00 | Buyer pays, no P&L impact |
 | **Gross margin per bag** | **≈ $1.48** | **≈ 46% GM** |
 
@@ -126,7 +126,7 @@ Faire Direct is the 0%-commission program for sellers who invite their own custo
 | Line | Per bag ($3.25, 900 bags/pallet) | Notes / Source |
 |---|---:|---|
 | Gross revenue | $3.25 | [source: B4] |
-| Operating COGS | −$1.77 | LOCKED 2026-04-29 |
+| Operating COGS | −$1.79 | LOCKED 2026-04-29 |
 | Per-bag freight (pallet drive economics) | −$0.07–$0.50 | [source: `freight-corridor-table.ts` ÷ 900 — WA $25/pallet ÷ 900 = $0.03; AZ $445/pallet ÷ 900 = $0.49] |
 | **Gross margin per bag** | **≈ $0.98–$1.41** | **≈ 30–43% GM (state-dependent)** |
 
@@ -135,7 +135,7 @@ Faire Direct is the 0%-commission program for sellers who invite their own custo
 | Line | Per bag ($3.00, 900 bags) | Notes / Source |
 |---|---:|---|
 | Gross revenue | $3.00 | [source: B5] |
-| Operating COGS | −$1.77 | LOCKED 2026-04-29 |
+| Operating COGS | −$1.79 | LOCKED 2026-04-29 |
 | Per-bag freight | $0.00 | Buyer pays |
 | **Gross margin per bag** | **≈ $1.23** | **≈ 41% GM** |
 
@@ -144,7 +144,7 @@ Faire Direct is the 0%-commission program for sellers who invite their own custo
 | Line | Per bag ($3.00 landed, 3+ pallet MOQ) | Notes / Source |
 |---|---:|---|
 | Gross revenue | $3.00 | [source: `/contracts/pricing-route-governance.md` §1 — proposed C-ANCH; awaits Q2 ratification] |
-| Operating COGS | −$1.77 | LOCKED 2026-04-29 |
+| Operating COGS | −$1.79 | LOCKED 2026-04-29 |
 | Per-bag freight (3+ pallet, drive amortized) | −$0.05–$0.35 | Multi-pallet drive math: total drive cost spread over 2700+ bags |
 | **Gross margin per bag** | **≈ $0.88–$1.18** | **≈ 29–39% GM (route-density dependent)** |
 
@@ -155,7 +155,7 @@ The route-anchor margin is structurally lower than B5 buyer-pays — but volume 
 | Line | Per bag (per show terms) | Notes / Source |
 |---|---:|---|
 | Gross revenue | varies | [source: `/contracts/distributor-pricing-commitments.md` §3 — Reunion 2026 was $3.25 + free freight at master carton MOQ; expired post-show] |
-| Operating COGS | −$1.77 | LOCKED 2026-04-29 |
+| Operating COGS | −$1.79 | LOCKED 2026-04-29 |
 | Per-bag freight (we absorb full freight on master cartons during shows) | −$0.30–$0.60 | [source: master-carton freight ÷ 36 bags] |
 | **Gross margin per bag** | **strictly per-show; flagged as one-off in `outreach-pitch-spec.md` §4 BLOCKED claims** | |
 
@@ -211,17 +211,17 @@ When you populate the proforma model from this framework:
 
 ## 5. Cross-references
 
-- `/CLAUDE.md` "Inventory & COGS Model" — $1.77/bag locked 2026-04-29
+- `/CLAUDE.md` "Inventory & COGS Model" — $1.79/bag locked 2026-04-29
 - `/contracts/wholesale-pricing.md` v2.2 — B-tier prices + freight modes
 - `/contracts/distributor-pricing-commitments.md` v1.0 — Sell-sheet $2.49, Option-A $2.50, Option-B $2.10
 - `/contracts/pricing-route-governance.md` v1.0 §3 — founder-drive freight economics
 - `/contracts/proposals/pricing-grid-v2.3-route-reconciliation.md` — C-ANCH (route anchor) proposed class
 - `/contracts/sales-tour-field-workflow.md` §3 — `freight-corridor-table.ts` per-state per-pallet drive cost
-- `src/lib/ops/pro-forma.ts` — Pro Forma v23 monthly volume + revenue + GP targets (needs $1.75 → $1.77 COGS refresh)
+- `src/lib/ops/pro-forma.ts` — Pro Forma v23 monthly volume + revenue + GP targets (needs $1.75 → $1.79 COGS refresh)
 - `/contracts/outreach-pitch-spec.md` — MSRP $5.99 / $4.99 retail tiers; bundle pricing
 
 ---
 
 ## 6. Version history
 
-- **0.1 — 2026-04-30** — First publication. Per-channel per-bag gross-margin framework for the proforma. Surfaces three flagged action items: (a) Amazon FBM single-bag negative margin, (b) Shopify DTC single-bag negative margin, (c) Pro Forma v23 needs $1.75→$1.77 COGS refresh + add Shopify DTC + Faire channels.
+- **0.1 — 2026-04-30** — First publication. Per-channel per-bag gross-margin framework for the proforma. Surfaces three flagged action items: (a) Amazon FBM single-bag negative margin, (b) Shopify DTC single-bag negative margin, (c) Pro Forma v23 needs $1.75→$1.79 COGS refresh + add Shopify DTC + Faire channels.

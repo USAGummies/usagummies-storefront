@@ -26,10 +26,10 @@ Usage examples:
 Output: JSON quote object + a human-readable summary block.
 
 The numbers in this script come from canonical contracts:
-  /contracts/wholesale-pricing.md §1 (COGS = $1.77 standard, $1.52/$1.60 reduced)
+  /contracts/wholesale-pricing.md §1 (COGS = $1.79 standard, $1.54/$1.62 reduced — Class C v2.3 lock 2026-04-30)
   /contracts/distributor-pricing-commitments.md §1-2 (sell-sheet + Option B floor)
   /contracts/proforma-channel-margins.md (margin-floor flags)
-  /CLAUDE.md (PLACEHOLDER cost-basis caveat — surfaced as a flag in every output)
+  /CLAUDE.md (3-vendor verified-COGS reconciliation — $1.544 factory + $0.25 Uline = $1.794 → $1.79)
 
 Approval taxonomy: see /contracts/custom-quote-formula.md §5.
 """
@@ -42,10 +42,15 @@ from dataclasses import dataclass, asdict, field
 from typing import Optional
 
 # ── Canonical numbers (from /contracts/) ─────────────────────────────────────
+# COGS values reflect the Class C v2.3 lock 2026-04-30 (Ben approved):
+#   factory $1.544 (Albanese $1.037 + Belmark $0.131 + Powers $0.376)
+#   + Uline $0.25  (master + 6 inner cases + 6 strip clips + 6 hooks per MC)
+#   = $1.794 → $1.79/bag fully loaded
+# Loose-pack formats remove Uline secondary components incrementally:
 COGS_BY_FORMAT = {
-    "standard":            1.77,  # full secondary packaging
-    "loose_inner":         1.60,  # inner cases + clip + hook removed
-    "loose_no_secondary":  1.52,  # full secondary packaging removed
+    "standard":            1.79,  # full secondary packaging (factory $1.544 + Uline $0.25)
+    "loose_inner":         1.62,  # inner cases + clip + hook removed (Uline drops to $0.08)
+    "loose_no_secondary":  1.54,  # full secondary packaging removed (Uline = $0)
 }
 SECONDARY_REMOVAL_BY_FORMAT = {
     "standard":            0.00,
@@ -53,7 +58,7 @@ SECONDARY_REMOVAL_BY_FORMAT = {
     "loose_no_secondary":  0.25,
 }
 MIN_MARGIN_FLOOR = {
-    "usa_gummies":   0.33,  # $/bag — ~18% GP at $1.77, ~22% at $1.52
+    "usa_gummies":   0.33,  # $/bag — ~18% GP at $1.79 standard, ~21% at $1.54 loose
     "private_label": 0.25,  # PL floor harder — pure cash-flow, lower margin OK
 }
 WHALE_WIGGLE = {

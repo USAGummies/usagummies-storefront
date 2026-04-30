@@ -23,6 +23,10 @@ import { kv } from "@vercel/kv";
 import { isAuthorized } from "@/lib/ops/abra-auth";
 import { getChannel } from "@/lib/ops/control-plane/channels";
 import { postMessage } from "@/lib/ops/control-plane/slack";
+import {
+  digestContentFingerprint,
+  shouldMirror,
+} from "@/lib/ops/control-plane/slack/mirror-dedup";
 import { newRunContext } from "@/lib/ops/control-plane/run-id";
 import { auditStore } from "@/lib/ops/control-plane/stores";
 import { buildAuditEntry } from "@/lib/ops/control-plane/audit";
@@ -166,13 +170,26 @@ async function runAgent(req: Request): Promise<Response> {
   if (shouldPost) {
     const channel = getChannel("operations");
     if (channel) {
-      try {
-        const res = await postMessage({ channel: channel.name, text: rendered });
-        if (res.ok) postedTo = channel.name;
-      } catch (err) {
-        digest.degraded.push(
-          `slack-post: ${err instanceof Error ? err.message : String(err)}`,
-        );
+      // Content-hash dedup: same digest body (vendors stale, voids, wallet
+      // balances) reposts daily. 24h TTL on content fingerprint = post
+      // ONCE per real change, silent on no-state-change days.
+      const contentFp = digestContentFingerprint(rendered);
+      const ok = await shouldMirror({
+        fingerprint: ["ops-agent-digest", contentFp],
+        ttlSeconds: 86_400,
+        namespace: "slack-mirror-dedup:v1:digest",
+      });
+      if (!ok) {
+        digest.degraded.push("slack-post: dedup-skip (digest unchanged in last 24h)");
+      } else {
+        try {
+          const res = await postMessage({ channel: channel.name, text: rendered });
+          if (res.ok) postedTo = channel.name;
+        } catch (err) {
+          digest.degraded.push(
+            `slack-post: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
       }
     } else {
       digest.degraded.push("slack-post: #operations channel not registered");

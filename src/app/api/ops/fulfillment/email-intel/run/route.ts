@@ -50,6 +50,7 @@ import {
 import { generateDraftReply } from "@/lib/ops/email-intelligence/draft";
 import {
   renderApprovalCard,
+  hasActionableSignal,
   renderEmailReport,
   type ScannedEmail,
 } from "@/lib/ops/email-intelligence/report";
@@ -452,7 +453,13 @@ async function runOnce(opts: RunBody): Promise<RunResult> {
   });
 
   let postedTo: string | null = null;
-  if (!opts.dryRun) {
+  // Slim mode (Cut C): suppress the post entirely when nothing
+  // actionable surfaced. Most digests were posting "_Scanned 50,
+  // classified 1, FYI/junk (1) — collapsed_" — pure noise. Critical /
+  // approval / sample-request / vendor / B2B / receipts buckets all
+  // still trigger the post; junk-only does not.
+  const actionable = hasActionableSignal(scanned);
+  if (!opts.dryRun && actionable) {
     const channelKey =
       (opts.slackChannel as Parameters<typeof getChannel>[0]) ?? "ops-daily";
     const channel = getChannel(channelKey);

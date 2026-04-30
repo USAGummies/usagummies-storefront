@@ -94,10 +94,18 @@ describe("composeDailyBrief()", () => {
     expect(txt).toContain("Send outreach email");
   });
 
-  it("refuses to fabricate revenue — renders 'unavailable' when revenueYesterday omitted", () => {
+  it("refuses to fabricate revenue — slim mode suppresses the entire revenue block when omitted", () => {
+    // Slim mode (Cut B 2026-04-30): the always-unavailable filler line
+    // ("External revenue integrations not wired") posted every brief
+    // and never changed. Removed in favor of silent-when-no-data.
+    // No-fabrication is enforced by ABSENCE of the section, not by a
+    // fallback line — once revenue is wired, the live block prints.
     const out = composeDailyBrief(baseInput());
-    expect(JSON.stringify(out.blocks)).toContain("External revenue integrations not wired");
-    expect(JSON.stringify(out.blocks)).toContain("rather than fabricated");
+    const txt = JSON.stringify(out.blocks);
+    expect(txt).not.toContain("Revenue (yesterday)");
+    expect(txt).not.toContain("rather than fabricated");
+    // Sanity: a fabricated number should never appear either.
+    expect(txt).not.toMatch(/\$\d+\.\d{2}.*Shopify/);
   });
 
   it("shows revenue lines when supplied with a live source", () => {
@@ -122,7 +130,12 @@ describe("composeDailyBrief()", () => {
     expect(txt).toContain("SP-API credentials not rotated yet");
   });
 
-  it("counts audit activity per division in the last 24h only", () => {
+  it("counts audit activity in meta but slim mode suppresses the by-division block", () => {
+    // Slim mode (Cut B 2026-04-30): the "Audit activity (last 24h) —
+    // production-supply-chain: 18, sales: 14..." block posted every
+    // brief with the same shape; Ben said it wasn't actionable. Meta
+    // count remains for downstream consumers; the rendered block is
+    // omitted from #ops-daily. Full audit log lives in #ops-audit.
     const entries = [
       buildAuditEntry(
         newRunContext({ agentId: "viktor", division: "sales", source: "on-demand" }),
@@ -141,11 +154,10 @@ describe("composeDailyBrief()", () => {
       ),
     ];
     const out = composeDailyBrief({ ...baseInput(), recentAudit: entries });
-    expect(out.meta.activityLast24h).toBe(2);
+    expect(out.meta.activityLast24h).toBe(2); // meta still tracks
     const txt = JSON.stringify(out.blocks);
-    expect(txt).toContain("Audit activity (last 24h)");
-    expect(txt).toContain("sales");
-    expect(txt).toContain("financials");
+    expect(txt).not.toContain("Audit activity (last 24h)"); // block suppressed
+    expect(txt).not.toContain("Active divisions"); // roster also suppressed
   });
 
   it("includes the last drift audit summary when provided", () => {

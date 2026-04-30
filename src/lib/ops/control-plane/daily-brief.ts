@@ -403,15 +403,10 @@ export function composeDailyBrief(input: BriefInput): BriefOutput {
       type: "section",
       text: { type: "mrkdwn", text: `*Revenue (yesterday)*\n${rows}` },
     });
-  } else {
-    blocks.push({
-      type: "section",
-      text: {
-        type: "mrkdwn",
-        text: `*Revenue (yesterday)*\n_External revenue integrations not wired into the brief yet (Shopify / Amazon / Faire). Per blueprint non-negotiable #2, this is shown as unavailable rather than fabricated._`,
-      },
-    });
   }
+  // Slim mode: suppress the "Revenue unavailable — not wired" filler line.
+  // It posts every brief and never changes. Once integrations are wired,
+  // the `if (input.revenue)` branch above will fire.
 
   // ---- Cash position ----
   if (input.cashPosition) {
@@ -459,15 +454,10 @@ export function composeDailyBrief(input: BriefInput): BriefOutput {
         text: renderARPositionMarkdown(input.arPosition),
       },
     });
-  } else {
-    blocks.push({
-      type: "section",
-      text: {
-        type: "mrkdwn",
-        text: `*AR Outstanding (sent invoices)*  unavailable — QBO AR query not wired into this run; drafts are NOT AR per 2026-03-30 Ben correction.`,
-      },
-    });
   }
+  // Slim mode: suppress the "AR unavailable — not wired" filler line.
+  // It posts every brief and never changes. When the QBO AR query lands,
+  // the `if (input.arPosition)` branch above will fire.
 
   // ---- Shipping Hub pre-flight (morning only) ----
   if (input.kind === "morning" && input.preflight) {
@@ -606,26 +596,15 @@ export function composeDailyBrief(input: BriefInput): BriefOutput {
   }
 
   // ---- Activity (audit entries last 24h) ----
+  // Slim mode: suppressed in the Slack brief. Ben said the "by-division"
+  // counts ("production-supply-chain: 18") aren't actionable. Full audit
+  // trail still lives in #ops-audit + the audit store.
+  // (Block intentionally omitted — see ops-audit for raw activity.)
   const totalActivity = Object.values(activityByDivision).reduce((a, b) => a + b, 0);
-  if (totalActivity > 0) {
-    const rows = Object.entries(activityByDivision)
-      .sort((a, b) => b[1] - a[1])
-      .map(([division, count]) => `• *${division}:* ${count}`)
-      .join("\n");
-    blocks.push({
-      type: "section",
-      text: { type: "mrkdwn", text: `*Audit activity (last 24h)*\n${rows}` },
-    });
-  }
 
-  // ---- Active divisions roster (always shown for orientation) ----
-  const divisionRoster = input.activeDivisions
-    .map((d) => `• *${d.name}* — ${d.humanOwner}`)
-    .join("\n");
-  blocks.push({
-    type: "section",
-    text: { type: "mrkdwn", text: `*Active divisions*\n${divisionRoster}` },
-  });
+  // ---- Active divisions roster ----
+  // Slim mode: also suppressed — same 6-row block on every brief, zero
+  // information value. Org chart lives in /contracts/divisions.json.
 
   // ---- Last drift audit summary ----
   if (input.lastDriftAuditSummary) {
@@ -958,12 +937,21 @@ function formatCount(value: number | null): string {
  *   ...
  *   _Per-stage: Lead 3, Sample Shipped 2, Quote/PO Sent 1_
  */
+/**
+ * Brief-slim cap on the stale-buyers list. The full list lives at
+ * `/ops/sales`; the brief only surfaces the top few + a tally so the
+ * post stays scannable. Drops from 8 lines (which Ben said was
+ * overwhelming) to 3 + a "+N more" footer.
+ */
+const STALE_BUYERS_TOP_N_IN_BRIEF = 3;
+
 export function renderStaleBuyersMarkdown(slice: StaleBuyerSummary): string {
   if (slice.stalest.length === 0) return "";
   const totalStale = slice.staleByStage.reduce((s, x) => s + x.count, 0);
   const header = `*Stale buyers — ${totalStale} deal(s) need follow-up* _(scanned ${slice.activeDealsScanned} active)_`;
   const lines: string[] = [header];
-  for (const d of slice.stalest) {
+  const top = slice.stalest.slice(0, STALE_BUYERS_TOP_N_IN_BRIEF);
+  for (const d of top) {
     const days = Number.isFinite(d.daysSinceActivity)
       ? `${d.daysSinceActivity}d`
       : "no activity";
@@ -971,6 +959,10 @@ export function renderStaleBuyersMarkdown(slice: StaleBuyerSummary): string {
       ? d.primaryCompanyName
       : d.dealName.slice(0, 60);
     lines.push(`• \`${d.stageName}\` — ${days} — ${company} — _${d.nextAction}_`);
+  }
+  const remaining = slice.stalest.length - top.length;
+  if (remaining > 0) {
+    lines.push(`_…and ${remaining} more — full list at <https://www.usagummies.com/ops/sales|/ops/sales>_`);
   }
   if (slice.staleByStage.length > 0) {
     const perStage = slice.staleByStage

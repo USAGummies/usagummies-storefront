@@ -78,6 +78,37 @@ function bucketEmails(scanned: ScannedEmail[]): Record<EmailCategory, ScannedEma
  * Render the full Slack report. Returns a string Markdown-style payload
  * for `chat.postMessage` `text` field.
  */
+/**
+ * Returns true iff the email-intel run produced any actionable signal —
+ * i.e. anything outside the `junk_fyi` bucket. Used to suppress the
+ * Slack post on no-actionable runs (which were ~70% of digests posting
+ * `_Scanned 50, classified 1, FYI/junk (1) — collapsed_` to #ops-daily).
+ *
+ * Drafts-ready and receipts/docs DO count as actionable — Ben/Rene want
+ * to know about new draft replies and incoming invoices.
+ */
+export function hasActionableSignal(scanned: ScannedEmail[]): boolean {
+  if (!scanned.length) return false;
+  const buckets = bucketEmails(scanned);
+  const hasCritical =
+    buckets.shipping_issue.length > 0 ||
+    buckets.ap_finance.some((s) => s.alreadyEngaged);
+  if (hasCritical) return true;
+  if (scanned.some((s) => s.hasApproval || s.hasDraft)) return true;
+  for (const k of [
+    "sample_request",
+    "ap_finance",
+    "vendor_supply",
+    "b2b_sales",
+    "customer_support",
+    "marketing_pr",
+    "receipt_document",
+  ] as const) {
+    if (buckets[k].length > 0) return true;
+  }
+  return false;
+}
+
 export function renderEmailReport(opts: {
   scanned: ScannedEmail[];
   rollup: ReportRollup;

@@ -74,19 +74,45 @@ TESTIMONIALS = [
 
 def load_font(size, bold=False):
     """Try a few common font paths; fallback to default if missing."""
-    candidates = [
+    # Impact has the bold display look but is missing many glyphs (★, 🇺🇸).
+    # Use Helvetica/SFNS for general text (full Unicode coverage), reserve
+    # Impact only when explicitly requested via bold=True.
+    bold_candidates = [
         "/System/Library/Fonts/Supplemental/Impact.ttf",
+        "/System/Library/Fonts/HelveticaNeue.ttc",
+    ]
+    regular_candidates = [
         "/System/Library/Fonts/Helvetica.ttc",
-        "/Library/Fonts/Arial Bold.ttf",
+        "/System/Library/Fonts/HelveticaNeue.ttc",
         "/System/Library/Fonts/SFNS.ttf",
     ]
-    for p in candidates:
+    for p in (bold_candidates if bold else regular_candidates):
         if os.path.exists(p):
             try:
                 return ImageFont.truetype(p, size)
             except Exception:
                 continue
     return ImageFont.load_default()
+
+
+def draw_star(draw, cx, cy, r, fill):
+    """Draw a 5-point star polygon centered at (cx, cy) with radius r."""
+    import math
+    points = []
+    for i in range(10):
+        angle = math.pi / 2 + i * math.pi / 5
+        radius = r if i % 2 == 0 else r * 0.4
+        points.append((cx + radius * math.cos(angle), cy - radius * math.sin(angle)))
+    draw.polygon(points, fill=fill)
+
+
+def draw_star_row(draw, cy, count, r, gap, fill):
+    """Draw `count` stars centered horizontally at vertical center cy."""
+    total_w = count * (r * 2) + (count - 1) * gap
+    start_x = (W - total_w) // 2 + r
+    for i in range(count):
+        cx = start_x + i * (r * 2 + gap)
+        draw_star(draw, cx, cy, r, fill)
 
 
 def draw_centered_text(draw, text, y, font, fill, max_width=None, line_spacing=1.15):
@@ -113,31 +139,30 @@ def make_card(t):
     # CTA accent stripe
     draw.rectangle([(0, H - cta_h), (W, H - cta_h + 8)], fill=RED)
 
-    # Logo wordmark (text-based since we don't ship a font that mimics the bag)
-    logo_font = load_font(64)
-    label_font = load_font(28)
-    hook_font = load_font(60)
-    quote_font = load_font(76)
+    # Fonts — bold=True hits Impact for display, =False uses Helvetica for body/Unicode
+    label_font = load_font(28, bold=True)
+    hook_font = load_font(60, bold=True)
+    quote_font = load_font(76, bold=True)
     name_font = load_font(36)
-    you_font = load_font(72)
-    cta_font = load_font(76)
-    cta_sub_font = load_font(36)
-    star_font = load_font(54)
+    you_font = load_font(72, bold=True)
+    cta_font = load_font(76, bold=True)
+    cta_sub_font = load_font(34)
 
-    # Tiny eyebrow tag
-    eyebrow = "★ REAL VERIFIED BUYER ★"
-    draw_centered_text(draw, eyebrow, 60, label_font, RED)
+    # Eyebrow with star drawn glyph (skip Unicode stars that don't render in Impact)
+    draw_star(draw, 360, 75, 14, RED)
+    draw_centered_text(draw, "REAL VERIFIED BUYER", 60, label_font, RED)
+    draw_star(draw, W - 360, 75, 14, RED)
 
     # Hook ("Tommie is ordering more.")
     y = draw_centered_text(draw, t["hook"], 110, hook_font, NAVY)
 
     # Quote (the heart of the ad)
     y += 40
-    y = draw_centered_text(draw, "“" + t["quote"] + "”", y, quote_font, NAVY, line_spacing=1.2)
+    y = draw_centered_text(draw, '"' + t["quote"] + '"', y, quote_font, NAVY, line_spacing=1.2)
 
-    # 5 stars
-    y += 20
-    draw_centered_text(draw, "★ ★ ★ ★ ★", y, star_font, GOLD)
+    # 5 stars (drawn polygons, not Unicode)
+    y += 30
+    draw_star_row(draw, y + 25, count=5, r=24, gap=14, fill=GOLD)
     y += 70
 
     # Author
@@ -151,7 +176,7 @@ def make_card(t):
     # Bottom CTA (white text on navy)
     cta_y = H - cta_h + 50
     draw_centered_text(draw, "BUY 4. GET 1 FREE.", cta_y, cta_font, OFF_WHITE)
-    draw_centered_text(draw, "$23.96 · 5-Pack · FREE SHIPPING 🇺🇸", cta_y + 90, cta_sub_font, (255, 255, 255))
+    draw_centered_text(draw, "$23.96  ·  5-PACK  ·  FREE SHIPPING", cta_y + 95, cta_sub_font, (255, 255, 255))
 
     return img
 

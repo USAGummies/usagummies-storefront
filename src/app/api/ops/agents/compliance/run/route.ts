@@ -28,6 +28,10 @@ import { NextResponse } from "next/server";
 import { isAuthorized } from "@/lib/ops/abra-auth";
 import { getChannel } from "@/lib/ops/control-plane/channels";
 import { postMessage } from "@/lib/ops/control-plane/slack";
+import {
+  digestContentFingerprint,
+  shouldMirror,
+} from "@/lib/ops/control-plane/slack/mirror-dedup";
 import { newRunContext } from "@/lib/ops/control-plane/run-id";
 import { auditStore } from "@/lib/ops/control-plane/stores";
 import { buildAuditEntry } from "@/lib/ops/control-plane/audit";
@@ -298,13 +302,26 @@ async function emitResult(
     const target = result.mode === "degraded" ? "ops-audit" : "operations";
     const channel = getChannel(target);
     if (channel) {
-      try {
-        const res = await postMessage({ channel: channel.name, text: result.rendered });
-        if (res.ok) result.postedTo = channel.name;
-      } catch (err) {
-        result.degraded.push(
-          `slack-post: ${err instanceof Error ? err.message : String(err)}`,
-        );
+      // Content-hash dedup: in DEGRADED mode the same FALLBACK doctrine
+      // list reposts daily until the calendar is populated — pure noise.
+      // 24h TTL on the content fingerprint → posts ONCE per change.
+      const contentFp = digestContentFingerprint(result.rendered);
+      const ok = await shouldMirror({
+        fingerprint: ["compliance-digest", result.mode, contentFp],
+        ttlSeconds: 86_400,
+        namespace: "slack-mirror-dedup:v1:digest",
+      });
+      if (!ok) {
+        result.degraded.push(`slack-post: dedup-skip (content unchanged in last 24h)`);
+      } else {
+        try {
+          const res = await postMessage({ channel: channel.name, text: result.rendered });
+          if (res.ok) result.postedTo = channel.name;
+        } catch (err) {
+          result.degraded.push(
+            `slack-post: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
       }
     } else {
       result.degraded.push(`slack-post: #${target} channel not registered`);

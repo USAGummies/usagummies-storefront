@@ -47,6 +47,7 @@ import { getChannel } from "@/lib/ops/control-plane/channels";
 import { newRunContext } from "@/lib/ops/control-plane/run-id";
 import { auditSurface } from "@/lib/ops/control-plane/slack";
 import { postMessage } from "@/lib/ops/control-plane/slack/client";
+import { shouldMirror } from "@/lib/ops/control-plane/slack/mirror-dedup";
 import { auditStore } from "@/lib/ops/control-plane/stores";
 import {
   createLabelForShipStationOrder,
@@ -727,11 +728,51 @@ async function postAlertOnSlackUploadFailure(args: {
   try {
     const alertsChannel = getChannel("ops-alerts");
     if (!alertsChannel) return;
+    // Cut D: deduplicate scope/permission failures. `missing_scope` and
+    // `not_in_channel` are CONFIG bugs (bot OAuth missing files:write,
+    // or bot not invited to channel) — same root cause for every order
+    // until ops fixes the Slack app config. Posting one alert per
+    // failed shipment generates 3+ identical warnings/day. Dedup the
+    // class-of-error fingerprint with a 24h TTL so it surfaces once
+    // per day until the config is fixed; per-shipment errors with
+    // unique error strings still pass through.
+    const errString = args.slackError.toLowerCase();
+    const isConfigError =
+      errString.includes("missing_scope") ||
+      errString.includes("not_in_channel") ||
+      errString.includes("not_authed") ||
+      errString.includes("invalid_auth");
+    if (isConfigError) {
+      const ok = await shouldMirror({
+        fingerprint: ["slack-upload-config-error", args.slackError],
+        ttlSeconds: 86_400,
+        namespace: "slack-mirror-dedup:v1:upload-error",
+      });
+      if (!ok) return; // suppressed — already alerted today
+    }
     const lines: string[] = [
       `:warning: *Slack file upload FAILED for ${args.orderNumber}* (${args.source}) — label is bought, just couldn't post the PDF.`,
       `Tracking: \`${args.tracking ?? "?"}\` · ${args.service} · $${args.cost.toFixed(2)}`,
       `Slack error: \`${args.slackError}\``,
     ];
+    if (isConfigError) {
+      lines.push(
+        `:wrench: *Config fix:* this is a recurring Slack-app permission issue, not a per-order bug.`,
+      );
+      if (errString.includes("missing_scope")) {
+        lines.push(
+          "Add `files:write` (and `files:read` if not present) to the SLACK_BOT_TOKEN OAuth scopes, then re-install the app.",
+        );
+      }
+      if (errString.includes("not_in_channel")) {
+        lines.push(
+          "Invite the USA Gummies Ops bot to the destination channel: `/invite @USA Gummies Ops`",
+        );
+      }
+      lines.push(
+        "_This alert is rate-limited to 1×/day until the config is fixed. Drive backup link below stays accurate per-shipment._",
+      );
+    }
     if (args.labelDriveLink) {
       lines.push(`*Drive label PDF:* <${args.labelDriveLink}|click to open + print>`);
     } else {

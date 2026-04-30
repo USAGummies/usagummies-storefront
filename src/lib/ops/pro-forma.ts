@@ -113,20 +113,35 @@ export function getMonthsThrough(month: Month): Month[] {
 // ---------------------------------------------------------------------------
 
 export const UNIT_ECONOMICS = {
-  cogsPerBag: 1.75,         // Albanese + Dutch Valley, 50K unit run
+  // LOCKED 2026-04-30 PM by Ben — Class C `pricing.change` v2.2 → v2.3 ratified.
+  // See /CLAUDE.md "Inventory & COGS Model" + /contracts/wholesale-pricing.md §1.
+  // Verified breakdown (all sources cited in wholesale-pricing.md §1):
+  //   Albanese gummies   $1.037   (BoA outflow 2026-03-17 = $55,244.50)
+  //   Belmark film       $0.131   (BoA outflow 2026-03-18 = $6,989.66)
+  //   Powers labor+carts $0.376   (BoA outflow 2026-03-31 = $10,020.25)
+  //   Factory subtotal   $1.544
+  //   Uline secondary    $0.250   (master+inner+strip clip+S-hook = $8.84/MC ÷ 36 bags)
+  //   ─────────────────────────────
+  //   Operating COGS     $1.794 → $1.79/bag
+  // Replaces the prior $1.77 lock (which understated factory by $0.024/bag, 1.4%).
+  // Replaces the legacy $1.75 placeholder ("Albanese + Dutch Valley") from the v23 proforma build.
+  // NOTE: the downstream gpPerUnit values below were calibrated against the old $1.75 COGS and are STALE.
+  // Per /contracts/proforma-channel-margins.md the honest per-bag GM at $1.79 COGS comes lower than these numbers.
+  // Rene to refresh in next pro-forma bump; canonical per-channel GM math lives in /contracts/proforma-channel-margins.md.
+  cogsPerBag: 1.79,
   amazon: {
     retailPrice: 5.99,      // 7.5 oz bag MSRP
     fbaFees: 3.71,           // Referral + FBA fulfillment
-    gpPerUnit: 0.53,
+    gpPerUnit: 0.53,         // STALE — calibrated against $1.75 COGS; honest GP at $1.79 ≈ $0.31 per /contracts/proforma-channel-margins.md §1.1
   },
   wholesale: {
     price: 3.49,             // Retailer wholesale
-    gpPerUnit: 1.74,
+    gpPerUnit: 1.74,         // STALE — calibrated against $1.75 COGS; honest GP at $1.79 ≈ $1.70
   },
   distributor: {
     sellPrice: 2.50,         // Sold in 6-packs with display
     displayCostPerUnit: 0.33,
-    gpPerUnit: 0.42,
+    gpPerUnit: 0.42,         // STALE — calibrated against $1.75 COGS; honest GP at $1.79 ≈ $0.38
   },
 } as const;
 

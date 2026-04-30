@@ -14,6 +14,34 @@ import type { AuditLogEntry, ChannelId } from "../types";
 import { getChannel } from "../channels";
 
 import { postMessage } from "./client";
+import { shouldMirror } from "./mirror-dedup";
+
+/**
+ * Per-action TTL (seconds) for the Slack-mirror dedup. Audit STORE
+ * remains authoritative — these TTLs only suppress redundant Slack
+ * mirrors of the same `(action, actor, entity)` event.
+ *
+ * Default = 1h (matches the typical sweep cadence). Sweep-class actions
+ * that fire repeatedly against the same entity get 24h.
+ */
+const MIRROR_TTL_BY_ACTION_PREFIX: ReadonlyArray<readonly [string, number]> = [
+  // approval-expiry-sweeper escalates the same approval every hour →
+  // mirror once per day per approval, store keeps the full hourly trail.
+  ["approval.sweep.", 86_400],
+  // operating-memory drift sweep — same drift surfaces hourly until fixed.
+  ["memory.drift.", 86_400],
+  // fulfillment-drift-audit weekly — same artifact resurfaces.
+  ["fulfillment.drift.", 86_400],
+];
+
+const DEFAULT_MIRROR_TTL_SECONDS = 3_600;
+
+function ttlForAction(action: string): number {
+  for (const [prefix, ttl] of MIRROR_TTL_BY_ACTION_PREFIX) {
+    if (action.startsWith(prefix)) return ttl;
+  }
+  return DEFAULT_MIRROR_TTL_SECONDS;
+}
 
 export class AuditSurface implements AuditSlackSurface {
   private readonly channelName: string;
@@ -23,6 +51,21 @@ export class AuditSurface implements AuditSlackSurface {
   }
 
   async mirror(entry: AuditLogEntry): Promise<void> {
+    // Dedup: same (action, actor, entityType, entityId, division) within
+    // TTL → skip the Slack mirror. Audit store still has the full record.
+    const fingerprint: ReadonlyArray<string> = [
+      entry.action,
+      `${entry.actorType}:${entry.actorId}`,
+      entry.entityType,
+      entry.entityId ?? "",
+      entry.division,
+    ];
+    const ok = await shouldMirror({
+      fingerprint,
+      ttlSeconds: ttlForAction(entry.action),
+      namespace: "slack-mirror-dedup:v1:audit",
+    });
+    if (!ok) return; // dedup skip — store is authoritative
     const text = renderAuditLine(entry);
     await postMessage({ channel: this.channelName, text });
   }

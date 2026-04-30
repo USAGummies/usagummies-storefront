@@ -47,6 +47,7 @@ import {
   type LabelDestination,
   type LabelResult,
 } from "@/lib/ops/shipstation-client";
+import { uploadBufferToSlack } from "@/lib/ops/slack-file-upload";
 import type { QBOJournalEntryInput } from "@/lib/ops/qbo-client";
 
 export const runtime = "nodejs";

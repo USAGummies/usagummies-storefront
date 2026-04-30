@@ -19,6 +19,10 @@ import { isCronAuthorized, unauthorized } from "@/lib/ops/control-plane/admin-au
 import { getChannel } from "@/lib/ops/control-plane/channels";
 import { postMessage } from "@/lib/ops/control-plane/slack";
 import {
+  digestContentFingerprint,
+  shouldMirror,
+} from "@/lib/ops/control-plane/slack/mirror-dedup";
+import {
   listShipStationCarriers,
   listVoidedLabels,
 } from "@/lib/ops/shipstation-client";
@@ -196,21 +200,35 @@ export async function GET(req: Request): Promise<Response> {
     // visibility because it gates his next buy-loop.
     const channel = getChannel("operations");
     if (channel) {
-      try {
-        const res = await postMessage({
-          channel: channel.name,
-          text: rendered,
-        });
-        if (res.ok) {
-          posted = true;
-          postedTo = channel.name;
-        } else {
-          degraded.push(`slack-post: not ok`);
+      // Content-hash dedup: same wallet balances + same 6 stale voids
+      // reposted daily for 9 days running was pure noise. 24h TTL on
+      // content fingerprint = post only when balance crosses floor or
+      // a NEW void appears.
+      const contentFp = digestContentFingerprint(rendered);
+      const ok = await shouldMirror({
+        fingerprint: ["wallet-check", contentFp],
+        ttlSeconds: 86_400,
+        namespace: "slack-mirror-dedup:v1:digest",
+      });
+      if (!ok) {
+        degraded.push("slack-post: dedup-skip (no state change in last 24h)");
+      } else {
+        try {
+          const res = await postMessage({
+            channel: channel.name,
+            text: rendered,
+          });
+          if (res.ok) {
+            posted = true;
+            postedTo = channel.name;
+          } else {
+            degraded.push(`slack-post: not ok`);
+          }
+        } catch (err) {
+          degraded.push(
+            `slack-post: ${err instanceof Error ? err.message : String(err)}`,
+          );
         }
-      } catch (err) {
-        degraded.push(
-          `slack-post: ${err instanceof Error ? err.message : String(err)}`,
-        );
       }
     } else {
       degraded.push("slack-post: #operations channel not registered");
