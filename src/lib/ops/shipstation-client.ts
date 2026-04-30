@@ -82,8 +82,14 @@ const PACKAGE_PROFILES: Record<
   // 2026-04-21 when Amazon FBM begins, this is the default for every
   // 1-bag order. Dimensions fit USPS Ground Advantage w/o surcharge.
   mailer: { length: 9, width: 6, height: 2, weightLbs: 0.55 },
-  // Inner case: 6 bags 7.5 oz + inserts. ~6 lb packed (weighed 2026-04-20).
-  case: { length: 14, width: 10, height: 8, weightLbs: 6 },
+  // Inner case: 7×7×7 box, 5–10 bags 7.5 oz each + minimal void-fill.
+  // Real-world spec confirmed by Ben 2026-04-30 — replacing the prior
+  // 14×10×8/6lb spec which was generating overstated UPS Ground quotes
+  // ($16+ for 6 bags). 7×7×7 stays under the USPS Cubic Tier 0.2 threshold
+  // (0.198 cu ft) so we get cubic-tier rates on the heavier multi-bag
+  // bundles. Weight is set for a typical 7-bag pack (52.5 oz ≈ 3.3 lb)
+  // and getRates re-quotes per-order so the actual weight wins.
+  case: { length: 7, width: 7, height: 7, weightLbs: 3 },
   // Master carton: 6 cases × 6 bags = 36 bags 7.5 oz. Packed weight
   // measured 2026-04-20 by Ben = 21 lb 2 oz = 21.125 lb. Canonical for
   // all future shipments until a SKU or case-pack change is logged.

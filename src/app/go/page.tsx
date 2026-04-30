@@ -8,7 +8,13 @@ import GoTracker from "./GoTracker.client";
 
 // API route that creates a Storefront API cart and redirects to checkout
 // (bypasses the Shop Pay / shop.app redirect that the raw cart permalink triggers)
-const CHECKOUT_URL = "/go/checkout";
+//
+// 2026-04-30: bundle ladder migrated to native Shopify BXGY automatic discounts.
+// Buy 4 Get 1 Free → qty=5 ($23.96), Buy 5 Get 2 → qty=7 ($29.95),
+// Buy 7 Get 3 → qty=10 ($41.93). Free shipping applies to ALL orders.
+const CHECKOUT_URL = "/go/checkout?qty=5";  // 5-Pack: B4G1F
+const CHECKOUT_URL_7 = "/go/checkout?qty=7";  // 7-Pack: B5G2F
+const CHECKOUT_URL_10 = "/go/checkout?qty=10"; // 10-Pack: B7G3F
 const CHECKOUT_URL_1 = "/go/checkout?qty=1";
 
 const TOP_REVIEWS = AMAZON_REVIEWS.reviews.slice(0, 3);
@@ -158,7 +164,7 @@ export default function GoLandingPage() {
               fontWeight: 700,
             }}
           >
-            GET THE 5-PACK
+            BUY 4, GET 1 FREE
           </a>
         </div>
       </header>
@@ -175,7 +181,7 @@ export default function GoLandingPage() {
           letterSpacing: "0.5px",
         }}
       >
-        🇺🇸 FREE SHIPPING on every order — <span style={{ color: "#c7a062" }}>Add 5 bags to save $0.99/bag (a free bag)</span>
+        🇺🇸 <strong>FREE SHIPPING</strong> on every order · <span style={{ color: "#c7a062" }}>Buy 4, Get 1 FREE — bundle deal up to 3 free bags</span>
       </div>
 
       {/* MOBILE-FIRST HERO: Image + Compact Offer */}
@@ -280,41 +286,69 @@ export default function GoLandingPage() {
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
               <span className="lp-display" style={{ fontSize: 20, letterSpacing: "1px", color: "#1B2A4A" }}>
-                5-BAG BUNDLE
+                BUY 4, GET 1 FREE
               </span>
               <span style={{ background: "#c7362c", color: "#fff", fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 20 }}>
                 MOST POPULAR
               </span>
             </div>
             <div style={{ fontSize: 12, color: "#5f5b56", marginTop: 4, fontStyle: "italic" }}>
-              Half of our customers start here.
+              5-Pack — half of our customers start here.
             </div>
 
             <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginTop: 4 }}>
-              <span className="lp-display" style={{ fontSize: 38, color: "#1B2A4A", lineHeight: 1 }}>$25.00</span>
+              <span className="lp-display" style={{ fontSize: 38, color: "#1B2A4A", lineHeight: 1 }}>$23.96</span>
               <span style={{ textDecoration: "line-through", fontSize: 16, color: "#999", fontWeight: 500 }}>$29.95</span>
             </div>
             <div style={{ fontSize: 13, color: "#2D7A3A", fontWeight: 700, marginTop: 2 }}>
-              You save $4.95 — that&apos;s a free bag!
+              5 bags, pay for 4 — that&rsquo;s 1 bag FREE.
             </div>
 
             <div style={{ display: "flex", gap: 12, marginTop: 10, flexWrap: "wrap" }}>
               <span style={{ fontSize: 12, fontWeight: 600, color: "#1B2A4A", display: "flex", alignItems: "center", gap: 4 }}>
-                <span style={{ color: "#2D7A3A", fontSize: 15 }}>✓</span> Free shipping included
+                <span style={{ color: "#2D7A3A", fontSize: 15 }}>✓</span> FREE SHIPPING
               </span>
               <span style={{ fontSize: 12, fontWeight: 600, color: "#1B2A4A", display: "flex", alignItems: "center", gap: 4 }}>
-                <span style={{ color: "#2D7A3A", fontSize: 15 }}>✓</span> Ships direct to you
+                <span style={{ color: "#2D7A3A", fontSize: 15 }}>✓</span> $4.79 / bag
               </span>
               <span style={{ fontSize: 12, fontWeight: 600, color: "#1B2A4A", display: "flex", alignItems: "center", gap: 4 }}>
-                <span style={{ color: "#2D7A3A", fontSize: 15 }}>✓</span> $25 total — no surprises
+                <span style={{ color: "#2D7A3A", fontSize: 15 }}>✓</span> Ships in 1–2 days
               </span>
             </div>
 
             <a href={CHECKOUT_URL} className="lp-cta" style={{ marginTop: 16 }}>
-              GET THE 5-PACK — $25 TOTAL
+              BUY 4, GET 1 FREE — $23.96 + FREE SHIP
             </a>
 
-            <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 6, marginTop: 10, fontSize: 11, color: "#5f5b56", fontWeight: 500 }}>
+            {/* Upsell tier — 7-Pack: Buy 5 Get 2 Free */}
+            <a href={CHECKOUT_URL_7} style={{
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+              marginTop: 10, padding: "12px 14px",
+              background: "#fffaf2", border: "2px solid #c7a062", borderRadius: 10,
+              textDecoration: "none", color: "#1B2A4A",
+            }}>
+              <span>
+                <span className="lp-display" style={{ fontSize: 15, letterSpacing: "0.5px" }}>BUY 5, GET 2 FREE</span>
+                <span style={{ display: "block", fontSize: 11, color: "#5f5b56" }}>7-Pack · $4.28/bag · FREE SHIP</span>
+              </span>
+              <span className="lp-display" style={{ fontSize: 20, color: "#c7362c" }}>$29.95 →</span>
+            </a>
+
+            {/* Upsell tier — 10-Pack: Buy 7 Get 3 Free */}
+            <a href={CHECKOUT_URL_10} style={{
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+              marginTop: 8, padding: "12px 14px",
+              background: "#fff5f3", border: "2px solid #c7362c", borderRadius: 10,
+              textDecoration: "none", color: "#1B2A4A",
+            }}>
+              <span>
+                <span className="lp-display" style={{ fontSize: 15, letterSpacing: "0.5px" }}>BUY 7, GET 3 FREE</span>
+                <span style={{ display: "block", fontSize: 11, color: "#5f5b56" }}>10-Pack · $4.19/bag · FREE SHIP · BEST VALUE</span>
+              </span>
+              <span className="lp-display" style={{ fontSize: 20, color: "#c7362c" }}>$41.93 →</span>
+            </a>
+
+            <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 6, marginTop: 12, fontSize: 11, color: "#5f5b56", fontWeight: 500 }}>
               <span>🔒</span>
               <span>America&rsquo;s Candy &middot; 100% American supply chain &middot; 30-day satisfaction guarantee</span>
             </div>
@@ -338,7 +372,7 @@ export default function GoLandingPage() {
               ✓ FREE SHIPPING · Ships direct in 1–2 days
             </div>
             <div style={{ fontSize: 11, color: "#5f5b56", marginTop: 6, lineHeight: 1.4 }}>
-              💡 Add 4 more bags and pay just <strong style={{ color: "#1B2A4A" }}>$5.00/bag</strong> — save $4.95 (a free bag).
+              💡 Buy 4 more and get the <strong style={{ color: "#1B2A4A" }}>5th bag FREE</strong> — $23.96 total + free ship.
             </div>
             <a
               href={CHECKOUT_URL_1}
@@ -542,7 +576,7 @@ export default function GoLandingPage() {
           </p>
         </div>
         <a href={CHECKOUT_URL} className="lp-cta">
-          GET THE 5-PACK — $25 TOTAL
+          BUY 4, GET 1 FREE — $23.96 + FREE SHIP
         </a>
         <a
           href={CHECKOUT_URL_1}
@@ -563,7 +597,7 @@ export default function GoLandingPage() {
             textDecoration: "none",
           }}
         >
-          TRY 1 BAG — $5.99
+          TRY 1 BAG — $5.99 + FREE SHIP
         </a>
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 6, marginTop: 10, fontSize: 11, color: "#5f5b56", fontWeight: 500 }}>
           <span>🔒</span>
@@ -609,7 +643,7 @@ export default function GoLandingPage() {
             lineHeight: 1.2,
           }}
         >
-          5-PACK $25<br /><span style={{ fontSize: 11, fontWeight: 500, letterSpacing: 0 }}>free shipping</span>
+          BUY 4 GET 1 FREE<br /><span style={{ fontSize: 11, fontWeight: 500, letterSpacing: 0 }}>$23.96 + free ship</span>
         </a>
         <a
           href={CHECKOUT_URL_1}
