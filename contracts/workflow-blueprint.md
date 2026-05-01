@@ -455,6 +455,12 @@ Each row uses the schema:
 - **Hard rules locked by tests:** EOD never renders it; empty alerts quiet-collapse; the cash/Plaid no-fabrication assertion scopes to the cash block so sourced margin dollars do not look like fabricated cash; no QBO/HubSpot/Shopify/Gmail/Slack writes are added.
 - **Monday MVP:** 🟢 top-3 margin alerts in the morning brief. AR aging and escalation-language template injection remain later Phase 36 items.
 
+#### Phase 6.14 — Vendor margin operator surface (NEW)
+- **Why:** The morning brief and OpenAI workspace tool expose margin alerts, but Rene/Ben still need a clickable internal surface to inspect the full sourced ledger without opening the markdown file.
+- **Architecture:** `/ops/finance/vendor-margin` is a read-only client page that calls `GET /api/ops/finance/vendor-margin`, summarizes alert counts, sorts committed vendors by risk, and renders channel rows plus pending vendors. Pure helper module `src/app/ops/finance/vendor-margin/data.ts` owns sorting/formatting so TBD and missing-actual cells never become fabricated zeroes.
+- **Hard rules locked by tests:** null/missing ledger input returns zero counts, sort is non-mutating, TBD stays `TBD`, alert labels/tones are deterministic, and no pricing/cart/QBO/HubSpot write path is introduced.
+- **Monday MVP:** 🟢 full margin ledger visible in ops UI. Still sourced from `contracts/per-vendor-margin-ledger.md`; edits remain PR/doc changes, not UI writes.
+
 #### Phase 7 — Receipt OCR extraction (prepare-for-review only) (NEW)
 - **Why:** `/ops/finance/review` already aggregates the receipt review queue, but Rene/Ben were doing field-by-field data entry by hand. Phase 7 attaches a *suggestion* to each captured receipt so reviewers see vendor/date/amount/currency/tax/last4/payment hints proposed before they fill in the canonical fields. Promotion remains 100% human — no auto-fill, no QBO write.
 - **Architecture:**

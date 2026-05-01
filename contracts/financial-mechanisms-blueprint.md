@@ -201,6 +201,11 @@ When a mechanism graduates from one status to the next, update this doc + the ve
 - **Spec:** Surface top-3 vendors with margin alerts (below-floor / thin / needs actuals) from the canonical ledger. AR aging joins remain future work.
 - **Code-side wire:** `BriefInput.vendorMargin`, `renderVendorMarginMarkdown`, and `/api/ops/daily-brief` direct parser read.
 
+### 6.4b `/ops/finance/vendor-margin` operator surface
+- **Status:** ✅ shipped — Phase 36.3b
+- **Spec:** Auth-gated read-only UI over the same vendor-margin endpoint. Shows source/version, alert counts, committed vendors sorted by risk, channel rows, and pending vendors. Unknown/TBD cells stay visible as `TBD`; nothing is backfilled or inferred.
+- **Code-side wire:** `src/app/ops/finance/vendor-margin/page.tsx`, `VendorMarginView.client.tsx`, and pure testable helpers in `src/app/ops/finance/vendor-margin/data.ts`.
+
 ### 6.5 HubSpot deal ↔ vendor-row two-way reconcile
 - **Status:** ✅ shipped — Phase 36.4 — `252d443`
 - **Spec:** When a deal stage advances to `Shipped`, post the GP/bag from the vendor row to the deal note.
@@ -268,6 +273,7 @@ When Notion blueprint syncs with this doc:
 
 ## Version history
 
+- **v1.7b — 2026-04-30 PM (late)** — Phase 36.3b shipped: `/ops/finance/vendor-margin` operator surface over the existing read-only vendor-margin API. Adds tested view helpers for alert counts, risk sorting, and TBD-preserving formatting.
 - **v1.7 — 2026-04-30 PM (late)** — *Phase 36 fully closed.* §6.5 (Phase 36.4) graduated 🔴 → ✅ via `252d443`. §6.6 (Phase 36.5) graduated 🟡 → ✅ via `7f49ca6` (wholesale AP-packet email + booth-order QBO invoice CustomerMemo injected). §6.7 (Phase 36.6) graduated 🟡 → ✅ via `bbffcc6` (full brief surface wired). Status tally: ✅ 28, 🟡 3 (§3.4 / §4.3 / §5.1 — all carry-overs from earlier doctrine, not Phase 36 work), 🔵 3, 🔴 0. **No 🔴 remain.** Phase 36.6d duplication cleanup (consolidate `pricing-grid-classifier.ts` + `off-grid-quotes.ts` to one source-of-truth) flagged as next-up polish.
 - **v1.6 — 2026-04-30 PM** — Phase 36.5 (kernel + AP-packet) + Phase 36.6 (kernel) shipped — `748e53a` + `5626af3`. §6.6 + §6.7 graduated 🔴 → 🟡 (kernels in code, brief-side surfaces still pending). §8 #1 + #4 closed (Q3 surcharge ratified, v23 COGS refresh shipped).
 - **v1.5 — 2026-04-30 PM** — Phase 36.7 shipped: `CHANNEL_GROSS_MARGINS` canonical per-bag margin model + 18 tests — `3a3fc40`. New §6.8 added.
