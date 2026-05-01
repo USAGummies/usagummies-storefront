@@ -461,6 +461,12 @@ Each row uses the schema:
 - **Hard rules locked by tests:** null/missing ledger input returns zero counts, sort is non-mutating, TBD stays `TBD`, alert labels/tones are deterministic, and no pricing/cart/QBO/HubSpot write path is introduced.
 - **Monday MVP:** 🟢 full margin ledger visible in ops UI. Still sourced from `contracts/per-vendor-margin-ledger.md`; edits remain PR/doc changes, not UI writes.
 
+#### Phase 6.15 — Off-grid quote replay surface (NEW)
+- **Why:** The morning brief can point at off-grid pricing risks, but operators need the full replayable list behind that alert. The source has to be the existing booth-quote audit/KV trail, not a guessed HubSpot or invoice scrape.
+- **Architecture:** `GET /api/ops/finance/off-grid` reads recent `sales-tour.booth-quote.composed` audit entries, loads the persisted booth quote payload by `kvKey`, projects priced lines through `src/lib/finance/off-grid-quote-sources.ts`, and classifies them with `buildOffGridQuotesBriefSlice`. `/ops/finance/off-grid` renders the same read model.
+- **Hard rules locked by tests:** malformed/missing KV payloads are skipped and reported, never counted as safe; zero-dollar/non-finite quote lines do not become candidates; the route exports only GET and has no KV writes, approval opens, Slack posts, QBO clients, or HubSpot stage writes.
+- **Monday MVP:** 🟢 off-grid quote audit trail is visible in ops UI. It remains visibility-only; Class C price changes still require the existing approval doctrine.
+
 #### Phase 7 — Receipt OCR extraction (prepare-for-review only) (NEW)
 - **Why:** `/ops/finance/review` already aggregates the receipt review queue, but Rene/Ben were doing field-by-field data entry by hand. Phase 7 attaches a *suggestion* to each captured receipt so reviewers see vendor/date/amount/currency/tax/last4/payment hints proposed before they fill in the canonical fields. Promotion remains 100% human — no auto-fill, no QBO write.
 - **Architecture:**

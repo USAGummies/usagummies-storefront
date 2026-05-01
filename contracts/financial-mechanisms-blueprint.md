@@ -235,6 +235,11 @@ When a mechanism graduates from one status to the next, update this doc + the ve
 - **Open follow-on:** HubSpot deal property `pricing_grid_status` (on / off / proposed) for deal-card visibility — Phase 36.6c.
 - **Note on duplication:** Two parallel implementations of the grid classifier ship today (`pricing-grid-classifier.ts` with structured `PRICING_GRID` + tier metadata, and `off-grid-quotes.ts` with flat `ON_GRID_BAG_PRICES_USD`). They were built in parallel sessions on the same lane; both pass tests. Future cleanup: consolidate to a single source-of-truth — likely have `off-grid-quotes.ts` import `PRICING_GRID` from `pricing-grid-classifier.ts`. Tracked as Phase 36.6d.
 
+### 6.7b `/ops/finance/off-grid` replay surface
+- **Status:** ✅ shipped — Phase 36.6b
+- **Spec:** Auth-gated read-only replay of recent `sales-tour.booth-quote.composed` audit entries. The route loads each persisted booth quote from KV, projects priced quote lines into `QuoteCandidate` rows, and runs the existing off-grid detector. Missing/malformed KV rows are listed as skipped, never counted as safe.
+- **Code-side wire:** `GET /api/ops/finance/off-grid`, `/ops/finance/off-grid`, and `src/lib/finance/off-grid-quote-sources.ts`.
+
 ### 6.8 Channel-level gross-margin canonical model — Phase 36.7 — `3a3fc40`
 - **Status:** ✅ shipped (was §8 #4 candidate — graduated)
 - **Spec:** Single source of truth for per-bag gross margin by channel, sourced from `/contracts/proforma-channel-margins.md`. Replaces the legacy `UNIT_ECONOMICS` stale `gpPerUnit` values calibrated against $1.75 COGS.
@@ -273,6 +278,7 @@ When Notion blueprint syncs with this doc:
 
 ## Version history
 
+- **v1.7c — 2026-04-30 PM (late)** — Phase 36.6b shipped: `/ops/finance/off-grid` replay surface over recent booth quote audit/KV records, plus read-only API and source projection tests. Missing quote payloads remain skipped, not falsely safe.
 - **v1.7b — 2026-04-30 PM (late)** — Phase 36.3b shipped: `/ops/finance/vendor-margin` operator surface over the existing read-only vendor-margin API. Adds tested view helpers for alert counts, risk sorting, and TBD-preserving formatting.
 - **v1.7 — 2026-04-30 PM (late)** — *Phase 36 fully closed.* §6.5 (Phase 36.4) graduated 🔴 → ✅ via `252d443`. §6.6 (Phase 36.5) graduated 🟡 → ✅ via `7f49ca6` (wholesale AP-packet email + booth-order QBO invoice CustomerMemo injected). §6.7 (Phase 36.6) graduated 🟡 → ✅ via `bbffcc6` (full brief surface wired). Status tally: ✅ 28, 🟡 3 (§3.4 / §4.3 / §5.1 — all carry-overs from earlier doctrine, not Phase 36 work), 🔵 3, 🔴 0. **No 🔴 remain.** Phase 36.6d duplication cleanup (consolidate `pricing-grid-classifier.ts` + `off-grid-quotes.ts` to one source-of-truth) flagged as next-up polish.
 - **v1.6 — 2026-04-30 PM** — Phase 36.5 (kernel + AP-packet) + Phase 36.6 (kernel) shipped — `748e53a` + `5626af3`. §6.6 + §6.7 graduated 🔴 → 🟡 (kernels in code, brief-side surfaces still pending). §8 #1 + #4 closed (Q3 surcharge ratified, v23 COGS refresh shipped).
