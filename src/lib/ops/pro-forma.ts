@@ -131,19 +131,294 @@ export const UNIT_ECONOMICS = {
   cogsPerBag: 1.79,
   amazon: {
     retailPrice: 5.99,      // 7.5 oz bag MSRP
-    fbaFees: 3.71,           // Referral + FBA fulfillment
-    gpPerUnit: 0.53,         // STALE — calibrated against $1.75 COGS; honest GP at $1.79 ≈ $0.31 per /contracts/proforma-channel-margins.md §1.1
+    fbaFees: 3.71,           // Referral + FBA fulfillment (combined)
+    gpPerUnit: 0.53,         // LEGACY (calibrated against $1.75 COGS, simplified fees) — see CHANNEL_GROSS_MARGINS.amazonFba below for honest $1.79 math (~$0.31 GP)
   },
   wholesale: {
-    price: 3.49,             // Retailer wholesale
-    gpPerUnit: 1.74,         // STALE — calibrated against $1.75 COGS; honest GP at $1.79 ≈ $1.70
+    price: 3.49,             // Retailer wholesale (B2 landed master carton)
+    gpPerUnit: 1.74,         // LEGACY (calibrated against $1.75 COGS) — see CHANNEL_GROSS_MARGINS.wholesaleB2 (~$1.42–$1.62 GP after freight)
   },
   distributor: {
     sellPrice: 2.50,         // Sold in 6-packs with display
     displayCostPerUnit: 0.33,
-    gpPerUnit: 0.42,         // STALE — calibrated against $1.75 COGS; honest GP at $1.79 ≈ $0.38
+    gpPerUnit: 0.42,         // LEGACY (calibrated against $1.75 COGS) — see CHANNEL_GROSS_MARGINS.faireDirect / .faireOptionB for honest math
   },
 } as const;
+
+// ----------------------------------------------------------------------------
+// CHANNEL_GROSS_MARGINS — canonical per-bag margin model (Phase 36.7)
+// ----------------------------------------------------------------------------
+//
+// Single source of truth for per-bag gross margin by channel, fed from
+// `/contracts/proforma-channel-margins.md` v0.1 (2026-04-30 PM).
+//
+// Why this exists:
+//   The legacy UNIT_ECONOMICS struct above has stale `gpPerUnit` values
+//   calibrated against an old $1.75 COGS placeholder. A handful of routes
+//   (amazon-profitability) still read UNIT_ECONOMICS for cogsPerBag, which
+//   is fine — that one number is current. Everything else should consume
+//   CHANNEL_GROSS_MARGINS instead, which has:
+//     - The current $1.79 COGS lock
+//     - Real channel fees (Amazon FBA fees broken into ref + FBA + inbound +
+//       storage; Shopify Payments fee per cart size; Faire 0% commission)
+//     - Real freight per bag (USPS labels for DTC/FBM, drive economics for
+//       wholesale/distributor)
+//     - Negative-margin flags (FBM single-bag, Shopify single-bag) so the
+//       morning brief and any quoting surface can refuse to silently
+//       lose money on those orders.
+//
+// Tests pin every row against /contracts/proforma-channel-margins.md so a
+// future COGS change can never drift these numbers without breaking CI.
+//
+// Phase 36.7 of /contracts/financial-mechanisms-blueprint.md §8 #4.
+
+/**
+ * Per-channel gross-margin row. All numbers per single 7.5oz bag unless
+ * the channel ships in bundles (5-pack, 10-pack, master carton, pallet),
+ * in which case `bagsPerOrder > 1` and the per-bag values are computed
+ * from the bundle math.
+ */
+export interface ChannelGrossMargin {
+  /** Stable channel slug. Use for dedup/UI keying. */
+  channel: string;
+  /** Human-readable label for surfaces (Slack, /ops dashboards). */
+  label: string;
+  /** Bags per typical order on this channel (1 / 5 / 10 / 36 / 900). */
+  bagsPerOrder: number;
+  /** Gross revenue per bag (= sell price ÷ bagsPerOrder). */
+  revenuePerBag: number;
+  /** Channel + payment fees per bag (Amazon refs, Shopify Payments, etc.). */
+  feesPerBag: number;
+  /** Operating COGS per bag — pinned to UNIT_ECONOMICS.cogsPerBag. */
+  cogsPerBag: number;
+  /**
+   * Per-bag freight allocated to this channel. Range tuple [low, high]
+   * when the cost varies by route/state (drive economics) or label
+   * tier; single number when fixed (zero for buyer-pays). Stored as a
+   * tuple even when low === high so consumers always see a range.
+   */
+  freightPerBag: readonly [number, number];
+  /** Gross profit per bag (low end of freight range — worst case). */
+  gpPerBagLow: number;
+  /** Gross profit per bag (high end — best case). */
+  gpPerBagHigh: number;
+  /** Gross-margin % at the worst-case end. */
+  gpPctLow: number;
+  /** Gross-margin % at the best-case end. */
+  gpPctHigh: number;
+  /**
+   * Status flag for downstream consumers (morning-brief alerts):
+   *   - "healthy"    GP > 25% on both ends.
+   *   - "thin"       GP between 0% and 25% on at least one end.
+   *   - "negative"   GP <= 0 on at least one end. SURFACE in alerts.
+   *   - "needs_actuals"  Has a `[needs ...]` flag in the source doc.
+   */
+  status: "healthy" | "thin" | "negative" | "needs_actuals";
+  /** Reference to /contracts/proforma-channel-margins.md section. */
+  source: string;
+  /** Optional human note (negative-margin warnings, structural caveats). */
+  note?: string;
+}
+
+const COGS = 1.79;
+
+function rowGp(
+  args: Omit<
+    ChannelGrossMargin,
+    | "cogsPerBag"
+    | "gpPerBagLow"
+    | "gpPerBagHigh"
+    | "gpPctLow"
+    | "gpPctHigh"
+    | "status"
+  > & {
+    cogsPerBag?: number;
+    /** Override the auto-derived status — for explicit "thin" or
+     *  "needs_actuals" flags that aren't purely numeric. */
+    statusOverride?: ChannelGrossMargin["status"];
+  },
+): ChannelGrossMargin {
+  const cogs = args.cogsPerBag ?? COGS;
+  const [freightLow, freightHigh] = args.freightPerBag;
+  // GP_low corresponds to the WORST-case freight (highest cost), GP_high
+  // corresponds to the BEST-case freight (lowest cost). The freight range
+  // is stored [low, high] so [0] is the cheapest and [1] is the priciest.
+  const gpHigh = round2(args.revenuePerBag - args.feesPerBag - cogs - freightLow);
+  const gpLow = round2(args.revenuePerBag - args.feesPerBag - cogs - freightHigh);
+  const pctHigh = args.revenuePerBag > 0 ? round1((gpHigh / args.revenuePerBag) * 100) : 0;
+  const pctLow = args.revenuePerBag > 0 ? round1((gpLow / args.revenuePerBag) * 100) : 0;
+  let status: ChannelGrossMargin["status"];
+  if (args.statusOverride) {
+    status = args.statusOverride;
+  } else if (gpLow <= 0) {
+    status = "negative";
+  } else if (pctLow < 25 || pctHigh < 25) {
+    status = "thin";
+  } else {
+    status = "healthy";
+  }
+  return {
+    ...args,
+    cogsPerBag: cogs,
+    gpPerBagLow: gpLow,
+    gpPerBagHigh: gpHigh,
+    gpPctLow: pctLow,
+    gpPctHigh: pctHigh,
+    status,
+  };
+}
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+function round1(n: number): number {
+  return Math.round(n * 10) / 10;
+}
+
+export const CHANNEL_GROSS_MARGINS: Readonly<Record<string, ChannelGrossMargin>> = {
+  // §1.1 — Amazon FBA. ~$0.33 GP/bag; flagged needs_actuals for inbound + storage.
+  amazonFba: rowGp({
+    channel: "amazonFba",
+    label: "Amazon FBA",
+    bagsPerOrder: 1,
+    revenuePerBag: 5.99,
+    feesPerBag: round2(0.48 + 3.06 + 0.30 + 0.05), // ref + FBA + inbound + storage = $3.89
+    freightPerBag: [0, 0],
+    source: "/contracts/proforma-channel-margins.md §1.1",
+    note: "Inbound + storage are estimates pending QBO actuals.",
+    statusOverride: "needs_actuals",
+  }),
+
+  // §1.2 — Amazon FBM single-bag. NEGATIVE — single-bag at $5.99 with $6.74+ USPS LOSES money.
+  amazonFbmSingle: rowGp({
+    channel: "amazonFbmSingle",
+    label: "Amazon FBM (single-bag)",
+    bagsPerOrder: 1,
+    revenuePerBag: 5.99,
+    feesPerBag: 0.48, // referral only
+    freightPerBag: [6.74, 6.95],
+    source: "/contracts/proforma-channel-margins.md §1.2",
+    note: "NEGATIVE GM — verify Amazon ship-credit covers the label, or pause FBM single-bag.",
+  }),
+
+  // §1.3 — Shopify DTC single-bag. NEGATIVE on free-ship single-bag at $5.99.
+  shopifyDtcSingle: rowGp({
+    channel: "shopifyDtcSingle",
+    label: "Shopify DTC (single-bag)",
+    bagsPerOrder: 1,
+    revenuePerBag: 5.99,
+    feesPerBag: 0.47, // 2.9% + $0.30 Shopify Payments
+    freightPerBag: [6.74, 6.95],
+    source: "/contracts/proforma-channel-margins.md §1.3",
+    note: "Free-shipping single-bag is structurally unprofitable. Either raise price, charge shipping <5 bags, or remove the offer.",
+  }),
+
+  // §1.4 — Shopify DTC 5-bag bundle ($25.00). $1.02–$1.42 GP/bag, ~20–28% GM.
+  shopifyDtc5Pack: rowGp({
+    channel: "shopifyDtc5Pack",
+    label: "Shopify DTC (5-bag bundle)",
+    bagsPerOrder: 5,
+    revenuePerBag: round2(25.0 / 5),
+    feesPerBag: round2(((25.0 * 0.029) + 0.30) / 5), // Shopify Payments per-bundle ÷ 5 = $0.205
+    freightPerBag: [round2(8.0 / 5), round2(10.0 / 5)],
+    source: "/contracts/proforma-channel-margins.md §1.4",
+  }),
+
+  // §1.5 — Shopify DTC 10-bag bundle ($50.00). $1.76–$2.06 GP/bag, ~35–41% GM.
+  shopifyDtc10Pack: rowGp({
+    channel: "shopifyDtc10Pack",
+    label: "Shopify DTC (10-bag bundle)",
+    bagsPerOrder: 10,
+    revenuePerBag: round2(50.0 / 10),
+    feesPerBag: round2(((50.0 * 0.029) + 0.30) / 10), // = $0.175
+    freightPerBag: [round2(10.0 / 10), round2(13.0 / 10)],
+    source: "/contracts/proforma-channel-margins.md §1.5",
+  }),
+
+  // §1.6 — Faire Direct ($2.49 sell-sheet, 0% commission). $0.32–$0.52 GP/bag.
+  faireDirect: rowGp({
+    channel: "faireDirect",
+    label: "Faire Direct (sell-sheet $2.49)",
+    bagsPerOrder: 1,
+    revenuePerBag: 2.49,
+    feesPerBag: 0.0, // 0% Faire Direct commission
+    freightPerBag: [0.20, 0.40],
+    source: "/contracts/proforma-channel-margins.md §1.6",
+  }),
+
+  // §1.7 — Faire Option B distributor ($2.10 delivered). −$0.07 to $0.13 GP/bag — STRUCTURAL THIN FLOOR.
+  faireOptionB: rowGp({
+    channel: "faireOptionB",
+    label: "Faire Option B distributor (Inderbitzin / Glacier)",
+    bagsPerOrder: 1,
+    revenuePerBag: 2.10,
+    feesPerBag: 0.0,
+    freightPerBag: [0.20, 0.40],
+    source: "/contracts/proforma-channel-margins.md §1.7",
+    note: "Strategic-credential play; near break-even by design. Don't extend to non-credential accounts at this price.",
+  }),
+
+  // §1.8 — Wholesale B2 master carton landed ($3.49). 41–46% GM.
+  wholesaleB2: rowGp({
+    channel: "wholesaleB2",
+    label: "Wholesale B2 (master carton, landed)",
+    bagsPerOrder: 36,
+    revenuePerBag: 3.49,
+    feesPerBag: 0.0,
+    freightPerBag: [0.10, 0.30],
+    source: "/contracts/proforma-channel-margins.md §1.8",
+  }),
+
+  // §1.9 — Wholesale B3 master carton buyer-pays. NOTE: as of v2.3 doctrine
+  // amendment, B3 is $3.50 per /contracts/wholesale-pricing.md §2 (Q3
+  // buyer-pays surcharge ratified). Source doc still shows $3.25 because
+  // it predates the amendment; we use the live doctrine number here.
+  wholesaleB3: rowGp({
+    channel: "wholesaleB3",
+    label: "Wholesale B3 (master carton, buyer-pays)",
+    bagsPerOrder: 36,
+    revenuePerBag: 3.50, // Q3 surcharge applied (was $3.25 pre-v2.3 amendment)
+    feesPerBag: 0.0,
+    freightPerBag: [0, 0], // buyer pays, no P&L impact
+    source: "/contracts/proforma-channel-margins.md §1.9 + wholesale-pricing.md §2 v2.3",
+  }),
+
+  // §1.10 — Wholesale B4 pallet landed ($3.25, 900 bags). 30–43% GM (state-dep).
+  wholesaleB4: rowGp({
+    channel: "wholesaleB4",
+    label: "Wholesale B4 (pallet, landed)",
+    bagsPerOrder: 900,
+    revenuePerBag: 3.25,
+    feesPerBag: 0.0,
+    freightPerBag: [0.07, 0.50],
+    source: "/contracts/proforma-channel-margins.md §1.10",
+    note: "Freight range is state-dependent: WA ~$0.03, AZ ~$0.49 per bag.",
+  }),
+
+  // §1.11 — Wholesale B5 pallet buyer-pays. NOTE: v2.3 amended to $3.25
+  // (was $3.00 pre-Q3 surcharge).
+  wholesaleB5: rowGp({
+    channel: "wholesaleB5",
+    label: "Wholesale B5 (pallet, buyer-pays)",
+    bagsPerOrder: 900,
+    revenuePerBag: 3.25, // Q3 surcharge applied (was $3.00 pre-v2.3 amendment)
+    feesPerBag: 0.0,
+    freightPerBag: [0, 0],
+    source: "/contracts/proforma-channel-margins.md §1.11 + wholesale-pricing.md §2 v2.3",
+  }),
+
+  // §1.12 — C-ANCH route-anchor (PROPOSED, awaits Class C). 29–39% GM.
+  wholesaleCANCH: rowGp({
+    channel: "wholesaleCANCH",
+    label: "Wholesale C-ANCH (route-anchor, 3+ pallet, landed)",
+    bagsPerOrder: 2700,
+    revenuePerBag: 3.00,
+    feesPerBag: 0.0,
+    freightPerBag: [0.05, 0.35],
+    source: "/contracts/proforma-channel-margins.md §1.12 (proposed)",
+    note: "PROPOSED — awaits Class C ratification per pricing-route-governance.md §1 Q2.",
+  }),
+};
 
 // ---------------------------------------------------------------------------
 // Loan Structure

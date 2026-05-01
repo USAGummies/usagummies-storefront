@@ -157,16 +157,16 @@ describe("buildApPacketEmail — order block", () => {
       buildState({ orderLines: [summarizeOrderLine("B3", 15)] }),
       BASIC_CTX,
     );
-    // 15 × 36 × $3.25 = $1,755.00
-    expect(r.body).toMatch(/Total: \$1755\.00/);
+    // v2.4 Q3 surcharge: 15 × 36 × $3.50 = $1,890.00 (was $1,755 at $3.25/bag)
+    expect(r.body).toMatch(/Total: \$1890\.00/);
   });
 
   it("respects totalUsdOverride for credit-line scenarios", () => {
     const r = buildApPacketEmail(
       buildState({ orderLines: [summarizeOrderLine("B3", 15)] }),
-      { ...BASIC_CTX, totalUsdOverride: 1755.0 }, // landed-freight comp included; total stays $1,755
+      { ...BASIC_CTX, totalUsdOverride: 1890.0 }, // v2.4 Q3 surcharge total; landed-freight comp included
     );
-    expect(r.body).toMatch(/Total: \$1755\.00/);
+    expect(r.body).toMatch(/Total: \$1890\.00/);
   });
 
   it("flags custom-freight requirement when ANY line crosses 3+ pallet threshold", () => {

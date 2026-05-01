@@ -175,16 +175,16 @@ describe("lineSubtotalUsd — invoice-grade rounding", () => {
     expect(lineSubtotalUsd("B2", 3)).toBe(376.92);
   });
 
-  it("1 master carton B3 = 36 × $3.25 = $117.00", () => {
-    expect(lineSubtotalUsd("B3", 1)).toBe(117.0);
+  it("1 master carton B3 = 36 × $3.50 = $126.00 (v2.4 Q3 surcharge)", () => {
+    expect(lineSubtotalUsd("B3", 1)).toBe(126.0);
   });
 
   it("1 pallet B4 = 900 × $3.25 = $2925.00", () => {
     expect(lineSubtotalUsd("B4", 1)).toBe(2925.0);
   });
 
-  it("1 pallet B5 = 900 × $3.00 = $2700.00", () => {
-    expect(lineSubtotalUsd("B5", 1)).toBe(2700.0);
+  it("1 pallet B5 = 900 × $3.25 = $2925.00 (v2.4 Q3 surcharge — was $2700 at $3.00/bag)", () => {
+    expect(lineSubtotalUsd("B5", 1)).toBe(2925.0);
   });
 
   it("zero unitCount → $0", () => {
@@ -193,8 +193,9 @@ describe("lineSubtotalUsd — invoice-grade rounding", () => {
 
   it("rounds to 2 decimals (no float-precision drift in invoices)", () => {
     // Synthetic case where IEEE-754 might drift; we round to cents.
-    const result = lineSubtotalUsd("B5", 7); // 7 * 900 * 3.00 = 18900
-    expect(result).toBe(18900);
+    // v2.4 surcharge: 7 × 900 × $3.25 = $20,475.00
+    const result = lineSubtotalUsd("B5", 7);
+    expect(result).toBe(20475);
     expect(Number.isInteger(result * 100)).toBe(true);
   });
 });
@@ -241,9 +242,9 @@ describe("Lookup helpers (single-tier accessors)", () => {
     expect(bagsPerUnit("B4")).toBe(900);
   });
 
-  it("bagPriceUsd returns canonical price", () => {
+  it("bagPriceUsd returns canonical price (v2.4: B5 raised $3.00 → $3.25 via Q3 surcharge)", () => {
     expect(bagPriceUsd("B2")).toBe(3.49);
-    expect(bagPriceUsd("B5")).toBe(3.0);
+    expect(bagPriceUsd("B5")).toBe(3.25);
   });
 
   it("freightMode returns canonical mode", () => {
@@ -288,7 +289,7 @@ describe("summarizeOrderLine — full structured projection", () => {
     const s = summarizeOrderLine("B5", 4);
     expect(s.tier).toBe("B5");
     expect(s.bags).toBe(3600); // 4 × 900
-    expect(s.subtotalUsd).toBe(10800); // 3600 × 3.00
+    expect(s.subtotalUsd).toBe(11700); // 3600 × $3.25 (v2.4 Q3 surcharge)
     expect(s.freightMode).toBe("buyer-paid"); // tier-level mode
     expect(s.customFreightRequired).toBe(true); // 3+ pallet escalation
   });

@@ -39,11 +39,11 @@ describe("classifyBoothTier — pricing-route-governance §1 truth table", () =>
     expect(r.approval).toBe("class-c");
   });
 
-  it("3 pallets + pickup → B5 buyer-pays $3.00/bag (Class A on-grid)", () => {
+  it("3 pallets + pickup → B5 buyer-pays $3.25/bag (Class A on-grid; v2.4 Q3 surcharge raised B5 from $3.00 to $3.25)", () => {
     const r = classifyBoothTier(intent({ scale: "pallet", count: 3, totalBags: 2700, freightAsk: "pickup" }));
     expect(r.pricingClass).toBe("C-STD");
     expect(r.lines[0].bGridDesignator).toBe("B5");
-    expect(r.lines[0].pricePerBag).toBe(3.0);
+    expect(r.lines[0].pricePerBag).toBe(3.25);
     expect(r.lines[0].freightStance).toBe("buyer-paid");
     expect(r.approval).toBe("none");
     expect(r.dealCheckRequired).toBe(false);
@@ -65,14 +65,14 @@ describe("classifyBoothTier — pricing-route-governance §1 truth table", () =>
     expect(r.approval).toBe("none");
   });
 
-  it("36 bags master-carton + pickup → B3 $3.25/bag buyer-pays + C-PU pickup floor (Class C)", () => {
+  it("36 bags master-carton + pickup → B3 $3.50/bag buyer-pays + C-PU pickup floor (Class C; v2.4 Q3 surcharge raised B3 from $3.25 to $3.50)", () => {
     const r = classifyBoothTier(intent({ scale: "master-carton", count: 1, totalBags: 36, freightAsk: "pickup" }));
     expect(r.pricingClass).toBe("C-PU");
     expect(r.lines).toHaveLength(2);
     expect(r.lines[0].pricingClass).toBe("C-PU");
     expect(r.lines[0].pricePerBag).toBe(2.0);
     expect(r.lines[1].bGridDesignator).toBe("B3");
-    expect(r.lines[1].pricePerBag).toBe(3.25);
+    expect(r.lines[1].pricePerBag).toBe(3.5);
     expect(r.approval).toBe("class-c");
     expect(r.dealCheckRequired).toBe(true);
   });
