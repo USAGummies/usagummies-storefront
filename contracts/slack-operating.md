@@ -2,7 +2,7 @@
 
 **Status:** CANONICAL
 **Source:** Notion blueprint §14.5 + §15.2
-**Version:** 1.1 — 2026-05-01
+**Version:** 1.2 — 2026-05-01
 **Mirror in code:** `src/lib/ops/control-plane/channels.ts` (+ `contracts/channels.json`).
 
 ---
@@ -94,10 +94,29 @@ These channels are migrated and archived on or before Monday 2026-04-20:
 
 Runtime code must route by live Slack `C...` ID when known. Archived ids `C0ALS6W7VB4` (`#abra-control`), `C0AKG9FSC2J` (`#financials`), `C0AS7UHNGPL` (`#wholesale-leads`), and `C0ARSF61U5D` (`#email-inbox`) are prohibited in production code.
 
+## Operator commands
+
+Slack is now also the lightweight operator dashboard surface. These commands are read-only unless routed through an approval card:
+
+| Command text | Where | Result |
+|---|---|---|
+| `ops dashboard` | Any watched channel | Posts the Sales Command Center Block Kit card in-thread. Shows revenue pace, approvals, Faire follow-ups, invites, retail drafts, AP packets, stale buyers, aging risk, blockers, and links to `/ops/sales`, `/ops/approvals`, `/ops/readiness`. |
+| `dispatch amazon`, `dispatch shopify`, `dispatch hubspot`, `dispatch manual` | `#operations` or `#sales` | Posts a dispatch shortcut thread reply. Any label buy still requires the canonical Class B approval path. |
+| `sample request` / `sample dispatch` | `#operations` | Posts the sample-dispatch template/instructions. Does not buy labels directly. |
+
+`ops dashboard` is the day-to-day Slack cockpit. `/ops/sales` remains the richer browser dashboard and source of truth.
+
+## Approval edit flow
+
+`Needs edit` opens a Slack modal where the approver enters the exact requested changes. Submitting the modal records a non-terminal `ask` decision, updates the approval card, and posts a thread note with the edit request. The original approval remains pending for audit, and the operator/agent must revise the payload and open a fresh approval card when ready.
+
+If Slack cannot open the modal, the system records a fallback `ask` decision and posts a thread instruction so the button never becomes a dead end.
+
 ### Rate and dedup
 Agents must not post the same payload (by fingerprint) twice within 6 hours to the same channel. Duplicate posts are a policy violation.
 
 ## Version history
 
+- **1.2 — 2026-05-01** — Documents Slack operator commands (`ops dashboard`) and the approval edit modal flow. Slack command-center posts now reuse the same Sales Command read model as `/ops/sales`.
 - **1.1 — 2026-05-01** — Adds live Slack channel IDs, `#shipping`, active `#marketing`, approval UX standard, and explicit archived-channel ID prohibition. Runtime mirrors now prefer channel IDs over names.
 - **1.0 — 2026-04-17** — First canonical publication. Derived from blueprint §14.5 and §15.2.
