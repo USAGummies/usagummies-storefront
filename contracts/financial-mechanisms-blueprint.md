@@ -261,11 +261,13 @@ Per [`/contracts/email-agents-system.md`](email-agents-system.md) v1.0 CANONICAL
 
 ### 7.1 Phase 37 — Inbound triage subsystem (16 build units)
 
-Per `/contracts/email-agents-system.md` §6. **Status: 🟡 doctrine-locked, code-build queued.** Ships INSIDE Viktor as workflow lanes (no new runtime agent).
+Per `/contracts/email-agents-system.md` §6. **Status: 🟢 37.1 SHIPPED · 37.2–37.16 queued.** Ships INSIDE Viktor as workflow lanes (no new runtime agent).
 
-37.1 Inbox Scanner · 37.2 Classifier · 37.3 HubSpot Verification cross-cut · 37.4 Validator extension · 37.5 Strategic Framework analyzer · 37.6 Slack Interactive Approval UI · 37.7 Spam Cleaner (Class A-d) · 37.8 Bounce/Routing/OOO · 37.9 Sample Shipper (S-08 wrap) · 37.10 Whale Escalator · 37.11 Polite-No/Qualify/Thread-Fix · 37.12 Receipt+AP Handler · 37.13 Memory layer · 37.14 Daily-brief surface · 37.15 Weekly Audit (Drift Audit Runner extension) · 37.16 Tests + drift-audit fixtures
+37.1 Inbox Scanner ✅ · 37.2 Classifier · 37.3 HubSpot Verification cross-cut · 37.4 Validator extension · 37.5 Strategic Framework analyzer · 37.6 Slack Interactive Approval UI · 37.7 Spam Cleaner (Class A-d) · 37.8 Bounce/Routing/OOO · 37.9 Sample Shipper (S-08 wrap) · 37.10 Whale Escalator · 37.11 Polite-No/Qualify/Thread-Fix · 37.12 Receipt+AP Handler · 37.13 Memory layer · 37.14 Daily-brief surface · 37.15 Weekly Audit (Drift Audit Runner extension) · 37.16 Tests + drift-audit fixtures
 
 **Sequence (per §6 lock):** 37.1 → 37.2 → 37.3 → 37.4 → 37.7 → 37.5 → 37.6 → 37.10 → 37.8 → 37.9 → 37.11 → 37.12 → 37.13 → 37.14 → 37.15 → 37.16. HARD STOPS first (whale before any drafter).
+
+**37.1 ship log (2026-04-30 PM):** `src/lib/sales/viktor/inbox-scanner.ts` (Class A read-only scan + denylist + KV `inbox:scan:<msgId>` records), 23-test coverage, cron route at `/api/ops/sales/viktor/inbox-scan/run` (every 5 min, weekday business hours per OQ-1). Reuses `gmail-reader.listEmails()` + `email-intelligence/cursor` — no new Gmail primitive. Kill switch: `INBOX_SCANNER_ENABLED=false`.
 
 ### 7.2 Phase 38 — B2B Cashflow Research System (8 build units)
 

@@ -87,6 +87,14 @@
     {
       "path": "/api/ops/inventory/burn-rate?refresh=true",
       "schedule": "30 3 * * 0"
+    },
+    {
+      "path": "/api/ops/sales/viktor/inbox-scan/run",
+      "schedule": "*/5 13-23 * * 1-5"
+    },
+    {
+      "path": "/api/ops/sales/viktor/inbox-scan/run",
+      "schedule": "*/5 0-4 * * 2-6"
     }
   ]
 }

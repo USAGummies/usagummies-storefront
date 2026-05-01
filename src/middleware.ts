@@ -76,6 +76,7 @@ const SELF_AUTHENTICATED_PREFIXES = [
   "/api/ops/transcript/", // TRANSCRIPT CAPTURE — P0-3 operating-memory transcript saver. POST /capture is the canonical write surface. isCronAuthorized() bearer CRON_SECRET. Added 2026-04-29 — same allowlist gap as operating-memory above.
   "/api/ops/sales-tour/", // SALES-TOUR — booth-visit field workflow for May 11–17 trip (`/contracts/sales-tour-field-workflow.md` v0.1). isAuthorized() (session OR Bearer CRON_SECRET). POST /booth is the entry; GET /booth is a readiness probe.
   "/api/ops/sales/apollo-enrich/", // APOLLO ENRICHMENT — Phase D5 v0.2 lead.enrichment.write (Class A) per /contracts/approval-taxonomy.md v1.6. GET/POST [contactId] = single-contact; POST sweep = bulk recent contacts (rate-limited). isAuthorized() session OR Bearer CRON_SECRET.
+  "/api/ops/sales/viktor/", // VIKTOR INBOUND TRIAGE — Phase 37.1 inbox-scan capability per /contracts/email-agents-system.md §2.1 (Class A `system.read`, no email send, no HubSpot write). isAuthorized() (session OR Bearer CRON_SECRET). Cron-fired every 5 min during weekday business hours.
 ];
 
 function isSelfAuthenticated(pathname: string): boolean {
