@@ -19,6 +19,9 @@
  * Auth: session or bearer CRON_SECRET (via middleware whitelist).
  */
 
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
+
 import { NextResponse } from "next/server";
 import { kv } from "@vercel/kv";
 
@@ -48,6 +51,10 @@ import {
   type LabelResult,
 } from "@/lib/ops/shipstation-client";
 import { uploadBufferToSlack } from "@/lib/ops/slack-file-upload";
+import {
+  parsePerVendorMarginLedger,
+  renderVendorMarginNoteLine,
+} from "@/lib/finance/per-vendor-margin";
 import type { QBOJournalEntryInput } from "@/lib/ops/qbo-client";
 
 export const runtime = "nodejs";
@@ -577,6 +584,34 @@ export async function POST(req: Request): Promise<Response> {
   if (body.hubspotDealId) {
     try {
       const firstLabel = labels[0];
+
+      // Phase 36.4 — append per-vendor margin context to the deal note.
+      // Reads the canonical /contracts/per-vendor-margin-ledger.md, looks up
+      // the vendor row matching this customer name, and appends the GP/bag
+      // line. Best-effort: ledger-read or no-match fails silently — the
+      // base note (tracking, carrier, cost) still posts. Pairs with
+      // /contracts/financial-mechanisms-blueprint.md §6.4.
+      let marginNoteLine: string | null = null;
+      try {
+        const ledgerPath = path.join(
+          process.cwd(),
+          "contracts/per-vendor-margin-ledger.md",
+        );
+        const ledgerMd = await fs.readFile(ledgerPath, "utf8");
+        const ledger = parsePerVendorMarginLedger(ledgerMd);
+        marginNoteLine = renderVendorMarginNoteLine(
+          ledger,
+          body.destination.name,
+        );
+      } catch {
+        // Ledger read or parse failed — continue without the margin line
+      }
+
+      const baseMemo = `Keys: ${keys.join(", ")}${pricingMatch ? ` · ${pricingMatch.terms}` : ""}`;
+      const memo = marginNoteLine
+        ? `${baseMemo}\n${marginNoteLine}`
+        : baseMemo;
+
       hubspotAdvance = await advanceDealOnShipment({
         dealId: body.hubspotDealId,
         trackingNumbers: labels
@@ -585,7 +620,7 @@ export async function POST(req: Request): Promise<Response> {
         carrier: firstLabel?.carrier,
         service: firstLabel?.service,
         labelCostTotal: Math.round(totalCost * 100) / 100,
-        memo: `Keys: ${keys.join(", ")}${pricingMatch ? ` · ${pricingMatch.terms}` : ""}`,
+        memo,
       });
     } catch (err) {
       hubspotAdvance = {

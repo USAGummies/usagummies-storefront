@@ -7,6 +7,7 @@ import {
   parsePercentRange,
   parsePerVendorMarginLedger,
   parseUsdRange,
+  renderVendorMarginNoteLine,
   selectVendorMarginAlerts,
   slugifyVendorName,
 } from "../per-vendor-margin";
@@ -132,5 +133,59 @@ describe("per-vendor margin ledger parser", () => {
     );
     expect(source).not.toMatch(/qbo-client|hubspot-client|fetchShopify|gmail-reader|slack-client/i);
     expect(source).not.toMatch(/\bfetch\s*\(/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 36.4 — renderVendorMarginNoteLine
+// ---------------------------------------------------------------------------
+
+describe("Phase 36.4 — renderVendorMarginNoteLine", () => {
+  const SAMPLE_LEDGER = `# Per-Vendor Margin Ledger
+
+**Status:** CANONICAL · v0.1 — 2026-04-30 PM
+
+## 1. Committed vendors (live pricing + PO or invoice in flight)
+
+### 1.1 Inderbitzin (regional distributor, WA)
+
+| Field | Value | Source |
+|---|---|---|
+| Tier / route | Distributor — Option B (delivered) | dist-pricing.md §2 |
+| $/bag (wholesale) | **$2.10** | Same |
+| Freight model | Delivered (we ship) | Same |
+| Operating COGS | $1.79 | wholesale-pricing.md §1 |
+| Per-bag freight (allocated) | $0.20–$0.40 | Drive economics |
+| **GP / bag** | **−$0.07 to $0.13** | **−3% to 6% GP — *thin margin floor*** |
+| Volume commit | TBD per agreement | |
+| Status | Active | strategic credential |
+`;
+
+  it("returns a margin context line for a known committed vendor", () => {
+    const ledger = parsePerVendorMarginLedger(SAMPLE_LEDGER);
+    const line = renderVendorMarginNoteLine(ledger, "Inderbitzin");
+    expect(line).toBeTruthy();
+    expect(line).toContain("Inderbitzin");
+    expect(line).toContain("$2.10/bag");
+    expect(line).toContain("Margin context:");
+  });
+
+  it("returns null for unknown vendor (no over-promising margin)", () => {
+    const ledger = parsePerVendorMarginLedger(SAMPLE_LEDGER);
+    expect(renderVendorMarginNoteLine(ledger, "ACME Foods")).toBeNull();
+  });
+
+  it("returns null when query is empty", () => {
+    const ledger = parsePerVendorMarginLedger(SAMPLE_LEDGER);
+    expect(renderVendorMarginNoteLine(ledger, "")).toBeNull();
+    expect(renderVendorMarginNoteLine(ledger, "   ")).toBeNull();
+  });
+
+  it("matches via partial slug (handles HubSpot deal-name variations)", () => {
+    const ledger = parsePerVendorMarginLedger(SAMPLE_LEDGER);
+    // "Inderbitzin Distributing" should still match the canonical "Inderbitzin"
+    const line = renderVendorMarginNoteLine(ledger, "Inderbitzin Distributing");
+    expect(line).toBeTruthy();
+    expect(line).toContain("Inderbitzin");
   });
 });

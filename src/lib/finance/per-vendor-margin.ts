@@ -103,6 +103,79 @@ export function selectVendorMarginAlerts(
     .slice(0, Math.max(0, limit));
 }
 
+/**
+ * Phase 36.4 — render a HubSpot deal note line with the per-bag economics
+ * for a given committed vendor. Used by the buy-label endpoint to append
+ * vendor-margin context to the auto-shipment note when a deal advances
+ * to `Shipped`. Returns null if the vendor isn't on the committed roster
+ * (no over-promising margin data we don't have).
+ *
+ * Output shape (single line):
+ *   "Margin context: $2.10/bag · GP $0.13/bag (6%) · status: Active —
+ *    Inderbitzin (Distributor Opt B)"
+ *
+ * Caller passes the parsed ledger + a vendor lookup query (HubSpot deal
+ * name, customer name, etc). Uses the same fuzzy slug match as the
+ * `/api/ops/finance/vendor-margin` endpoint so the deal note shows the
+ * SAME vendor row that surfaces in the morning brief.
+ */
+export function renderVendorMarginNoteLine(
+  ledger: PerVendorMarginLedger,
+  vendorQuery: string,
+): string | null {
+  if (!vendorQuery?.trim()) return null;
+  const slug = slugifyVendorName(vendorQuery);
+  // First significant word of the query (e.g. "Inderbitzin" from
+  // "Inderbitzin Distributing"). Used to match against vendor names that
+  // include parenthetical descriptors like "Inderbitzin (regional distributor, WA)".
+  const queryFirstToken = slug.split("-")[0] ?? "";
+  const vendor =
+    ledger.committedVendors.find((v) => {
+      const vendorFirstToken = v.slug.split("-")[0] ?? "";
+      return (
+        v.slug === slug ||
+        v.slug.includes(slug) ||
+        slug.includes(v.slug) ||
+        v.name.toLowerCase().includes(vendorQuery.toLowerCase()) ||
+        vendorQuery.toLowerCase().includes(v.name.toLowerCase()) ||
+        // First-token match — handles parenthetical descriptors
+        // (e.g. query "Inderbitzin Distributing" matches vendor
+        // "Inderbitzin (regional distributor, WA)" via shared first token).
+        (vendorFirstToken.length >= 4 &&
+          queryFirstToken.length >= 4 &&
+          vendorFirstToken === queryFirstToken)
+      );
+    }) ?? null;
+  if (!vendor) return null;
+
+  const parts: string[] = [];
+  if (vendor.pricePerBagUsd != null) {
+    parts.push(`$${vendor.pricePerBagUsd.toFixed(2)}/bag`);
+  }
+  if (vendor.gpPerBagUsd) {
+    const lo = vendor.gpPerBagUsd.min;
+    const hi = vendor.gpPerBagUsd.max;
+    const range =
+      Math.abs(hi - lo) < 0.01
+        ? `$${lo.toFixed(2)}/bag`
+        : `$${lo.toFixed(2)}–$${hi.toFixed(2)}/bag`;
+    parts.push(`GP ${range}`);
+  }
+  if (vendor.gpPct) {
+    const lo = vendor.gpPct.min;
+    const hi = vendor.gpPct.max;
+    const pct =
+      Math.abs(hi - lo) < 0.5
+        ? `${Math.round(lo)}%`
+        : `${Math.round(lo)}–${Math.round(hi)}%`;
+    parts.push(`(${pct})`);
+  }
+  if (vendor.statusLabel) parts.push(`status: ${vendor.statusLabel}`);
+
+  if (parts.length === 0) return null;
+  return `Margin context: ${parts.join(" · ")} — ${vendor.name}`;
+}
+
 export function parseUsdRange(value: string): MarginRange | null {
   const cleaned = normalizeMinus(value).replace(/,/g, "");
   const matches = Array.from(
