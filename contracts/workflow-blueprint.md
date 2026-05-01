@@ -401,6 +401,12 @@ Each row uses the schema:
   - Synthetic missing-metadata agents trip the read-model invariant.
 - **Monday MVP:** 🟢 read-only. No cron, no LLM calls, no queue claims, no external writes.
 
+#### Phase 6.5 — B2B Revenue Watcher heartbeat dry-run (NEW)
+- **Why:** Notion's AI-agent operating notes call for heartbeat-driven agents with queue, cadence, budget, output state, and audit-ready run records. The first revenue lane is B2B Revenue Watcher. Phase 6.5 ships the safe dry-run before any scheduler or Slack posting.
+- **Architecture:** `src/lib/ops/b2b-revenue-watcher.ts` defines the read-only heartbeat contract, summarizes stale buyers, Faire follow-ups, pending approvals, and wholesale inquiries, then emits a canonical `AgentHeartbeatRunRecord`. `GET/POST /api/ops/agents/b2b-revenue-watcher/run` is auth-gated and reads the existing Sales Command readers in parallel.
+- **Hard rules locked by tests:** no Slack post, no Gmail send, no HubSpot write, no approval opened, no QBO/Shopify/Faire API write. Actionable queues produce `outputState: "task_created"` with `/ops/sales` as the next human action; source failures produce `failed_degraded` with explicit reasons; quiet wired sources produce `no_action`.
+- **Monday MVP:** 🟢 dry-run only. No cron. No autonomous execution. This is the first heartbeat-shaped revenue agent output that can later be scheduled once Ben approves cadence.
+
 #### Phase 7 — Receipt OCR extraction (prepare-for-review only) (NEW)
 - **Why:** `/ops/finance/review` already aggregates the receipt review queue, but Rene/Ben were doing field-by-field data entry by hand. Phase 7 attaches a *suggestion* to each captured receipt so reviewers see vendor/date/amount/currency/tax/last4/payment hints proposed before they fill in the canonical fields. Promotion remains 100% human — no auto-fill, no QBO write.
 - **Architecture:**

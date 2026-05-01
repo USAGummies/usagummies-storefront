@@ -223,6 +223,7 @@ Shipped in this change:
 - `ops.sales.stale-buyers` is a ready read-only registry entry backed by `/api/ops/sales/stale-buyers`.
 - `contracts/agent-heartbeat.md` and `src/lib/ops/agent-heartbeat/*` are the first repo-native heartbeat primitive layer. They define context, idempotency keys, allowed output states, and run-record completion only; no LLM execution or external writes are wired.
 - `/ops/agents/packs` now surfaces static heartbeat metadata for every registered agent: cadence, queue source, allowed output states, and budget guardrails. This is read-only operator context for future ChatGPT workspace-agent orchestration, not runtime activation.
+- `/api/ops/agents/b2b-revenue-watcher/run` is the first heartbeat dry-run for a revenue agent. It returns a canonical run record and next-human-action summary; it does not schedule itself, post Slack, send Gmail, mutate HubSpot, or open approvals.
 
 Acceptance:
 
