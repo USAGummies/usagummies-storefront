@@ -154,6 +154,20 @@ export const OPENAI_WORKSPACE_TOOLS: readonly OpenAIWorkspaceTool[] = Object.fre
     safetyNotes: READ_ONLY_NOTES,
   },
   {
+    id: "ops.finance.off-grid-quotes",
+    name: "Off-grid quote visibility",
+    description:
+      "Read recent booth quotes priced outside the canonical B-tier grid, including skipped source rows when audit/KV replay is incomplete. Read-only; no pricing changes, approvals, QBO, HubSpot, Shopify, or Slack writes.",
+    mode: "read",
+    status: "ready",
+    audience: "Ben+Rene",
+    readOnly: true,
+    requiresHumanApproval: false,
+    backingRoute: "/api/ops/finance/off-grid",
+    backingSurface: "/ops/finance/off-grid",
+    safetyNotes: READ_ONLY_NOTES,
+  },
+  {
     id: "ops.receipts.review-packets",
     name: "Receipt review packets",
     description:

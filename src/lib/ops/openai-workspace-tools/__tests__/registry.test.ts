@@ -123,6 +123,19 @@ describe("OpenAI workspace tool registry", () => {
     expect(t?.description).toMatch(/no heartbeat trigger/i);
   });
 
+  it("ops.finance.off-grid-quotes exposes the read-only off-grid replay surface", () => {
+    const t = getOpenAIWorkspaceTool("ops.finance.off-grid-quotes");
+    expect(t).toBeDefined();
+    expect(t?.status).toBe("ready");
+    expect(t?.mode).toBe("read");
+    expect(t?.audience).toBe("Ben+Rene");
+    expect(t?.readOnly).toBe(true);
+    expect(t?.requiresHumanApproval).toBe(false);
+    expect(t?.backingRoute).toBe("/api/ops/finance/off-grid");
+    expect(t?.backingSurface).toBe("/ops/finance/off-grid");
+    expect(t?.description).toMatch(/no pricing changes/i);
+  });
+
   it("all read tools are actually read-only and never require approval", () => {
     const readTools = OPENAI_WORKSPACE_TOOLS.filter((tool) => tool.mode === "read");
     expect(readTools.length).toBeGreaterThan(0);
