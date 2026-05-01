@@ -247,6 +247,49 @@ When a mechanism graduates from one status to the next, update this doc + the ve
 
 ---
 
+## 7. Email Capabilities System (Phase 37 + Phase 38)
+
+Per [`/contracts/email-agents-system.md`](email-agents-system.md) v1.0 CANONICAL — Ben approval 2026-04-30 PM. Capabilities-first email subsystem covering inbound triage, B2B research + outreach prep, financial/AP handling, HubSpot verification, and audit + spam-cleanup. **Built INSIDE Viktor + existing runtimes (S-08, Finance Exception Agent, Booke, Compliance Specialist S-14, Drift Audit Runner). NO new top-level runtime agents created.**
+
+### 7.0 Doctrine alignment
+
+- ✅ Aligns with `/contracts/agent-architecture-audit.md` (no 26-agent sprawl; capabilities, not new agents)
+- ✅ Aligns with `/contracts/agent-heartbeat.md` §11 B2B Revenue Watcher (this proposal operationalizes that watcher's email surface)
+- ✅ Aligns with `/contracts/approval-taxonomy.md` v1.6 (uses only existing slugs: `gmail.send`, `hubspot.deal.stage.move`, `shipment.create`, `qbo.bill.create`, `lead.enrichment.write`, `hubspot.task.create`, `draft.email`, `internal.note`, `open-brain.capture`, `slack.post.audit`, `approved-claims.add`, `claim.counsel-review.request`, `receipt.review.promote`, `vendor.master.create`)
+- ✅ P0-1..P0-7 all confirmed shipped (precondition met per `agent-heartbeat.md` §12)
+- ✅ HubSpot 9-property + 2-group schema live (per `email-agents-hubspot-property-spec.md` v0.3 EXECUTED)
+
+### 7.1 Phase 37 — Inbound triage subsystem (16 build units)
+
+Per `/contracts/email-agents-system.md` §6. **Status: 🟡 doctrine-locked, code-build queued.** Ships INSIDE Viktor as workflow lanes (no new runtime agent).
+
+37.1 Inbox Scanner · 37.2 Classifier · 37.3 HubSpot Verification cross-cut · 37.4 Validator extension · 37.5 Strategic Framework analyzer · 37.6 Slack Interactive Approval UI · 37.7 Spam Cleaner (Class A-d) · 37.8 Bounce/Routing/OOO · 37.9 Sample Shipper (S-08 wrap) · 37.10 Whale Escalator · 37.11 Polite-No/Qualify/Thread-Fix · 37.12 Receipt+AP Handler · 37.13 Memory layer · 37.14 Daily-brief surface · 37.15 Weekly Audit (Drift Audit Runner extension) · 37.16 Tests + drift-audit fixtures
+
+**Sequence (per §6 lock):** 37.1 → 37.2 → 37.3 → 37.4 → 37.7 → 37.5 → 37.6 → 37.10 → 37.8 → 37.9 → 37.11 → 37.12 → 37.13 → 37.14 → 37.15 → 37.16. HARD STOPS first (whale before any drafter).
+
+### 7.2 Phase 38 — B2B Cashflow Research System (8 build units)
+
+Per `/contracts/email-agents-system.md` §13. **Status: 🔴 blueprint-only — must NOT start until Phase 37 complete (HARD doctrine lock).** *"Firing Touch 1's at scale without reply-handling = Spottswood at scale."*
+
+38.1 Prospect Research Engine (Apollo + classifier + pyramid + Op Souvenir Shelf scaffolding) · 38.2 ProspectFrame + CashflowFrame structs · 38.3 HubSpot Backfill (17 Notion targets imported with `cadence_state=not_started`) · 38.4 Outreach Prep Engine · 38.5 Cadence Sequencer · 38.6 Opportunity Scanner Engine (trade show + RangeMe + HARO) · 38.7 Daily Cashflow Brief Surface · 38.8 Tests + drift-audit + heartbeat instrumentation
+
+### 7.3 What Phase 37/38 EXPLICITLY DOES NOT DO
+
+Locked guardrails per `/contracts/email-agents-system.md` §7:
+- ❌ NO autonomous outbound email (universal approval gate, zero exceptions)
+- ❌ NO new agents added to `AGENT_REGISTRY`
+- ❌ NO new approval slugs registered
+- ❌ NO new divisions registered
+- ❌ NO QBO Chart of Accounts mutation
+- ❌ NO pricing/cart/bundle/inventory changes
+- ❌ NO Drew-owns-anything assertion
+- ❌ NO regulatory framing in customer-facing copy without Approved Claims List + counsel review
+- ❌ NO autonomous customer-facing send during quiet hours (9 PM – 6 AM PT)
+- ❌ NO scraping pipeline for distributor-pyramid (manual quarterly only)
+- ❌ NO Apollo scale-up beyond 60/week until Phase 37 reply loop is proven
+
+---
+
 ## 7. Cross-references + governance
 
 This blueprint is itself governed by:

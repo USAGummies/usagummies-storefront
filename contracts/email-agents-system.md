@@ -1,6 +1,7 @@
-# Email Capabilities System — DRAFT PROPOSAL (NOT YET CANONICAL)
+# Email Capabilities System — CANONICAL v1.0
 
-**Status:** DRAFT — strategy input only. **NOT approved as canonical runtime design.** Requires simplification before canonicalization. Not a green-light to build code or to register new agents.
+**Status:** ✅ CANONICAL — Ben approval 2026-04-30 PM ("lets do it" — approves recommended defaults wholesale + Phase 37 lane = inside Viktor).
+**Doc lives at:** `/contracts/email-agents-system.md` (renamed from `email-agents-system-proposal.md` on canonicalization).
 **Author:** Claude (drafted from full 2026-04-30 session history; revised v0.4 against `/contracts/agent-architecture-audit.md` + `/contracts/agent-heartbeat.md` + `/contracts/approval-taxonomy.md` v1.6 lockstep)
 **Trigger:** Ben's 2026-04-30 PM directive: *"how do you build a real set of email agents and workflows, so we can actually automate email, scanning the inbox, drafting replies, strategy etc etc, draft for me what that addition to the system would be."*
 **Pairs with:** [`/contracts/governance.md`](governance.md), [`/contracts/approval-taxonomy.md`](approval-taxonomy.md), [`/contracts/agent-architecture-audit.md`](agent-architecture-audit.md), [`/contracts/agent-heartbeat.md`](agent-heartbeat.md), [`/contracts/operating-memory.md`](operating-memory.md), [`/contracts/financial-mechanisms-blueprint.md`](financial-mechanisms-blueprint.md), [`/CLAUDE.md`](../CLAUDE.md) Execution Rules
@@ -584,9 +585,45 @@ The proposal is sized to today's actual failure modes. Each row maps an incident
 
 ---
 
-## 9. Open questions — answers locked in v0.4 + remaining for Ben + Rene
+## 9. Open questions — ALL ANSWERED + LOCKED (v1.0 canonical)
 
-**ANSWERED in v0.4 (locked into doctrine):**
+**Per Ben 2026-04-30 PM "lets do it" — recommended defaults approved wholesale.** All 24 open questions across v0.3 → v0.5 are now closed. Each lock below is canonical doctrine; further changes require explicit Class B `pricing.change`-equivalent doctrine-edit approval.
+
+**v1.0 LOCKED ANSWERS (15 from §9 + 8 from prior versions = 23 total; OQ-16 was already locked in v0.2):**
+
+- **OQ-1 Cron frequency:** ✅ 5-min weekday 6 AM – 9 PM PT polling + 30-min off-hours. Gmail Push deferred to a future optimization.
+- **OQ-2 Whale list:** ✅ Current 21-domain list canonical. Versioned-add path (Class B doctrine edit) for future additions.
+- **OQ-3 Quiet hours:** ✅ 9 PM – 6 AM PT default. Non-urgent drafts queue for next-morning approval.
+- **OQ-4 OOO re-poke:** ✅ 14-day default re-poke window.
+- **OQ-5 Legal-language Class C-or-D:** ✅ **Class D (human-only).** Aligns with existing `secret.share` + `contract.sign` Class D precedents.
+- **OQ-6 Phase 37 internal ordering:** ✅ Per §6 sequence — HARD STOPS first (Whale Escalator before any reply drafter); foundation before consumers.
+- **OQ-7 Memory hygiene:** ✅ Weekly stale-state cleanup — prune OOO records past return-date, archive bounces > 90 days, age out HOLDs > 30 days with `#ops-approvals` flag.
+- **OQ-8 LLM provider:** ✅ Claude API only (existing pattern via `@anthropic-ai/sdk`).
+- **OQ-9 Notion view for Rene's AP:** ✅ Defer to a v0.5+ doc revision; HubSpot + Slack sufficient for v1.
+- **OQ-10 Booke handoff:** ✅ Existing manual-upload flow Rene runs. Don't build direct API integration until Booke surfaces one.
+- **OQ-11 Vendor-bill auto-attach via `/api/ops/qbo/attachment`:** ✅ Yes, use existing route. Already wired per Viktor 4/29 ops audit.
+- **OQ-12 Spam-cleaner deletion semantics:** ✅ Trash (30-day Gmail auto-purge). NOT hard-delete.
+- **OQ-13 Edit-cycle limit:** ✅ 3 edit cycles per draft, then "review with Ben in person."
+- **OQ-14 Strategic Framework rendering:** ✅ Top-of-card for Class C/D + whales; collapsed expandable for Class B routine.
+- **OQ-15 Weekly audit recipient:** ✅ `#ops-approvals` (Ben primary) + mirror to `#financials` if findings include receipt/bill/AR items.
+
+**Locked in v0.2:** OQ-16 universal approval gate (zero exceptions for outbound email).
+
+**Locked in v0.4:** OQ-17 Apollo cap, OQ-18 vertical taxonomy + experimental flags, OQ-19 cadence timing, OQ-20 Whale Touch-1 = Class B, OQ-21 HARO strict allow-list, OQ-22 distributor-pyramid manual quarterly + HubSpot, OQ-23 LLM cost cap (deterministic templates first), OQ-24 Operation Souvenir Shelf migration via Phase 38.3.
+
+---
+
+## 9.1 Phase 37 lane lock — INSIDE VIKTOR (per Ben 2026-04-30 PM)
+
+**Decision:** Phase 37 capabilities ship as workflow lanes inside the existing **Viktor** sales runtime (per §11.2 row "qualifying-answerer / polite-no-closer / urgency-checker / thread-continuity-fixer / whale-escalator / ooo-tracker / routing-updater / bounce-cleaner / delay-watcher" all owned by Viktor). Sample-class capabilities continue to live in **Sample/Order Dispatch (S-08)**. Receipt/bill capabilities live in **Finance Exception Agent + Booke + Compliance Specialist (S-14)**.
+
+**No new top-level inbox-scanner runtime is created.** Per the §15 promotion gate, capabilities can graduate to runtime agents later — but the v1.0 canonical state ships everything as Viktor workflow extensions.
+
+**Why this lane (Ben's reasoning + my recommendation):**
+- Honors `/contracts/agent-architecture-audit.md` "do not create new agents until we audit what exists"
+- Reuses Viktor's existing approval-flow plumbing (Class B `gmail.send`, `hubspot.deal.stage.move`, `lead.enrichment.write`)
+- Single-runtime mental model — Ben opens `/ops/agents/status`, sees Viktor, drills in to see all email capabilities under one roof
+- Lower risk surface — no new agent = no new heartbeat metadata, no new dashboard surface, no new approval-class registration
 
 - **OQ-16 — Universal approval gate exceptions:** ✅ confirmed. Zero exceptions for outbound email. Class A reserved for internal-state writes only.
 - **OQ-17 — Apollo cap:** ✅ Tue/Thu only, 30 candidates/run, 60 candidates/week max. Quality > volume. No scale-up until Phase 37 reply loop is proven AND API rate limits verified. Locked in §11.3.1.
@@ -598,23 +635,7 @@ The proposal is sized to today's actual failure modes. Each row maps an incident
 - **OQ-23 — Pitch-angle LLM cost cap:** ✅ deterministic vertical templates first. LLM generation only for T0 / T1 / approved daily batches / explicit Ben-approved special campaigns. NOT 6,200 calls/year by default. Locked in §11.3.3 + Phase 38.4.
 - **OQ-24 — Operation Souvenir Shelf migration:** ✅ migrate the 17 Notion targets into HubSpot via Phase 38.3 backfill, marked `source = Operation Souvenir Shelf`, `cadence_state = not_started`, `approval_required = true`. Do not contact until Phase 37 is complete and cadence starts. Locked in §13 / Phase 38.3.
 
-**REMAINING for Ben + Rene to answer before approval:**
-
-1. **OQ-1 — Cron frequency:** is 5-min weekday-business-hours polling acceptable, or do you want Gmail Push (lower latency, more setup)?
-2. **OQ-2 — Whale list:** is §3.1 the canonical list, or do you want to add/remove?
-3. **OQ-3 — Quiet hours:** confirm 9 PM – 6 AM PT default for the approval-card surface?
-4. **OQ-4 — OOO re-poke:** 14-day default re-poke window correct, or shorter/longer?
-5. **OQ-5 — Class C vs Class D escalation for legal-language:** Class C (Ben + Rene) or Class D (human-only, attorney-loop)?
-6. **OQ-6 — Phase ordering inside Phase 37:** does my recommended sequence match your priority?
-7. **OQ-7 — Memory hygiene:** weekly "stale state" cleanup that prunes OOO records past return date + bounces older than 90 days, or keep forever?
-8. **OQ-8 — LLM provider for classifier + edit-via-LLM:** Claude API only, or option to switch?
-9. **OQ-9 — Notion integration for Rene's AP review surface:** HubSpot + Slack sufficient, or also Notion view?
-10. **OQ-10 — Booke AI handoff format:** existing manual-upload flow Rene runs, or direct API integration if exposed?
-11. **OQ-11 — Vendor-bill auto-attach to QBO via existing `/api/ops/qbo/attachment`:** use it, or wait for Rene's CoA mapping to fully canonicalize?
-12. **OQ-12 — Spam-cleaner deletion semantics:** Trash (30-day recovery) or HARD delete? My read: Trash.
-13. **OQ-13 — Edit-cycle limit:** 3 edit cycles per draft, or different?
-14. **OQ-14 — Strategic Framework rendering:** top-of-card for whales/Class C/D, collapsed for routine — confirm or change?
-15. **OQ-15 — Weekly audit recipient channel:** `#ops-approvals` only, or also `#financials`?
+**ALL OQs CLOSED.** No remaining open questions before canonicalization. Future doctrine changes require Class B doctrine-edit approval.
 
 ---
 
@@ -1080,6 +1101,7 @@ This proposal's compatibility against the load-bearing contracts. Audit performe
 
 ## Version history
 
+- **v1.0 — 2026-04-30 PM (CANONICAL)** — Ben "lets do it" approval. All 15 remaining OQs answered with recommended defaults. Phase 37 lane locked = INSIDE VIKTOR (no new top-level runtime). Doc renamed from `email-agents-system-proposal.md` → `email-agents-system.md` and registered in `/contracts/financial-mechanisms-blueprint.md` as Phase 37 + Phase 38. **Phase 37.1 — Inbox Scanner — is now ready to start. Code build NOT initiated by canonicalization commit; awaits explicit "ship Phase 37.1" go-ahead from Ben on the actual code lane.** No new agents added to AGENT_REGISTRY, no new approval slugs, no new divisions. P0-1..P0-7 all confirmed shipped. HubSpot 9-property + 2-group schema live (per spec v0.3 EXECUTED).
 - **v0.4.1 — 2026-04-30 PM (DRAFT, status update only)** — §11.6 schema status updated to ✅ EXECUTED. Per Ben's directive, the 9 missing HubSpot custom properties + 2 property groups were created via API (Path B from the companion spec). No doctrine change, no canonicalization shift, no new agents/slugs/divisions. This is a status note documenting the unblock; remaining gates (15 OQs + P37 build sequence) unchanged. See `/contracts/email-agents-hubspot-property-spec.md` v0.3 §7 for the per-property creation log.
 - **v0.4 — 2026-04-30 PM (DRAFT, doctrine-alignment audit)** — Major restructure to align with `/contracts/agent-architecture-audit.md` + `/contracts/agent-heartbeat.md` + `/contracts/approval-taxonomy.md` v1.6: (a) §0a doctrine-alignment block — *"5 subsystems composed of capabilities, NOT 26 new agents"* framing; (b) HubSpot hard gate locked from prior implicit reference into explicit §11.6 rule; (c) all "specialist agents" renamed to "capabilities" — none register new runtime agents until §15 promotion gate is met; (d) Phase 38 collapsed from 10 micro-builds to 8 build units (38.1–38.8); (e) NEW `CashflowFrame` struct (§11.2) — peer to `ProspectFrame`, decides daily priority via `cashSpeed` axis; (f) NEW §11.5 Cashflow Scoreboard doctrine — bags / cash / GP / next action / due / approval / status as the unifying scoreboard fields written to HubSpot; (g) §11.7 daily-brief made cashflow-first per Ben's lock — strategic credentialing plays never block cashflow plays; (h) NEW §15 promotion gate ("no new runtime agent unless 7 conditions met"); (i) NEW §16 doctrine-compatibility audit; (j) §3.6 regulatory-hook guardrail (NEVER customer-facing without Approved Claims + counsel review); (k) HARO scanner strict allow-list locked; (l) RangeMe scanner produces structured submit/skip recommendation card, NEVER autonomous; (m) Distributor-pyramid set to manual quarterly + HubSpot, NO scraping pipeline; (n) Apollo cap: Tue/Thu only, 30/run, 60/week max; (o) Touch cadence locked: 0/5–7/14 default, 0/3/7 gateway, T0 manual T2/T3; (p) Whale Touch-1 = Class B `gmail.send` Ben approval, NOT Class C unless pricing/money/exclusivity in play; (q) pitch-angle LLM cost capped — deterministic templates first, LLM only for T0/T1/approved batches; (r) `co_pack_partner`, `airline_amenity`, `military_exchange` marked EXPERIMENTAL; (s) Operation Souvenir Shelf migration spec'd via Phase 38.3 backfill, do-not-contact-until-Phase-37-complete. OQ-17..OQ-24 all answered + retired. 15 remaining open questions documented in §9.
 - **v0.3 — 2026-04-30 PM (DRAFT, Viktor research strategies + sub-system architecture)** — Major additions: (a) §11 B2B Sales Research Sub-System — 8 specialist research agents (apollo-prospector, vertical-classifier, pitch-angle-builder, cadence-sequencer, trade-show-scanner, rangeme-campaign-scanner, haro-press-scanner, distributor-pyramid-mapper); (b) §11.1 strategic-doctrine block (hunt-whales-build-routes, gateway-communities, Operation Souvenir Shelf, premium-impulse positioning, regulatory tailwind, distributor-pyramid, multi-channel route compounding, sample-as-credential); (c) §11.2 vertical-targeting framework with `ProspectVertical` + `ProspectFrame` typed structs (18 verticals); (d) §11.4 closed-loop integration with inbound triage; (e) §11.5 daily-brief surfaces for research; (f) §12 sub-system architecture summary — 5 coordinated sub-systems, 23 specialists + 3 cross-cutting; (g) §13 Phase 38 build phases (38.1–38.10) with inbound-before-outbound sequencing rationale; (h) §14 8 new open questions (Apollo rate limits, vertical taxonomy completeness, cadence timing, HARO filter strictness, Notion → HubSpot migration). Total open questions now 24.
