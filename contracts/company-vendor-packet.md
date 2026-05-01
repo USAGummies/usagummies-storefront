@@ -110,10 +110,11 @@ Spokane, WA
 |---|---|
 | Flavors | **Cherry, Watermelon, Orange, Green Apple, Lemon** |
 | Claims (canonical) | Made in USA · Dye-free · No artificial colors · 100% natural color (paprika, turmeric, beet juice, etc.) · Premium gummy candy · Non-GMO ingredients |
-| Allergens | **Gelatin (beef-derived).** Manufactured in a facility that processes other confectionery. *No major Big-9 allergens (peanut, tree nut, dairy, egg, wheat, soy, fish, shellfish, sesame).* |
-| Kosher | NOT kosher-certified (gelatin is non-kosher beef). |
-| Halal | NOT halal-certified. |
-| Vegan | **NO** (contains gelatin). |
+| Allergens | 🚩 **BEN: confirm gelatin source** — the bag's printed ingredient panel (Belmark) and Albanese spec sheet are the primary sources. Until verified by Drew or pulled from the printed panel, the safe statement is: *"Contains gelatin. No major Big-9 allergens (peanut, tree nut, dairy, egg, wheat, soy, fish, shellfish, sesame)."* DO NOT specify "beef-derived" or "pork-derived" without primary-source verification. |
+| Gelatin source verification path | (1) Pull printed bag panel from Belmark art file in Drive `Packaging > Belmark`. (2) Cross-check Albanese product spec sheet (Albanese is our raw gummy supplier — see `/CLAUDE.md` Production). (3) Confirm with Drew (Albanese vendor relationship owner). |
+| Kosher | **NOT kosher-certified.** *Note:* gelatin source affects this — kosher requires kosher-certified gelatin (typically beef from kosher slaughter, or fish-derived). We do not have a certificate either way. |
+| Halal | **NOT halal-certified.** Same caveat as kosher — depends on gelatin source + slaughter certification we don't have. |
+| Vegan | **NO** — contains gelatin (animal-derived regardless of source). |
 | Gluten | **Gluten-free** (no gluten-containing ingredients). |
 | Country of origin | **USA — manufactured at Powers Confections, Spokane WA** |
 | Compliance | CA AB 418 compliant (no Red 3, BVO, potassium bromate, propylparaben). CA AB 2316 compliant (no Red 40, Yellow 5/6, Blue 1/2, Green 3 — none in product to begin with). TX SB 25 compliant (no warning label triggers). |
@@ -218,5 +219,6 @@ When Ben fills in EIN / DUNS / COA location / COI carrier / return policy:
 
 ## Version history
 
-- **v1.1 — 2026-04-30 PM (later)** — EIN (`33-4744824`) + DUNS (`13-863-5866`) locked by Ben. Removes the two highest-priority `🚩 BEN: fill` blockers. 3 remaining: COA location (Powers Confections issues per-batch — Drew can pull from Powers portal on demand), COI carrier (insurance carrier name + cert location), return policy canonical text. None of those gate P0 portal submissions.
+- **v1.2 — 2026-04-30 PM (latest)** — Walked back unsourced "gelatin (beef-derived)" claim in §5. The original v1.0 wording asserted a specific source without primary-source verification — ingredient source must be pulled from the Belmark printed bag panel and/or Albanese spec sheet, neither of which I had direct access to. Replaced with a 🚩 BEN-fill flag + verification path. The kosher/halal/vegan rows were also tightened (kosher and halal both depend on the gelatin source we haven't verified; vegan is unambiguously NO regardless). Compliance-class fields now follow the same source-or-stop discipline as the financial fields.
+- **v1.1 — 2026-04-30 PM** — EIN (`33-4744824`) + DUNS (`13-863-5866`) locked by Ben. Removes the two highest-priority `🚩 BEN: fill` blockers. 3 remaining: COA location (Powers Confections issues per-batch — Drew can pull from Powers portal on demand), COI carrier (insurance carrier name + cert location), return policy canonical text. None of those gate P0 portal submissions.
 - **v1.0 — 2026-04-30 PM** — Initial publication. Built to be the single source of truth for every portal / vendor / RangeMe / new-account submission. 5 fields flagged `🚩 BEN: fill` (EIN, DUNS, COA location, COI carrier, return policy canonical text). All other 80+ fields canonicalized from existing contracts + code.
