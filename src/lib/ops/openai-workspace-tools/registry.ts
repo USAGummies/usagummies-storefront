@@ -127,6 +127,20 @@ export const OPENAI_WORKSPACE_TOOLS: readonly OpenAIWorkspaceTool[] = Object.fre
     safetyNotes: READ_ONLY_NOTES,
   },
   {
+    id: "ops.inbox.unified",
+    name: "Unified inbox snapshot",
+    description:
+      "Read the operator unified inbox across Gmail, Slack, B2B, Shopify, and Amazon buyer messages. ChatGPT may summarize and prioritize, but must not triage via AI, draft, send, archive, delete, label, or mutate inbox state.",
+    mode: "read",
+    status: "ready",
+    audience: "Ben",
+    readOnly: true,
+    requiresHumanApproval: false,
+    backingRoute: "/api/ops/inbox",
+    backingSurface: "/ops/inbox",
+    safetyNotes: READ_ONLY_NOTES,
+  },
+  {
     id: "ops.finance.review",
     name: "Finance review queue",
     description:
@@ -309,6 +323,22 @@ export const OPENAI_WORKSPACE_TOOLS: readonly OpenAIWorkspaceTool[] = Object.fre
     requiresHumanApproval: true,
     blocker:
       "QBO bill creation is parked pending Rene's vendor/account/class mapping and an explicit Class C approval slug.",
+    safetyNotes: PROHIBITED_NOTES,
+  },
+  {
+    id: "ops.email-intel.run.direct",
+    name: "Direct email-intelligence runner",
+    description:
+      "Prohibited for ChatGPT workspace agents. The email-intel auto-replier remains disabled after the 2026-04-30 incident; any future re-enable requires explicit kill-switch review, dry-run validation, and Slack approval-chain verification.",
+    mode: "prohibited",
+    status: "blocked",
+    audience: "Ben",
+    readOnly: false,
+    requiresHumanApproval: true,
+    backingRoute: "/api/ops/fulfillment/email-intel/run",
+    backingSurface: "/ops/inbox",
+    blocker:
+      "EMAIL_INTEL_ENABLED defaults off after the Eric Miller incident; ChatGPT may read inbox context but cannot trigger the runner.",
     safetyNotes: PROHIBITED_NOTES,
   },
   {

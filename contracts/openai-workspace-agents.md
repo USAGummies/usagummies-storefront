@@ -230,6 +230,8 @@ Shipped in this change:
 - Manual watcher dry-runs now append one fail-soft internal `system.read` audit entry, allowing `/ops/agents/status` to observe runs without adding any external write path.
 - The watcher now has an audit-only weekday cron at `14:45 UTC`; it still does not post Slack or mutate external systems.
 - Watcher run output now carries a bounded top-stale-buyer preview so ChatGPT workspace agents can name the first concrete buyer/stage/action while staying read-only.
+- `ops.inbox.unified` is a ready read-only registry entry backed by `/api/ops/inbox` and `/ops/inbox`, giving ChatGPT workspace agents inbox context without enabling AI triage, drafting, sending, archiving, deleting, labels, or the email-intel runner.
+- `ops.email-intel.run.direct` is explicitly prohibited/blocked. The email-intel auto-replier remains disabled after the 2026-04-30 incident; ChatGPT cannot trigger `/api/ops/fulfillment/email-intel/run`.
 - `ops.finance.vendor-margin` is a ready read-only registry entry backed by `/api/ops/finance/vendor-margin` and `/ops/finance/vendor-margin`, giving ChatGPT/Codex agents sourced per-vendor margin context without QBO, HubSpot, Shopify, pricing, or invoice writes.
 - `ops.finance.off-grid-quotes` is a ready read-only registry entry backed by `/api/ops/finance/off-grid` and `/ops/finance/off-grid`, giving ChatGPT/Codex agents visibility into off-grid quote replay without pricing changes, approvals, QBO, HubSpot, Shopify, or Slack writes.
 

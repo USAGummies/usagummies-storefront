@@ -136,6 +136,30 @@ describe("OpenAI workspace tool registry", () => {
     expect(t?.description).toMatch(/no pricing changes/i);
   });
 
+  it("ops.inbox.unified exposes inbox context as read-only", () => {
+    const t = getOpenAIWorkspaceTool("ops.inbox.unified");
+    expect(t).toBeDefined();
+    expect(t?.status).toBe("ready");
+    expect(t?.mode).toBe("read");
+    expect(t?.readOnly).toBe(true);
+    expect(t?.requiresHumanApproval).toBe(false);
+    expect(t?.backingRoute).toBe("/api/ops/inbox");
+    expect(t?.backingSurface).toBe("/ops/inbox");
+    expect(t?.description).toMatch(/must not triage via AI/i);
+  });
+
+  it("blocks direct email-intel runner access after the incident", () => {
+    const t = getOpenAIWorkspaceTool("ops.email-intel.run.direct");
+    expect(t).toBeDefined();
+    expect(t?.status).toBe("blocked");
+    expect(t?.mode).toBe("prohibited");
+    expect(t?.readOnly).toBe(false);
+    expect(t?.requiresHumanApproval).toBe(true);
+    expect(t?.backingRoute).toBe("/api/ops/fulfillment/email-intel/run");
+    expect(t?.blocker).toMatch(/EMAIL_INTEL_ENABLED defaults off/i);
+    expect(t?.description).toMatch(/2026-04-30 incident/i);
+  });
+
   it("all read tools are actually read-only and never require approval", () => {
     const readTools = OPENAI_WORKSPACE_TOOLS.filter((tool) => tool.mode === "read");
     expect(readTools.length).toBeGreaterThan(0);
