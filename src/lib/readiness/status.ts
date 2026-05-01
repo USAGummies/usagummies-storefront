@@ -373,6 +373,20 @@ export const SMOKE_CHECKLIST: readonly SmokeCheckItem[] = [
     surface: "operator",
   },
   {
+    href: "/ops/approvals",
+    label: "Slack approvals",
+    description:
+      "In #ops-approvals, click Needs edit on a safe test approval. Slack should open the edit-request modal and post the submitted request in-thread.",
+    surface: "operator",
+  },
+  {
+    href: "/ops/sales",
+    label: "Slack ops dashboard",
+    description:
+      "In a watched Slack channel, send `ops dashboard`. The bot should reply in-thread with the Sales Command Center Block Kit card.",
+    surface: "operator",
+  },
+  {
     href: "/api/ops/openai-workspace-tools/mcp",
     label: "OpenAI workspace MCP",
     description:

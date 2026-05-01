@@ -239,7 +239,7 @@ describe("smoke checklist — stable shape", () => {
       expect(c.description).toBeTruthy();
     }
   });
-  it("includes the public locator + login + ops shipping + ap packets + locations", () => {
+  it("includes the public locator + login + ops shipping + ap packets + Slack cockpit", () => {
     const hrefs = SMOKE_CHECKLIST.map((c) => c.href);
     expect(hrefs).toContain("/where-to-buy");
     expect(hrefs).toContain("/wholesale");
@@ -248,6 +248,8 @@ describe("smoke checklist — stable shape", () => {
     expect(hrefs).toContain("/ops/finance/review");
     expect(hrefs).toContain("/ops/ap-packets");
     expect(hrefs).toContain("/ops/locations");
+    expect(SMOKE_CHECKLIST.some((c) => c.label === "Slack approvals")).toBe(true);
+    expect(SMOKE_CHECKLIST.some((c) => c.label === "Slack ops dashboard")).toBe(true);
     expect(hrefs).toContain("/api/ops/openai-workspace-tools/mcp");
   });
 });
