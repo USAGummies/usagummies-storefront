@@ -355,6 +355,98 @@ export const AGENT_MANIFEST: readonly AgentManifestEntry[] = [
     purpose:
       "Lean operator-facing wrapper around sample-dispatch. Ben at his desk drops a sample → Class B shipment.create approval in #ops-approvals. Whale detection (Buc-ee's, KeHE, McLane, Eastern National, Xanterra, Delaware North, Aramark, Compass, Sodexo) flags high-stakes drops.",
   },
+  {
+    id: "approval-sweeper",
+    name: "Approval Expiry Sweeper",
+    contract: "/contracts/governance.md",
+    classification: "job",
+    approvalClass: "A",
+    owner: "claude",
+    approver: null,
+    lifecycle: "active",
+    purpose:
+      "P0-5 hourly sweep of the pending-approvals queue. Persists `expired` terminal state for stale approvals + emits audit envelopes. Class A — never executes the underlying B/C action, only marks state.",
+  },
+  {
+    id: "amazon-fbm-unshipped-alert",
+    name: "Amazon FBM Unshipped Alert",
+    contract: "/CLAUDE.md (Amazon FBM workflow)",
+    classification: "task",
+    approvalClass: "A",
+    owner: "ben",
+    approver: null,
+    lifecycle: "active",
+    purpose:
+      "Polls SP-API for unshipped FBM orders, dedups against KV, posts a fresh batch to #operations. Flags <12h-to-ship-by with :rotating_light: so Ben keeps the Prime badge.",
+    notes:
+      "Task by design — alerting only. Dispatch happens via /api/ops/amazon/dispatch (manual ship-to copy from Seller Central until SP-API RDT lands).",
+  },
+  {
+    id: "auto-ship",
+    name: "Auto-Ship Pipeline",
+    contract: "/contracts/integrations/shipstation.md",
+    classification: "job",
+    approvalClass: "A",
+    owner: "ben",
+    approver: null,
+    lifecycle: "active",
+    purpose:
+      "Channel-agnostic ShipStation `awaiting_shipment` drain. For orders that fit a canonical packaging profile, auto-buys the label + drops the PDF into #shipping. Ships from Ashford.",
+  },
+  {
+    id: "viktor-pipeline",
+    name: "Viktor Pipeline Digest",
+    contract: "/contracts/viktor.md",
+    classification: "task",
+    approvalClass: "A",
+    owner: "ben",
+    approver: null,
+    lifecycle: "active",
+    purpose:
+      "Weekly Monday morning #sales digest of HubSpot pipeline health: deal counts + $ by stage, stale deals (>14d), close-month deals, top 5 by amount. Read-only — never mutates HubSpot.",
+    notes:
+      "Task by design — Viktor's bounded role is HubSpot maintenance + Slack Q&A; the weekly digest extends visibility without expanding scope.",
+  },
+  {
+    id: "inventory-snapshot",
+    name: "Inventory Snapshot Cache",
+    contract: "",
+    classification: "task",
+    approvalClass: "A",
+    owner: "claude",
+    approver: null,
+    lifecycle: "active",
+    purpose:
+      "Periodically fresh-fetches Shopify inventory + caches in KV so downstream agents (Shipping Hub over-promise check, daily brief) get cheap reads.",
+    notes:
+      "Task by design — pure cache-warming primitive. No Slack post, no mutation.",
+  },
+  {
+    id: "inventory-burn-rate",
+    name: "Inventory Burn-Rate Calibrator",
+    contract: "",
+    classification: "task",
+    approvalClass: "A",
+    owner: "claude",
+    approver: null,
+    lifecycle: "active",
+    purpose:
+      "Weekly (Sunday 03:30 UTC) re-computation of inventory burn rates from Shopify + Amazon order history; writes calibrated rates to KV ahead of the Monday drift audit + daily Ops Agent reads.",
+    notes:
+      "Task by design — calibration only. Burn-rate consumers (drift audit, ops agent) read from this KV.",
+  },
+  {
+    id: "fulfillment-retry",
+    name: "Fulfillment Dispatch-Retry Drain",
+    contract: "",
+    classification: "job",
+    approvalClass: "A",
+    owner: "ben",
+    approver: null,
+    lifecycle: "active",
+    purpose:
+      "Drains `fulfillment:dispatch-retry-queue` every 30 min during business hours. Reposts OrderIntents whose Slack approval-card post failed on first try; alerts #ops-alerts when an entry exhausts MAX_ATTEMPTS.",
+  },
 ] as const;
 
 // ---------------------------------------------------------------------------

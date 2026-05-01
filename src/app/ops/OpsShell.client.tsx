@@ -35,6 +35,7 @@ const NAV_SECTIONS: NavSection[] = [
     title: "COMMAND",
     items: [
       { href: "/ops/abra", label: "Abra", icon: "\u{1F9E0}", roles: ["admin", "employee"] },
+      { href: "/ops/today", label: "Today", icon: "🇺🇸", roles: ["admin", "employee"] },
       { href: "/ops", label: "Command Center", icon: "\u{1F3AF}", roles: ["admin", "employee", "investor", "partner", "banker"] },
       { href: "/ops/approvals", label: "Approvals", icon: "\u2705", roles: ["admin", "employee"], badge: "pendingApprovals" },
       { href: "/ops/drafts", label: "Draft Emails", icon: "\u2709\uFE0F", roles: ["admin", "employee"] },
