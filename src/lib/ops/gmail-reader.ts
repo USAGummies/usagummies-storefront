@@ -78,6 +78,7 @@ export type ListEmailsOpts = {
 
 let _gmail: ReturnType<typeof google.gmail> | null = null;
 let _gmailSend: ReturnType<typeof google.gmail> | null = null;
+let _gmailModify: ReturnType<typeof google.gmail> | null = null;
 
 function getGmailClient() {
   if (_gmail) return _gmail;
@@ -165,6 +166,85 @@ function getGmailSendClient(): ReturnType<typeof google.gmail> | null {
     `GMAIL_SERVICE_ACCOUNT_JSON=${!!process.env.GMAIL_SERVICE_ACCOUNT_JSON}`
   );
   return null;
+}
+
+/**
+ * Get a Gmail client with `gmail.modify` permission — required for moving
+ * messages to trash, applying labels, and other state-change ops.
+ *
+ * Phase 37.7 Spam Cleaner is the first caller. Uses OAuth2 refresh token
+ * (scopes baked in at consent time) or service-account with the modify
+ * scope listed. Returns null if neither path is configured.
+ */
+function getGmailModifyClient(): ReturnType<typeof google.gmail> | null {
+  if (_gmailModify) return _gmailModify;
+
+  const clientId = process.env.GMAIL_OAUTH_CLIENT_ID || process.env.GCP_GMAIL_OAUTH_CLIENT_ID;
+  const clientSecret = process.env.GMAIL_OAUTH_CLIENT_SECRET || process.env.GCP_GMAIL_OAUTH_CLIENT_SECRET;
+  const refreshToken = process.env.GMAIL_OAUTH_REFRESH_TOKEN || process.env.GCP_GMAIL_OAUTH_REFRESH_TOKEN;
+
+  if (clientId && clientSecret && refreshToken) {
+    const oauth2 = new google.auth.OAuth2(clientId, clientSecret);
+    oauth2.setCredentials({ refresh_token: refreshToken });
+    _gmailModify = google.gmail({ version: "v1", auth: oauth2 });
+    return _gmailModify;
+  }
+
+  const saJson = process.env.GMAIL_SERVICE_ACCOUNT_JSON;
+  if (saJson) {
+    const creds = JSON.parse(saJson);
+    const auth = new google.auth.GoogleAuth({
+      credentials: creds,
+      scopes: [
+        "https://www.googleapis.com/auth/gmail.readonly",
+        "https://www.googleapis.com/auth/gmail.modify",
+      ],
+      clientOptions: {
+        subject: "ben@usagummies.com",
+      },
+    });
+    _gmailModify = google.gmail({ version: "v1", auth });
+    return _gmailModify;
+  }
+
+  return null;
+}
+
+/**
+ * Move a Gmail message to Trash via `gmail.users.messages.trash`.
+ *
+ * Used by Phase 37.7 Spam Cleaner (Class A-d autonomous DELETE per
+ * /contracts/email-agents-system.md §2.5d + §2.8). The message is
+ * moved to Gmail's Trash folder where it auto-purges after 30 days —
+ * recoverable until then.
+ *
+ * Returns a structured result; never throws so the spam-cleaner runner
+ * can surface per-message failures in its daily digest without taking
+ * down the whole batch.
+ */
+export async function moveToTrash(
+  messageId: string,
+): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const gmail = getGmailModifyClient();
+  if (!gmail) {
+    return {
+      ok: false,
+      error:
+        "Gmail modify client not available — needs gmail.modify scope on OAuth2 token or service account",
+    };
+  }
+  try {
+    const res = await gmail.users.messages.trash({
+      userId: "me",
+      id: messageId,
+    });
+    return { ok: true, id: res.data?.id ?? messageId };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
 }
 
 // ---------------------------------------------------------------------------

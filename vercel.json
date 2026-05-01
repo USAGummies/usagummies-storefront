@@ -95,6 +95,10 @@
     {
       "path": "/api/ops/sales/viktor/inbox-scan/run",
       "schedule": "*/5 0-4 * * 2-6"
+    },
+    {
+      "path": "/api/ops/sales/viktor/spam-cleaner/run",
+      "schedule": "0 8 * * *"
     }
   ]
 }
