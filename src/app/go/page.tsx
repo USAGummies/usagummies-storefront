@@ -116,8 +116,12 @@ export default function GoLandingPage() {
           .lp-sticky-bar { display: none; }
         }
         /* Supply-chain US map — base styles + highlight the 5 active states.
-           The SVG's internal <defs><style> block was stripped (hydration
-           mismatch); we recreate the base styles here.
+           The SVG's internal defs/stylesheet block was stripped (hydration
+           mismatch); we recreate the base styles here. Note: do NOT write
+           the literal substring style-with-angle-brackets inside this CSS —
+           React's server renderer escapes it to a CSS hex sequence
+           (CSS escape for "s") which then mismatches client hydration and triggers React
+           error #418. (Fix: 2026-04-30, see commit re hydration #418.)
            2026-04-30: mobile fix — bump min-height + force preserveAspectRatio
            via container so the SVG doesn't render as a tiny postage stamp on
            narrow viewports. */
