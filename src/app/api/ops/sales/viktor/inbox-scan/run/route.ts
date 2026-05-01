@@ -1,24 +1,27 @@
 /**
- * Phase 37.1 — Inbox Scanner cron route (Viktor capability).
+ * Phase 37.1 + 37.2 — Inbox Scanner + Classifier cron route (Viktor).
  *
- * Per /contracts/email-agents-system.md §2.1 + §9.1:
+ * Per /contracts/email-agents-system.md §2.1 + §2.2 + §9.1:
  *   - Runtime owner: Viktor (sales). NOT a new top-level agent.
- *   - Class A `system.read` only — no email send, no HubSpot write.
+ *   - Class A `system.read` only — no email send, no HubSpot write,
+ *     no spam-cleaner delete (37.7 owns that lane).
  *   - Cadence: every 5 minutes during weekday business hours
  *     (6 AM – 9 PM PT) per Ben's OQ-1 lock 2026-04-30 PM.
  *
+ * Pipeline (one tick):
+ *   1. Inbox scan (Phase 37.1) — list new envelopes, write `inbox:scan:<id>`
+ *      records with status `received` / `received_noise`.
+ *   2. Classifier (Phase 37.2) — classify the new records into the
+ *      22 v1 categories (whale HARD STOP first), persist back at the
+ *      same key with status `classified` / `classified_whale`.
+ *
  * Auth: middleware whitelist + isAuthorized fallback (CRON_SECRET bearer).
  *
- * Output: JSON `InboxScanReport` from `runInboxScanner()`. Side-effects:
- *   - One KV record per never-seen message id at `inbox:scan:<msgId>`.
- *   - Cursor advance at `email-intel:cursor:gmail` to max observed date.
- *   - One audit entry per run via `auditStore().append()`.
+ * Kill switch: `INBOX_SCANNER_ENABLED=false` env var pauses both stages
+ * without redeploy.
  *
- * Kill switch: `INBOX_SCANNER_ENABLED=false` env var pauses without
- * redeploy (mirrors the legacy `EMAIL_INTEL_ENABLED` pattern).
- *
- * NOTE: this route does NOT classify, draft, or escalate. Phase 37.2 is
- * the classifier; this is the bare scan-and-persist layer.
+ * NOTE: this route does NOT draft replies or open approvals. Drafting is
+ * Phase 37.5 + 37.6 + 37.11; approvals are §2.5a (Phase 37.6).
  */
 import { NextResponse } from "next/server";
 
@@ -26,6 +29,10 @@ import { isAuthorized } from "@/lib/ops/abra-auth";
 import { buildAuditEntry } from "@/lib/ops/control-plane/audit";
 import { newRunContext } from "@/lib/ops/control-plane/run-id";
 import { auditStore } from "@/lib/ops/control-plane/stores";
+import {
+  runClassifier,
+  type ClassifierReport,
+} from "@/lib/sales/viktor/classifier";
 import {
   runInboxScanner,
   type InboxScanReport,
@@ -93,6 +100,7 @@ async function run(req: Request): Promise<Response> {
   }
 
   let report: InboxScanReport | null = null;
+  let classifierReport: ClassifierReport | null = null;
   let error: string | undefined;
 
   try {
@@ -100,6 +108,34 @@ async function run(req: Request): Promise<Response> {
       dryRun: body.dryRun,
       maxEmails: body.maxEmails,
     });
+
+    // Phase 37.2 — chain the classifier on whatever the scanner just
+    // wrote. Scanner returns `newRecords` even in dry-run; the classifier
+    // honors the dry-run flag too so neither stage mutates KV when off.
+    if (report.newRecords.length > 0) {
+      try {
+        classifierReport = await runClassifier({
+          records: report.newRecords,
+          dryRun: body.dryRun,
+        });
+      } catch (err) {
+        // Classifier failure does NOT fail the run — scanner output is
+        // still useful, classifier-degraded is just a degraded note.
+        const msg = err instanceof Error ? err.message : String(err);
+        classifierReport = {
+          examined: report.newRecords.length,
+          classified: 0,
+          skippedAlreadyClassified: 0,
+          skippedNoise: 0,
+          byCategory: {},
+          whaleHits: 0,
+          unclassified: 0,
+          degraded: true,
+          degradedNotes: [`runClassifier-threw: ${msg}`],
+          classifiedRecords: [],
+        };
+      }
+    }
   } catch (err) {
     error = err instanceof Error ? err.message : String(err);
   }
@@ -126,6 +162,16 @@ async function run(req: Request): Promise<Response> {
                 cursorAdvanced: report.cursorAdvanced,
                 cursorBefore: report.cursorBefore,
                 cursorAfter: report.cursorAfter,
+                classifier: classifierReport
+                  ? {
+                      examined: classifierReport.examined,
+                      classified: classifierReport.classified,
+                      whaleHits: classifierReport.whaleHits,
+                      unclassified: classifierReport.unclassified,
+                      byCategory: classifierReport.byCategory,
+                      degraded: classifierReport.degraded,
+                    }
+                  : null,
               }
             : undefined,
           error: error
@@ -137,8 +183,8 @@ async function run(req: Request): Promise<Response> {
                 }
               : undefined,
           sourceCitations: [
-            { system: "contracts.email-agents-system", id: "§2.1" },
-            { system: "phase", id: "37.1" },
+            { system: "contracts.email-agents-system", id: "§2.1+§2.2+§3.1" },
+            { system: "phase", id: "37.1+37.2" },
           ],
           confidence: 1,
         },
@@ -162,5 +208,6 @@ async function run(req: Request): Promise<Response> {
     ok: true,
     runId: runCtx.runId,
     report,
+    classifier: classifierReport,
   });
 }

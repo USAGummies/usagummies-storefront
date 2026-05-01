@@ -40,9 +40,9 @@ When a mechanism graduates from one status to the next, update this doc + the ve
 - **Math:** 13 channels with per-bag economics, every cell sourced
 
 ### 1.3 Per-vendor margin ledger
-- **Status:** ✅ shipped (v0.1 committed 2026-04-30 PM)
+- **Status:** ✅ shipped (Phase 36.1 → 36.4 — kernel, API, brief, HubSpot deal-note wire, operator UI all shipped)
 - **Source:** `/contracts/per-vendor-margin-ledger.md`
-- **Code-side wire:** 🔴 Phase 36 (queued — see §6 below)
+- **Code-side wire:** `src/lib/finance/per-vendor-margin.ts` (parser + types) · `/api/ops/finance/vendor-margin` (read-only JSON) · `/ops/finance/vendor-margin` (operator UI per `c6090742`) · morning-brief vendor-margin watch section · HubSpot deal-note auto-includes vendor margin context on shipment (`252d443`).
 
 ---
 
@@ -67,10 +67,9 @@ When a mechanism graduates from one status to the next, update this doc + the ve
 - **Inputs:** 8 fields (volume_bags, format, freight_mode, payment_terms, branded_or_pl, bag_size_oz, delivery_window_days, multi_batch)
 
 ### 2.4 Q3 buyer-pays surcharge (+$0.25/bag) — B3 → $3.50, B5 → $3.25
-- **Status:** 🔵 proposed (Rene 2026-04-30 AM, math validated, awaiting Ben Class C `pricing.change` sign-off)
-- **Source:** Slack DM thread + `#financials` thread
-- **Code-side wire:** Pending ratification → `wholesale-pricing.md` v2.4 + `pricing-tiers.ts` price-table update
-- **Action:** Ben ratifies in `#financials` → `/contracts/wholesale-pricing.md` v2.4 lands within an hour
+- **Status:** ✅ shipped (ratified by Ben 2026-04-30 PM Class C `pricing.change`)
+- **Source:** `/contracts/wholesale-pricing.md` v2.4 · `#financials` ratification thread · v1.4 blueprint history
+- **Code-side wire:** `src/lib/wholesale/pricing-tiers.ts` (B3 = $3.50, B5 = $3.25) · `src/lib/finance/pricing-grid-classifier.ts` `PRICING_GRID` (B3/B5 status="ratified") · `f207408` ratification commit · 8 test fixtures realigned (`pricing-tiers.test.ts`, `classify-booth-tier.test.ts`, `wholesale-ap-email.test.ts`).
 
 ### 2.5 v2.3 pricing reconciliation grid (6-class taxonomy: Pickup / Distributor / Standard / Route-anchor / Route-fill / Strategic-credential)
 - **Status:** 🔵 proposed (proposal doc shipped 2026-04-30 AM)
@@ -261,13 +260,15 @@ Per [`/contracts/email-agents-system.md`](email-agents-system.md) v1.0 CANONICAL
 
 ### 7.1 Phase 37 — Inbound triage subsystem (16 build units)
 
-Per `/contracts/email-agents-system.md` §6. **Status: 🟢 37.1 SHIPPED · 37.2–37.16 queued.** Ships INSIDE Viktor as workflow lanes (no new runtime agent).
+Per `/contracts/email-agents-system.md` §6. **Status: 🟢 37.1 + 37.2 SHIPPED · 37.3–37.16 queued.** Ships INSIDE Viktor as workflow lanes (no new runtime agent).
 
-37.1 Inbox Scanner ✅ · 37.2 Classifier · 37.3 HubSpot Verification cross-cut · 37.4 Validator extension · 37.5 Strategic Framework analyzer · 37.6 Slack Interactive Approval UI · 37.7 Spam Cleaner (Class A-d) · 37.8 Bounce/Routing/OOO · 37.9 Sample Shipper (S-08 wrap) · 37.10 Whale Escalator · 37.11 Polite-No/Qualify/Thread-Fix · 37.12 Receipt+AP Handler · 37.13 Memory layer · 37.14 Daily-brief surface · 37.15 Weekly Audit (Drift Audit Runner extension) · 37.16 Tests + drift-audit fixtures
+37.1 Inbox Scanner ✅ · 37.2 Classifier (deterministic layer) ✅ · 37.3 HubSpot Verification cross-cut · 37.4 Validator extension · 37.5 Strategic Framework analyzer · 37.6 Slack Interactive Approval UI · 37.7 Spam Cleaner (Class A-d) · 37.8 Bounce/Routing/OOO · 37.9 Sample Shipper (S-08 wrap) · 37.10 Whale Escalator · 37.11 Polite-No/Qualify/Thread-Fix · 37.12 Receipt+AP Handler · 37.13 Memory layer · 37.14 Daily-brief surface · 37.15 Weekly Audit (Drift Audit Runner extension) · 37.16 Tests + drift-audit fixtures
 
 **Sequence (per §6 lock):** 37.1 → 37.2 → 37.3 → 37.4 → 37.7 → 37.5 → 37.6 → 37.10 → 37.8 → 37.9 → 37.11 → 37.12 → 37.13 → 37.14 → 37.15 → 37.16. HARD STOPS first (whale before any drafter).
 
 **37.1 ship log (2026-04-30 PM):** `src/lib/sales/viktor/inbox-scanner.ts` (Class A read-only scan + denylist + KV `inbox:scan:<msgId>` records), 23-test coverage, cron route at `/api/ops/sales/viktor/inbox-scan/run` (every 5 min, weekday business hours per OQ-1). Reuses `gmail-reader.listEmails()` + `email-intelligence/cursor` — no new Gmail primitive. Kill switch: `INBOX_SCANNER_ENABLED=false`.
+
+**37.2 ship log (2026-04-30 PM):** `src/lib/sales/viktor/classifier.ts` — 22-class v1 enum (A–AA), `WHALE_DOMAINS` HARD STOP (28 canonical domains per §3.1, idempotent re-runs no-op), deterministic rule layer (postmaster N/O/P, OOO I/J, contact-left J, legal U, volume V, pricing-pushback D, executive T, vendor-portal E, received-ack M), legacy classifier reused as fallback via `mapLegacyCategory`, KV records elevated to status `classified` / `classified_whale`. 27-test coverage. Wired into the inbox-scan cron route — scanner+classifier run as one heartbeat. **LLM fallback (Phase 37.2.b) deferred** — `_unclassified` records surface for human triage. Drafting is Phase 37.5+37.6+37.11.
 
 ### 7.2 Phase 38 — B2B Cashflow Research System (8 build units)
 
