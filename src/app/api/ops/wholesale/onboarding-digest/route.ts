@@ -3,7 +3,7 @@
  *
  * Daily Slack digest of stalled wholesale onboarding flows. Calls
  * `listRecentFlows`, filters to stalled (heuristic same as the
- * /api/ops/wholesale/onboarding read surface), formats a #financials
+ * /api/ops/wholesale/onboarding read surface), formats a #finance
  * post, and dispatches via the existing Slack client.
  *
  * **Auth:** CRON_SECRET bearer or session. Same posture as the read
@@ -40,8 +40,8 @@ import { listRecentFlows } from "@/lib/wholesale/onboarding-store";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** Slack channel id for #financials (canonical per channels.json). */
-const SLACK_FINANCIALS_CHANNEL_ID = "C0AKG9FSC2J";
+/** Slack channel id for #finance (canonical per channels.json). */
+const SLACK_FINANCIALS_CHANNEL_ID = "C0ATF50QQ1M";
 const DEDUP_TTL_SECONDS = 24 * 3600;
 const DEFAULT_STALL_HOURS = 24;
 

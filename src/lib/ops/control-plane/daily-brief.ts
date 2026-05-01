@@ -596,7 +596,7 @@ export function composeDailyBrief(input: BriefInput): BriefOutput {
   // ---- Wholesale onboarding blockers (Phase D3, morning only) ----
   // Stalled flows from the wholesale-onboarding KV store, projected
   // into a morning-glance line for Ben. The dedicated digest in
-  // #financials (Phase 35.f.5.b) remains for Rene; this is the brief
+  // #finance (Phase 35.f.5.b) remains for Rene; this is the brief
   // companion. Quiet-collapse when zero stalled.
   if (input.kind === "morning" && input.onboardingBlockers) {
     const blockerText = renderOnboardingBlockersMarkdown(input.onboardingBlockers);

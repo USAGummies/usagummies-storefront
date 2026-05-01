@@ -86,7 +86,7 @@ export interface DispatchDeps {
     state: OnboardingState,
   ) => Promise<{ ok: true } | { ok: false; error: string }>;
 
-  /** Post a Slack message to #financials. */
+  /** Post a Slack message to #finance. */
   slackPostFinancialsNotif: (
     state: OnboardingState,
   ) => Promise<{ ok: true; ts?: string } | { ok: false; error: string }>;

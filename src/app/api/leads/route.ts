@@ -319,21 +319,16 @@ export async function POST(req: Request) {
     }
   }
 
-  // Direct Slack notification for wholesale leads. Posts to #financials
-  // (where Rene + Ben already work) so a new lead is visible in real
-  // time without depending on the legacy Make.com bridge (broken since
-  // ~Apr 13). Per /contracts/operating-memory.md v1.0: "every system-
-  // generated report posts to Slack first." Fail-soft: a Slack post
-  // failure never blocks the lead-capture response.
+  // Direct Slack notification for wholesale leads. Posts to #sales, the
+  // live replacement for the retired #wholesale-leads/#abra-control
+  // surfaces, so a new lead is visible without depending on the legacy
+  // Make.com bridge. Fail-soft: a Slack post failure never blocks the
+  // lead-capture response.
   //
-  // **Hardened (Rene 2026-04-27 walkthrough):** uses channel ID
-  // (`C0AKG9FSC2J`) not name to remove name-resolution ambiguity.
-  // CHECKS the postMessage return value — silent failures were
-  // hiding a `not_in_channel` error from Rene's first test. On
-  // failure, falls back to `#abra-control` (where the bot is a
-  // confirmed member) with a loud diagnostic so the operator sees
-  // the failure path and can invite the bot to #financials.
-  const FINANCIALS_CHANNEL_ID = "C0AKG9FSC2J";
+  // Use channel ID, not name, to remove name-resolution ambiguity.
+  // #sales is private, so failures are surfaced loudly via DM fallback
+  // with instructions to invite the bot.
+  const SALES_CHANNEL_ID = "C0AQQRXUYF7";
   // Fallback: DM Ben directly. The bot can DM any workspace user
   // without needing a channel-membership invite. `#abra-control`
   // would have worked but was archived on 2026-04-19. DM is more
@@ -358,24 +353,24 @@ export async function POST(req: Request) {
     const text = lines.join("\n");
     try {
       const res = await postMessage({
-        channel: FINANCIALS_CHANNEL_ID,
+        channel: SALES_CHANNEL_ID,
         text,
       });
       if (!res.ok) {
         // Loud diagnostic — most likely cause is `not_in_channel`
-        // (bot needs to be invited to #financials). Fallback to a
+        // (bot needs to be invited to #sales). Fallback to a
         // direct DM to Ben so the operator gets the notification
         // even when channel-posting is blocked.
         console.error(
-          `[leads] Slack post to #financials failed: ${res.error}. Bot likely needs invite to channel ${FINANCIALS_CHANNEL_ID}. Falling back to DM Ben.`,
+          `[leads] Slack post to #sales failed: ${res.error}. Bot likely needs invite to channel ${SALES_CHANNEL_ID}. Falling back to DM Ben.`,
         );
         try {
           await postMessage({
             channel: FALLBACK_DM_USER_ID,
             text:
               `:rotating_light: *Wholesale lead notification — DM fallback*\n` +
-              `Tried to post to #financials (\`${FINANCIALS_CHANNEL_ID}\`) but got \`${res.error || "unknown error"}\`. ` +
-              `Fix: invite the bot to #financials (in the channel: \`/invite @USA Gummies Ops\`, OR Settings → Integrations → Add an App → USA Gummies Ops).\n\n` +
+              `Tried to post to #sales (\`${SALES_CHANNEL_ID}\`) but got \`${res.error || "unknown error"}\`. ` +
+              `Fix: invite the bot to #sales (in the channel: \`/invite @USA Gummies Ops\`, OR Settings → Integrations → Add an App → USA Gummies Ops).\n\n` +
               `*Original notification below:*\n${text}`,
           });
         } catch {

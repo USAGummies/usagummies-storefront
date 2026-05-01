@@ -214,7 +214,7 @@ const CATEGORY_DEFAULTS: Partial<Record<EmailCategoryV1, CategoryDefaults>> = {
       "Leaking COGS to defend the price",
     ],
     playSeed:
-      "HARD HOLD — surface to Ben + Rene in #financials. Never autonomous reply. Formal proposal track if buyer is whale-class.",
+      "HARD HOLD — surface to Ben + Rene in #finance. Never autonomous reply. Formal proposal track if buyer is whale-class.",
     opportunity: {
       lowUsd: 5_000,
       highUsd: 50_000,
@@ -329,7 +329,7 @@ const CATEGORY_DEFAULTS: Partial<Record<EmailCategoryV1, CategoryDefaults>> = {
       "Exclusivity / multi-year trap",
     ],
     playSeed:
-      "HARD HOLD — surface to Ben + Rene in #financials thread. Never autonomous reply. Formal PDF proposal track only.",
+      "HARD HOLD — surface to Ben + Rene in #finance thread. Never autonomous reply. Formal PDF proposal track only.",
     opportunity: {
       lowUsd: 50_000,
       highUsd: 5_000_000,
@@ -407,7 +407,7 @@ const CATEGORY_DEFAULTS: Partial<Record<EmailCategoryV1, CategoryDefaults>> = {
     goal: "redirect",
     risks: ["Auto-posting to QBO without Rene approval"],
     playSeed:
-      "Extract bill data, attach PDF to QBO bill DRAFT, post to #financials for Rene Class C approval. NEVER auto-post.",
+      "Extract bill data, attach PDF to QBO bill DRAFT, post to #finance for Rene Class C approval. NEVER auto-post.",
     opportunity: {
       lowUsd: 0,
       highUsd: 0,
@@ -438,7 +438,7 @@ const CATEGORY_DEFAULTS: Partial<Record<EmailCategoryV1, CategoryDefaults>> = {
     goal: "redirect",
     risks: ["Mismatching to wrong invoice"],
     playSeed:
-      "Match payment to outstanding invoice in QBO. Class B mark-paid if exact match; Class C #financials if no match.",
+      "Match payment to outstanding invoice in QBO. Class B mark-paid if exact match; Class C #finance if no match.",
     opportunity: {
       lowUsd: 0,
       highUsd: 0,

@@ -84,12 +84,10 @@ export interface Channel {
   /** Division that owns this channel (sets rules, resolves routing disputes). */
   owningDivision: DivisionId;
   /**
-   * Phase 27 — actual Slack channel ID (`Cxxx`) for routes that need
-   * the canonical ID rather than the human name. Specifically
-   * `files.completeUploadExternal` requires the channel ID, not the
-   * name. Optional because most chat.postMessage call sites accept
-   * the human `#name` form. Populate when the channel is known to
-   * exist in the workspace and a code path uses files-API uploads.
+   * Actual Slack channel ID (`Cxxx`) for routes that need canonical
+   * routing rather than the human name. Required for file uploads and
+   * safer for private-channel chat posts because archived/recreated
+   * names drift. Optional only for latent channels that do not exist yet.
    */
   slackChannelId?: string;
 }

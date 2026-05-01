@@ -44,10 +44,11 @@ function ttlForAction(action: string): number {
 }
 
 export class AuditSurface implements AuditSlackSurface {
-  private readonly channelName: string;
+  private readonly channelRef: string;
 
   constructor(channelId: ChannelId = "ops-audit") {
-    this.channelName = getChannel(channelId)?.name ?? "#ops-audit";
+    const channel = getChannel(channelId);
+    this.channelRef = channel?.slackChannelId ?? channel?.name ?? "#ops-audit";
   }
 
   async mirror(entry: AuditLogEntry): Promise<void> {
@@ -67,7 +68,7 @@ export class AuditSurface implements AuditSlackSurface {
     });
     if (!ok) return; // dedup skip — store is authoritative
     const text = renderAuditLine(entry);
-    await postMessage({ channel: this.channelName, text });
+    await postMessage({ channel: this.channelRef, text });
   }
 }
 

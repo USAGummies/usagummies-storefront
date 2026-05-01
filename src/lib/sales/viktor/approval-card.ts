@@ -32,7 +32,7 @@ import type { ValidationReport } from "./validator";
 /**
  * Approval class per /contracts/email-agents-system.md §2.5. Drives:
  *   - The card emoji/header color
- *   - Whether the card lands in #ops-approvals (B) or #financials (C/D)
+ *   - Whether the card lands in #ops-approvals (B) or #finance (C/D)
  *   - The Approve button label ("Approve" vs "Approve · Class C — needs Rene too")
  */
 export type ApprovalClass = "B" | "C" | "D";
@@ -260,7 +260,7 @@ export interface ApprovalCard {
  *
  * Per spec §2.5a: caller routes the resulting payload to:
  *   - `#ops-approvals` for Class B
- *   - `#financials` for Class C / D
+ *   - `#finance` for Class C / D
  */
 export function buildApprovalCard(opts: ApprovalCardInput): ApprovalCard {
   const blocks: SlackBlock[] = [];
@@ -299,12 +299,12 @@ export function buildApprovalCard(opts: ApprovalCardInput): ApprovalCard {
  *
  * Defaults:
  *   - Class B → `#ops-approvals`
- *   - Class C → `#financials`
- *   - Class D → `#financials` (operator pings counsel manually)
+ *   - Class C → `#finance`
+ *   - Class D → `#finance` (operator pings counsel manually)
  */
 export function approvalCardChannel(classLevel: ApprovalClass): string {
   if (classLevel === "C" || classLevel === "D") {
-    return process.env.SLACK_CHANNEL_FINANCIALS_NAME ?? "#financials";
+    return process.env.SLACK_CHANNEL_FINANCE_NAME ?? process.env.SLACK_CHANNEL_FINANCIALS_NAME ?? "#finance";
   }
   return process.env.SLACK_CHANNEL_OPS_APPROVALS_NAME ?? "#ops-approvals";
 }

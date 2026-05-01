@@ -5,7 +5,7 @@
  * Phase D — D3 = "wholesale onboarding blockers". The data layer
  * already exists (Phase 35.f.5 — `/api/ops/wholesale/onboarding` for
  * Rene's review surface + `/api/ops/wholesale/onboarding-digest` for
- * the daily Slack post in `#financials`). D3's gap is surfacing the
+ * the daily Slack post in `#finance`). D3's gap is surfacing the
  * same stall signal in the MORNING BRIEF (`#ops-daily`) as a tight
  * one-liner alongside D1/D2/D4 — so Ben sees the wholesale funnel
  * pulse without checking the dedicated dashboard.

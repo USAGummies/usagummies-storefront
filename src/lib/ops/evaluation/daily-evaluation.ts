@@ -101,7 +101,7 @@ async function postControlAlert(text: string): Promise<void> {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      channel: "C0ALS6W7VB4",
+      channel: "C0ATUGGUZL6",
       text,
     }),
     signal: AbortSignal.timeout(10000),
@@ -153,12 +153,12 @@ export async function runDailyEvaluation(baseUrl?: string): Promise<EvaluationRu
     await fetch(`${siteUrl}/api/ops/abra/chat`, {
       method: "POST",
       headers,
-      body: JSON.stringify({
-        message: warmupQuery,
-        channel: "slack",
-        slack_channel_id: "C0ALS6W7VB4",
-        actor_label: "ben",
-      }),
+        body: JSON.stringify({
+          message: warmupQuery,
+          channel: "slack",
+          slack_channel_id: "C0ATWJDKLTU",
+          actor_label: "ben",
+        }),
       signal: AbortSignal.timeout(12000),
     }).catch(() => null);
   }
@@ -177,7 +177,7 @@ export async function runDailyEvaluation(baseUrl?: string): Promise<EvaluationRu
         body: JSON.stringify({
           message: test.query,
           channel: "slack",
-          slack_channel_id: actor === "rene" ? "C0AKG9FSC2J" : "C0ALS6W7VB4",
+          slack_channel_id: actor === "rene" ? "C0ATF50QQ1M" : "C0ATWJDKLTU",
           actor_label: actor,
         }),
         signal: AbortSignal.timeout(Math.max(test.maxMs + 5000, 12000)),

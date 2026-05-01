@@ -14,7 +14,7 @@
  *   5. If `wholesale_onboarding_complete` is also true, advance the deal
  *      stage to "Shipped" (3017718460) and ping Ben for pack prep
  *      (orders ship from Ashford, WA — Ben handles, not Drew).
- *   6. Slack ping #financials with the revenue + deal link.
+ *   6. Slack ping #finance with the revenue + deal link.
  *
  * Non-blocking: any failure path returns 200 to Shopify (so it doesn't
  * retry storm us) but logs to console + Slack for manual follow-up.

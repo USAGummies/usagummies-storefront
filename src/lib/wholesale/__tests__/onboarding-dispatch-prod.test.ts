@@ -10,7 +10,7 @@
  *   - Factory returns a complete DispatchDeps (every key present).
  *   - HubSpot handlers route to the correct underlying helper.
  *   - HubSpot handlers return ok:false when isHubSpotConfigured() is false.
- *   - Slack handler posts to #financials (channel id C0AKG9FSC2J)
+ *   - Slack handler posts to #finance (channel id C0ATF50QQ1M)
  *     and includes the captured order lines in the message.
  *   - kvArchiveInquiry maps OnboardingState → WholesaleInquiryRecord
  *     fields and calls appendWholesaleInquiry.
@@ -731,7 +731,7 @@ describe("auditFlowComplete", () => {
 });
 
 describe("__INTERNAL constants", () => {
-  it("exposes the canonical #financials channel id", () => {
-    expect(__INTERNAL.SLACK_FINANCIALS_CHANNEL_ID).toBe("C0AKG9FSC2J");
+  it("exposes the canonical #finance channel id", () => {
+    expect(__INTERNAL.SLACK_FINANCIALS_CHANNEL_ID).toBe("C0ATF50QQ1M");
   });
 });

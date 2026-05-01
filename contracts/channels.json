@@ -1,13 +1,14 @@
 {
   "$schema": "https://usagummies.com/schemas/channels.v1.json",
   "version": "1.0",
-  "updated_at": "2026-04-17",
+  "updated_at": "2026-05-01",
   "source": "Notion blueprint §14.5 + §15.2",
   "canonical_code_mirror": "src/lib/ops/control-plane/channels.ts",
   "active": [
     {
       "id": "ops-daily",
       "name": "#ops-daily",
+      "slack_channel_id": "C0ATWJDKLTU",
       "owning_division": "executive-control",
       "purpose": "Daily control-tower brief and executive rollup",
       "allowed": [
@@ -25,6 +26,7 @@
     {
       "id": "ops-approvals",
       "name": "#ops-approvals",
+      "slack_channel_id": "C0ATWJDHS74",
       "owning_division": "executive-control",
       "purpose": "Human approval gate for all Class B and Class C actions",
       "allowed": [
@@ -40,6 +42,7 @@
     {
       "id": "ops-audit",
       "name": "#ops-audit",
+      "slack_channel_id": "C0AUQSA66TS",
       "owning_division": "executive-control",
       "purpose": "Permanent audit trail of agent writes and policy events",
       "allowed": [
@@ -53,6 +56,7 @@
     {
       "id": "ops-alerts",
       "name": "#ops-alerts",
+      "slack_channel_id": "C0ATUGGUZL6",
       "owning_division": "platform-data-automation",
       "purpose": "System health and incident firehose",
       "allowed": [
@@ -66,6 +70,7 @@
     {
       "id": "sales",
       "name": "#sales",
+      "slack_channel_id": "C0AQQRXUYF7",
       "owning_division": "sales",
       "purpose": "Revenue execution across B2B, DTC, and Amazon",
       "allowed": [
@@ -82,6 +87,7 @@
     {
       "id": "finance",
       "name": "#finance",
+      "slack_channel_id": "C0ATF50QQ1M",
       "owning_division": "financials",
       "purpose": "Cash, accounting, reconciliation",
       "allowed": [
@@ -100,6 +106,7 @@
     {
       "id": "operations",
       "name": "#operations",
+      "slack_channel_id": "C0AR75M63Q9",
       "owning_division": "production-supply-chain",
       "purpose": "Production, supply, samples, shipping",
       "allowed": [
@@ -135,6 +142,7 @@
     {
       "id": "research",
       "name": "#research",
+      "slack_channel_id": "C08HWA9SRP1",
       "owning_division": "research-intelligence",
       "purpose": "Research synthesis and intelligence routing",
       "allowed": [
@@ -147,20 +155,32 @@
     {
       "id": "receipts-capture",
       "name": "#receipts-capture",
+      "slack_channel_id": "C0APYNE9E73",
       "owning_division": "financials",
       "purpose": "Receipt intake",
       "allowed": ["receipt images/files", "required metadata"],
       "not_allowed": ["anything unrelated to receipt capture"]
-    }
-  ],
-  "latent": [
+    },
     {
       "id": "marketing",
       "name": "#marketing",
+      "slack_channel_id": "C08J9EER9L5",
       "owning_division": "marketing-brand",
-      "activates_when": "marketing-brand OR marketing-paid activates",
-      "purpose": "Brand + paid marketing"
-    },
+      "purpose": "Brand + paid marketing",
+      "allowed": [
+        "campaign reviews",
+        "ad performance",
+        "creative pipeline",
+        "brand assets"
+      ],
+      "not_allowed": [
+        "finance approvals",
+        "shipping labels",
+        "general ops chatter"
+      ]
+    }
+  ],
+  "latent": [
     {
       "id": "trade-shows",
       "name": "#trade-shows",

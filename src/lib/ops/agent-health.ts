@@ -147,7 +147,7 @@ export const AGENT_MANIFEST: readonly AgentManifestEntry[] = [
     approver: "rene",
     lifecycle: "active",
     purpose:
-      "Surfaces uncategorized transactions, duplicate vendors, and Plaid drift in #financials each morning.",
+      "Surfaces uncategorized transactions, duplicate vendors, and Plaid drift in #finance each morning.",
   },
   {
     id: "ops",
@@ -211,7 +211,7 @@ export const AGENT_MANIFEST: readonly AgentManifestEntry[] = [
     approver: "rene",
     lifecycle: "active",
     purpose:
-      "Reconciles Plaid feed against QBO weekly, surfaces deltas + duplicates in #financials.",
+      "Reconciles Plaid feed against QBO weekly, surfaces deltas + duplicates in #finance.",
   },
   {
     id: "amazon-settlement",
@@ -223,7 +223,7 @@ export const AGENT_MANIFEST: readonly AgentManifestEntry[] = [
     approver: null,
     lifecycle: "active",
     purpose:
-      "Reads Amazon settlement reports + posts a weekly summary to #financials. No write path yet.",
+      "Reads Amazon settlement reports + posts a weekly summary to #finance. No write path yet.",
     notes:
       "Task today — graduates to job once Amazon → QBO journal-entry slug is registered.",
   },

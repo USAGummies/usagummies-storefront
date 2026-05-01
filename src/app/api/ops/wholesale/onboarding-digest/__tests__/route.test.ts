@@ -147,7 +147,7 @@ describe("onboarding-digest — happy path with stalled flows", () => {
     expect(body.slackTs).toBe("1.234");
     expect(postMessageMock).toHaveBeenCalledTimes(1);
     const call = postMessageMock.mock.calls[0][0];
-    expect(call.channel).toBe("C0AKG9FSC2J");
+    expect(call.channel).toBe("C0ATF50QQ1M");
     expect(call.text).toContain("Stale Inc");
     expect(call.text).toContain("wf_stale");
     expect(call.text).toContain("stalled at");

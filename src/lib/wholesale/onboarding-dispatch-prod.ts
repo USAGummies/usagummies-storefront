@@ -15,7 +15,7 @@
  *                                     (custom property write)
  *   - kv.archive-inquiry         → `appendWholesaleInquiry`
  *   - kv.write-order-captured    → `writeOrderCapturedSnapshot`
- *   - slack.post-financials-notif → `postMessage` to #financials
+ *   - slack.post-financials-notif → `postMessage` to #finance
  *   - audit.flow-complete        → `auditStore.append` (audit envelope)
  *
  * **Stubbed (TODO Phase 35.f.3.c — needs Rene + integration design):**
@@ -61,8 +61,8 @@ import { sendViaGmailApiDetailed } from "@/lib/ops/gmail-reader";
 // Constants
 // ---------------------------------------------------------------------------
 
-/** Slack channel id for #financials (canonical per channels.json). */
-const SLACK_FINANCIALS_CHANNEL_ID = "C0AKG9FSC2J";
+/** Slack channel id for #finance (canonical per channels.json). */
+const SLACK_FINANCIALS_CHANNEL_ID = "C0ATF50QQ1M";
 
 /**
  * BCC-Rene-on-new-customer rule (locked 2026-04-28).

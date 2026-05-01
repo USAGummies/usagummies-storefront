@@ -12,6 +12,7 @@ const CHANNELS: readonly Channel[] = Object.freeze([
   {
     id: "ops-daily",
     name: "#ops-daily",
+    slackChannelId: "C0ATWJDKLTU",
     state: "active",
     owningDivision: "executive-control",
     divisions: ["executive-control"],
@@ -27,6 +28,7 @@ const CHANNELS: readonly Channel[] = Object.freeze([
   {
     id: "ops-approvals",
     name: "#ops-approvals",
+    slackChannelId: "C0ATWJDHS74",
     state: "active",
     owningDivision: "executive-control",
     divisions: ["executive-control"],
@@ -41,6 +43,7 @@ const CHANNELS: readonly Channel[] = Object.freeze([
   {
     id: "ops-audit",
     name: "#ops-audit",
+    slackChannelId: "C0AUQSA66TS",
     state: "active",
     owningDivision: "executive-control",
     divisions: ["executive-control", "platform-data-automation"],
@@ -56,6 +59,7 @@ const CHANNELS: readonly Channel[] = Object.freeze([
   {
     id: "ops-alerts",
     name: "#ops-alerts",
+    slackChannelId: "C0ATUGGUZL6",
     state: "active",
     owningDivision: "platform-data-automation",
     divisions: ["executive-control", "platform-data-automation"],
@@ -71,6 +75,7 @@ const CHANNELS: readonly Channel[] = Object.freeze([
   {
     id: "sales",
     name: "#sales",
+    slackChannelId: "C0AQQRXUYF7",
     state: "active",
     owningDivision: "sales",
     divisions: ["sales"],
@@ -86,6 +91,7 @@ const CHANNELS: readonly Channel[] = Object.freeze([
   {
     id: "finance",
     name: "#finance",
+    slackChannelId: "C0ATF50QQ1M",
     state: "active",
     owningDivision: "financials",
     divisions: ["financials"],
@@ -103,6 +109,7 @@ const CHANNELS: readonly Channel[] = Object.freeze([
   {
     id: "operations",
     name: "#operations",
+    slackChannelId: "C0AR75M63Q9",
     state: "active",
     owningDivision: "production-supply-chain",
     divisions: ["production-supply-chain"],
@@ -148,6 +155,7 @@ const CHANNELS: readonly Channel[] = Object.freeze([
   {
     id: "research",
     name: "#research",
+    slackChannelId: "C08HWA9SRP1",
     state: "active",
     owningDivision: "research-intelligence",
     divisions: ["research-intelligence"],
@@ -162,6 +170,7 @@ const CHANNELS: readonly Channel[] = Object.freeze([
   {
     id: "receipts-capture",
     name: "#receipts-capture",
+    slackChannelId: "C0APYNE9E73",
     state: "active",
     owningDivision: "financials",
     divisions: ["financials"],
@@ -173,12 +182,18 @@ const CHANNELS: readonly Channel[] = Object.freeze([
   {
     id: "marketing",
     name: "#marketing",
-    state: "latent",
+    slackChannelId: "C08J9EER9L5",
+    state: "active",
     owningDivision: "marketing-brand",
     divisions: ["marketing-brand", "marketing-paid"],
     purpose: "Brand + paid marketing (activates when either Marketing division activates)",
-    allowedContent: [],
-    notAllowed: [],
+    allowedContent: [
+      "campaign reviews",
+      "ad performance",
+      "creative pipeline",
+      "brand assets",
+    ],
+    notAllowed: ["finance approvals", "shipping labels", "general ops chatter"],
   },
   {
     id: "trade-shows",

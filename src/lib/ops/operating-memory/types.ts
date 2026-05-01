@@ -69,7 +69,7 @@ export interface SourceProvenance {
   sourceSystem: string;
   /**
    * Stable id within the source system. For Slack, this is the channel
-   * id + ts (e.g. "C0AKG9FSC2J:1714248192.001234"). For Gmail, the
+   * id + ts (e.g. "C0ATF50QQ1M:1714248192.001234"). For Gmail, the
    * thread+message id. Required: dedupe and audit cite this.
    */
   sourceRef: string;

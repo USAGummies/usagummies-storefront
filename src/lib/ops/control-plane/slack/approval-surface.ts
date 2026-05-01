@@ -15,16 +15,16 @@ import { getChannel } from "../channels";
 import { postMessage, updateMessage } from "./client";
 
 export class ApprovalSurface implements ApprovalSlackSurface {
-  private readonly channelName: string;
+  private readonly channelRef: string;
 
   constructor(channelId: ChannelId = "ops-approvals") {
     const channel = getChannel(channelId);
-    this.channelName = channel?.name ?? "#ops-approvals";
+    this.channelRef = channel?.slackChannelId ?? channel?.name ?? "#ops-approvals";
   }
 
   async surfaceApproval(request: ApprovalRequest): Promise<{ channel: ChannelId; ts: string }> {
     const { text, blocks } = renderApprovalMessage(request);
-    const result = await postMessage({ channel: this.channelName, text, blocks });
+    const result = await postMessage({ channel: this.channelRef, text, blocks });
 
     // Degraded mode: store is authoritative; return a sentinel so the caller
     // knows Slack didn't record a thread but the request itself is valid.
@@ -38,7 +38,7 @@ export class ApprovalSurface implements ApprovalSlackSurface {
     if (!request.slackThread?.ts) return; // never surfaced successfully — skip
     const { text, blocks } = renderApprovalMessage(request);
     await updateMessage({
-      channel: this.channelName,
+      channel: this.channelRef,
       ts: request.slackThread.ts,
       text,
       blocks,

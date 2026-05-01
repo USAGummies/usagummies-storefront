@@ -8,6 +8,17 @@ This doc replaces ad-hoc Slack messages about "what's the workflow for X." If a 
 
 ---
 
+## Cross-Cutting — Slack Command Surface Hardening (2026-05-01)
+
+- **Audit source:** Live Slack channel lookup + Notion Consolidated Operating Canon + repo `contracts/slack-operating.md`.
+- **Finding:** `#abra-control`, `#financials`, `#wholesale-leads`, and `#email-inbox` are archived/retired, but runtime/docs still had stale IDs and name-based routing.
+- **Runtime fix:** `channels.ts` and `contracts/channels.json` now carry live Slack `C...` IDs for every active channel; approval and audit Slack surfaces prefer `slackChannelId` over `#name`.
+- **Route fix:** wholesale lead notifications route to `#sales` (`C0AQQRXUYF7`); wholesale onboarding finance digests route to `#finance` (`C0ATF50QQ1M`); evaluation pings route to `#ops-alerts` / `#ops-daily` / `#finance`.
+- **Policy lock:** archived IDs `C0ALS6W7VB4`, `C0AKG9FSC2J`, `C0AS7UHNGPL`, and `C0ARSF61U5D` are prohibited in production source.
+- **Next polish lane:** redesign approval cards as operator-console Block Kit cards: top-line action/owner/status, formatted workflow payload previews, evidence collapsed before wall-of-text, edit/ask path, and dashboard deep links.
+
+---
+
 ## Format
 
 Each row uses the schema:
@@ -1498,6 +1509,8 @@ Each order row now carries a **Buy these again** button. Pure helper `intentFrom
 ---
 
 ## Version history
+
+- **1.64 — 2026-05-01** — Slack command-surface hardening pass. Live Slack + Notion audit found archived-channel drift (`#abra-control`, `#financials`, `#wholesale-leads`, `#email-inbox`) and name-based routing in approval/audit surfaces. Runtime channel registry and `contracts/channels.json` now pin live `C...` IDs for every active channel; `ApprovalSurface` and `AuditSurface` post/update via channel ID; wholesale leads route to `#sales`, finance/onboarding digests route to `#finance`, and evaluation pings route to live ops channels. `contracts/slack-operating.md` v1.1 adds the channel-ID map, archived-ID prohibition, and approval UX standard. Tests lock active-channel IDs and prevent retired IDs from active routing.
 
 - **1.63 — 2026-04-30** — Phase 6.17: Email-agent readiness heartbeat dry-run. Adds `src/lib/ops/email-agents-heartbeat.ts` plus `GET|POST /api/ops/agents/email-intel/run`, a read-only heartbeat-shaped route that derives the same readiness gates as `/ops/email-agents`, returns a canonical `AgentHeartbeatRunRecord`, and appends one fail-soft internal `system.read` audit row. It does **not** invoke `/api/ops/fulfillment/email-intel/run`, read Gmail, create Gmail drafts, open Slack approvals, mutate HubSpot, or touch QBO/Shopify. OpenAI workspace registry adds `ops.email-agents.readiness-dry-run`; direct email-intel runner remains prohibited.
 

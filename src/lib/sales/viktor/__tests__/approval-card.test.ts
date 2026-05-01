@@ -304,12 +304,12 @@ describe("approval-card / approvalCardChannel", () => {
     expect(approvalCardChannel("B")).toBe("#ops-approvals");
   });
 
-  it("Class C → #financials (default)", () => {
-    expect(approvalCardChannel("C")).toBe("#financials");
+  it("Class C → #finance (default)", () => {
+    expect(approvalCardChannel("C")).toBe("#finance");
   });
 
-  it("Class D → #financials (default)", () => {
-    expect(approvalCardChannel("D")).toBe("#financials");
+  it("Class D → #finance (default)", () => {
+    expect(approvalCardChannel("D")).toBe("#finance");
   });
 });
 
