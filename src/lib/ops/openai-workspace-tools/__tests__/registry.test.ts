@@ -40,6 +40,19 @@ describe("OpenAI workspace tool registry", () => {
     expect(t?.blocker).toBeUndefined();
   });
 
+  it("ops.agents.b2b-revenue-watcher.run is read-only heartbeat dry-run", () => {
+    const t = getOpenAIWorkspaceTool("ops.agents.b2b-revenue-watcher.run");
+    expect(t).toBeDefined();
+    expect(t?.status).toBe("ready");
+    expect(t?.mode).toBe("read");
+    expect(t?.readOnly).toBe(true);
+    expect(t?.requiresHumanApproval).toBe(false);
+    expect(t?.backingRoute).toBe(
+      "/api/ops/agents/b2b-revenue-watcher/run",
+    );
+    expect(t?.description).toMatch(/does not post Slack/i);
+  });
+
   it("ops.operating-memory.search is wired to the P0-3 transcript-saver backing route", () => {
     const t = getOpenAIWorkspaceTool("ops.operating-memory.search");
     expect(t).toBeDefined();

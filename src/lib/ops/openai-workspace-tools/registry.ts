@@ -182,6 +182,20 @@ export const OPENAI_WORKSPACE_TOOLS: readonly OpenAIWorkspaceTool[] = Object.fre
     safetyNotes: READ_ONLY_NOTES,
   },
   {
+    id: "ops.agents.b2b-revenue-watcher.run",
+    name: "B2B Revenue Watcher heartbeat dry-run",
+    description:
+      "Run the read-only B2B Revenue Watcher heartbeat and return its canonical run record. It reads sales queues and recommends a next human action; it does not post Slack, send Gmail, mutate HubSpot, open approvals, or write external systems.",
+    mode: "read",
+    status: "ready",
+    audience: "Ben",
+    readOnly: true,
+    requiresHumanApproval: false,
+    backingRoute: "/api/ops/agents/b2b-revenue-watcher/run",
+    backingSurface: "/ops/sales",
+    safetyNotes: READ_ONLY_NOTES,
+  },
+  {
     id: "ops.operating-memory.search",
     name: "Operating memory search",
     description:
