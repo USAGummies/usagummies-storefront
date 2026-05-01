@@ -172,6 +172,19 @@ describe("OpenAI workspace tool registry", () => {
     expect(t?.description).toMatch(/never triggers email-intel/i);
   });
 
+  it("ops.email-agents.readiness-dry-run exposes the safe heartbeat path", () => {
+    const t = getOpenAIWorkspaceTool("ops.email-agents.readiness-dry-run");
+    expect(t).toBeDefined();
+    expect(t?.status).toBe("ready");
+    expect(t?.mode).toBe("read");
+    expect(t?.readOnly).toBe(true);
+    expect(t?.requiresHumanApproval).toBe(false);
+    expect(t?.backingRoute).toBe("/api/ops/agents/email-intel/run");
+    expect(t?.backingSurface).toBe("/ops/email-agents");
+    expect(t?.description).toMatch(/does not trigger email-intel/i);
+    expect(t?.description).toMatch(/direct runner/i);
+  });
+
   it("all read tools are actually read-only and never require approval", () => {
     const readTools = OPENAI_WORKSPACE_TOOLS.filter((tool) => tool.mode === "read");
     expect(readTools.length).toBeGreaterThan(0);

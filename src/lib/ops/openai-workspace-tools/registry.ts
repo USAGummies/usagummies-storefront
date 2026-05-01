@@ -155,6 +155,20 @@ export const OPENAI_WORKSPACE_TOOLS: readonly OpenAIWorkspaceTool[] = Object.fre
     safetyNotes: READ_ONLY_NOTES,
   },
   {
+    id: "ops.email-agents.readiness-dry-run",
+    name: "Email agents readiness heartbeat dry-run",
+    description:
+      "Run the read-only email-agent readiness heartbeat. It returns a canonical run record from incident/schema/kill-switch gates; it does not trigger email-intel, create Gmail drafts, open Slack approvals, mutate HubSpot, or call the direct runner.",
+    mode: "read",
+    status: "ready",
+    audience: "Ben",
+    readOnly: true,
+    requiresHumanApproval: false,
+    backingRoute: "/api/ops/agents/email-intel/run",
+    backingSurface: "/ops/email-agents",
+    safetyNotes: READ_ONLY_NOTES,
+  },
+  {
     id: "ops.finance.review",
     name: "Finance review queue",
     description:
