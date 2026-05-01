@@ -206,12 +206,27 @@ When a mechanism graduates from one status to the next, update this doc + the ve
 - **Spec:** When a deal stage advances to `Shipped`, post the GP/bag from the vendor row to the deal note. When a vendor row updates (price change), patch any open deals.
 
 ### 6.6 Escalation language template injection
-- **Status:** 🔴 blueprint-only — Phase 36.5
+- **Status:** 🟡 doctrine-locked, kernel + AP-packet shipped — Phase 36.5 — `748e53a`
 - **Spec:** Bake Rene's canonical escalation line into the booth-quote engine + invoice templates + AP packet templates. Currently ad-hoc.
+- **Code-side wire (shipped):**
+  - `src/lib/finance/escalation-language.ts` — `STANDARD_ESCALATION_CLAUSE` (Rene's verbatim 2026-04-29 wording) + 8-variant `ESCALATION_CLAUSES` + `pickEscalationClause()` + `renderEscalationBlock()`. Single source of truth.
+  - `src/lib/sales-tour/escalation-clause.ts` — refactored to delegate to canonical (no string drift).
+  - `src/lib/ops/ap-packets/templates.ts` — Jungle Jim's AP-packet reply body now embeds the canonical clause between catalog details + signature.
+  - 24 tests in `src/lib/finance/__tests__/escalation-language.test.ts` pin every variant + cross-surface drift guard + AP-packet injection.
+- **Code-side wire (pending):** QBO invoice POST flow `customerMemo` injection (Phase 36.5b). Per-vendor margin ledger emits matching variant on row create (Phase 36.5c).
 
 ### 6.7 Off-grid pricing visibility flag in morning brief
-- **Status:** 🔴 blueprint-only — Phase 36.6
+- **Status:** 🟡 doctrine-locked, kernel shipped — Phase 36.6 — `5626af3`
 - **Spec:** Surface every non-grid quote in the morning brief stack-down section. Forces operator review even on Class A/B autonomous actions.
+- **Code-side wire (shipped):**
+  - `src/lib/finance/pricing-grid-classifier.ts` — `PRICING_GRID` (canonical price set sourced from wholesale-pricing.md §2 v2.4 + distributor-pricing-commitments.md §1-§4 + pricing-route-governance.md §1) + `classifyPricePerBag()` (returns onGrid / nearestTier / signed deviation / matchesProposedTier flag) + `isFullyRatifiedPrice()` (strict canonical check).
+  - 32 tests in `src/lib/finance/__tests__/pricing-grid-classifier.test.ts` pin every B-tier + distributor + show-special + proposed-tier classification.
+- **Code-side wire (pending):** aggregator over recent quotes/orders + `BriefInput.offGridQuotes` slot + `renderOffGridQuotesMarkdown()` + brief-route fetcher. HubSpot deal property `pricing_grid_status` for deal-card visibility.
+
+### 6.8 Channel-level gross-margin canonical model — Phase 36.7 — `3a3fc40`
+- **Status:** ✅ shipped (was §8 #4 candidate — graduated)
+- **Spec:** Single source of truth for per-bag gross margin by channel, sourced from `/contracts/proforma-channel-margins.md`. Replaces the legacy `UNIT_ECONOMICS` stale `gpPerUnit` values calibrated against $1.75 COGS.
+- **Code-side wire:** `CHANNEL_GROSS_MARGINS` export in `src/lib/ops/pro-forma.ts` — 12 channels (Amazon FBA / FBM, Shopify DTC 1/5/10-pack, Faire Direct + Option B, Wholesale B2-B5, C-ANCH proposed). Each row carries revenue/fees/freight/COGS/GP/GP% + status (healthy/thin/negative/needs_actuals) + source citation. 18 tests in `src/lib/ops/__tests__/channel-gross-margins.test.ts` pin every channel against the source doc.
 
 ---
 
@@ -236,16 +251,19 @@ When Notion blueprint syncs with this doc:
 
 ## 8. Open items needing Ben + Rene decision
 
-1. **Q3 buyer-pays surcharge ratification** — Ben Class C sign-off in `#financials` thread → `wholesale-pricing.md` v2.4 + booth-quote engine update.
-2. **v2.3 pricing reconciliation grid ratification** — Ben + Rene dual sign-off → graduate proposal to canon, pricing-classes.ts module.
-3. **Phase 36 build sequencing** — which of 6.2 / 6.3 / 6.4 / 6.5 / 6.6 / 6.7 lands first? My read: 6.2 → 6.3 → 6.4 → 6.6 → 6.7 → 6.5 (parser → endpoint → brief → templates → flag → HubSpot writeback).
-4. **v23 pro forma COGS refresh** — `src/lib/ops/pro-forma.ts:116` still has stale `cogsPerBag: 1.75` ("Albanese + Dutch Valley" comment). Bump to $1.79 + add Shopify DTC + Faire as proforma channels. Phase 36.7 candidate.
-5. **EIN + DUNS canonicalization** — flagged in `/contracts/company-vendor-packet.md` §1. Ben to surface for the portal-submission backlog.
+1. **Q3 buyer-pays surcharge ratification** — ✅ ratified 2026-04-30 PM. Doctrine: `wholesale-pricing.md` §2 v2.4 (B3 → $3.50, B5 → $3.25). Test fixtures + `pricing-tiers.ts` updated `3a3fc40`.
+2. **v2.3 pricing reconciliation grid ratification** — Ben + Rene dual sign-off → graduate proposal to canon, pricing-classes.ts module. *Open.*
+3. **Phase 36 build sequencing** — _read superseded by actual ship order:_ 36.1 → 36.2 → 36.3 → 36.7 → 36.6 → 36.5 (parser → endpoint → brief → channel-margin model → grid classifier → escalation language). 36.4 (HubSpot deal ↔ vendor reconcile) and the brief-side wire-ups for 36.5/36.6 remain open.
+4. **v23 pro forma COGS refresh** — ✅ shipped via §6.8 — `cogsPerBag: 1.79` + new `CHANNEL_GROSS_MARGINS` model + 18 tests. `3a3fc40`.
+5. **EIN + DUNS canonicalization** — flagged in `/contracts/company-vendor-packet.md` §1. Ben to surface for the portal-submission backlog. *Open.*
 
 ---
 
 ## Version history
 
+- **v1.6 — 2026-04-30 PM** — Phase 36.5 (kernel + AP-packet) + Phase 36.6 (kernel) shipped — `748e53a` + `5626af3`. §6.6 + §6.7 graduated 🔴 → 🟡 (kernels in code, brief-side surfaces still pending). §8 #1 + #4 closed (Q3 surcharge ratified, v23 COGS refresh shipped).
+- **v1.5 — 2026-04-30 PM** — Phase 36.7 shipped: `CHANNEL_GROSS_MARGINS` canonical per-bag margin model + 18 tests — `3a3fc40`. New §6.8 added.
+- **v1.4 — 2026-04-30 PM** — Q3 buyer-pays surcharge ratified by Ben (B3 → $3.50, B5 → $3.25). `wholesale-pricing.md` graduated to v2.4. Test fixtures + `pricing-tiers.ts` realigned.
 - **v1.3 — 2026-04-30 PM** — Phase 36.3 shipped: morning-brief vendor margin watch section.
 - **v1.2 — 2026-04-30 PM** — Phase 36.2 shipped: auth-gated read-only vendor-margin JSON endpoint.
 - **v1.1 — 2026-04-30 PM** — Phase 36.1 shipped: per-vendor margin ledger parser with no-fabrication tests.
