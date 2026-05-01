@@ -59,13 +59,26 @@ export const PRICING_TIERS: readonly PricingTier[] = [
   "B5",
 ] as const;
 
-/** Per-bag prices in USD, locked 2026-04-27. */
+/**
+ * Per-bag prices in USD.
+ *
+ * v1.0 (2026-04-27): B1/B2 $3.49, B3 $3.25, B4 $3.25, B5 $3.00.
+ * v2.4 (2026-04-30 PM Class C `pricing.change` ratified): Rene's
+ * across-the-board +$0.25/bag surcharge on buyer-pays freight tiers.
+ *   - B3: $3.25 → $3.50  (now $0.01 above B2 landed → buyers pick landed)
+ *   - B5: $3.00 → $3.25  (now matches B4 landed parity → buyers pick landed)
+ *   - B1/B2/B4: unchanged
+ * Rationale: we still pick + pack on buyer-pays, so we should get something
+ * for it; the price-gap collapse nudges buyers toward letting us ship
+ * (less coordination, more revenue, easier ops). Source:
+ * `/contracts/wholesale-pricing.md` §2 + version-history v2.4.
+ */
 export const BAG_PRICE_USD: Readonly<Record<PricingTier, number>> = {
   B1: 3.49, // local case, Ben delivers — internal only
   B2: 3.49, // master carton, landed
-  B3: 3.25, // master carton, buyer pays freight
+  B3: 3.5, // master carton, buyer pays freight (v2.4: was 3.25)
   B4: 3.25, // pallet, landed
-  B5: 3.0, // pallet, buyer pays freight
+  B5: 3.25, // pallet, buyer pays freight (v2.4: was 3.00)
 };
 
 /**

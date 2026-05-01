@@ -3,7 +3,10 @@
  *
  * Locks the contract from `/contracts/wholesale-pricing.md` v1.0:
  *   - Five stable designators only; ids unchanged.
- *   - Per-bag prices: B1=$3.49, B2=$3.49, B3=$3.25, B4=$3.25, B5=$3.00.
+ *   - Per-bag prices: B1=$3.49, B2=$3.49, B3=$3.50, B4=$3.25, B5=$3.25.
+ *     (B3 + B5 bumped +$0.25 in v2.4 — Rene's 2026-04-30 PM Class C
+ *      `pricing.change`: buyer-pays surcharge across both buyer-freight
+ *      tiers; price-gap collapse nudges buyers to landed.)
  *   - Bags per unit: B1=6, B2=36, B3=36, B4=900, B5=900.
  *   - Freight modes: B2/B4 landed, B3/B5 buyer-paid, B1 custom (Ben delivers).
  *   - Online exposure: B1 INTERNAL only; B2-B5 online.
@@ -47,21 +50,21 @@ describe("PRICING_TIERS canonical enum", () => {
   });
 });
 
-describe("BAG_PRICE_USD per-tier prices (LOCKED 2026-04-27)", () => {
+describe("BAG_PRICE_USD per-tier prices (v2.4 — Q3 surcharge ratified 2026-04-30 PM)", () => {
   it("B1 = $3.49 (local case, Ben delivers)", () => {
     expect(BAG_PRICE_USD.B1).toBe(3.49);
   });
   it("B2 = $3.49 (master carton, landed)", () => {
     expect(BAG_PRICE_USD.B2).toBe(3.49);
   });
-  it("B3 = $3.25 (master carton + buyer freight)", () => {
-    expect(BAG_PRICE_USD.B3).toBe(3.25);
+  it("B3 = $3.50 (master carton + buyer freight, v2.4 +$0.25 surcharge)", () => {
+    expect(BAG_PRICE_USD.B3).toBe(3.5);
   });
   it("B4 = $3.25 (pallet, landed)", () => {
     expect(BAG_PRICE_USD.B4).toBe(3.25);
   });
-  it("B5 = $3.00 (pallet + buyer freight, lowest standard)", () => {
-    expect(BAG_PRICE_USD.B5).toBe(3.0);
+  it("B5 = $3.25 (pallet + buyer freight, v2.4 +$0.25 surcharge → matches B4 landed)", () => {
+    expect(BAG_PRICE_USD.B5).toBe(3.25);
   });
 });
 
