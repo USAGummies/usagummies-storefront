@@ -23,6 +23,7 @@
  */
 import type { OnboardingState } from "./onboarding-flow";
 import { TIER_DISPLAY, TIER_INVOICE_LABEL } from "./pricing-tiers";
+import { STANDARD_ESCALATION_CLAUSE } from "@/lib/finance/escalation-language";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -184,6 +185,13 @@ function buildBody(
   lines.push(
     `Once we receive your completed NCS-001, we'll finalize your customer profile in our system and send the official invoice. We can ship as soon as the order is confirmed — the NCS-001 doesn't block shipment, only the AP profile completion.`,
   );
+  lines.push("");
+
+  // Phase 36.5 — canonical escalation clause. Locks the launch order's
+  // pricing without committing to forever-locked reorder pricing.
+  // Single source: src/lib/finance/escalation-language.ts.
+  lines.push("Pricing terms:");
+  lines.push(STANDARD_ESCALATION_CLAUSE);
   lines.push("");
 
   lines.push(

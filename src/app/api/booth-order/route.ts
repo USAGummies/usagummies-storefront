@@ -34,6 +34,7 @@ import {
   isShipStationConfigured,
 } from "@/lib/ops/shipstation-client";
 import { upsertOrder } from "@/lib/ops/order-desk";
+import { STANDARD_ESCALATION_CLAUSE } from "@/lib/finance/escalation-language";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -540,7 +541,11 @@ export async function POST(req: Request) {
           DueDate: dueDate,
           BillEmail: email?.trim() ? { Address: email.trim() } : undefined,
           CustomerMemo: {
-            value: "Net 10. This submit is a real order. No onboarding step is required; shipment or handoff releases per payment terms.",
+            // Phase 36.5 — escalation clause baked into every booth-order
+            // QBO invoice. Source of truth: src/lib/finance/escalation-language.ts.
+            value:
+              "Net 10. This submit is a real order. No onboarding step is required; shipment or handoff releases per payment terms.\n\n" +
+              STANDARD_ESCALATION_CLAUSE,
           },
           Line: [
             {
