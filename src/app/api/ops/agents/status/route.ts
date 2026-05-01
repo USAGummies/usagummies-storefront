@@ -158,6 +158,8 @@ interface AgentStatus {
   lastRunAt: string | null;
   lastResult: AuditLogEntry["result"] | null;
   lastAction: string | null;
+  lastSummary: string | null;
+  lastError: string | null;
   runsLast24h: number;
   errorsLast24h: number;
   staleness: "green" | "yellow" | "red" | "unknown";
@@ -258,6 +260,8 @@ export async function GET(req: Request): Promise<Response> {
       lastRunAt,
       lastResult: lastEntry?.result ?? null,
       lastAction: lastEntry?.action ?? null,
+      lastSummary: extractAuditSummary(lastEntry),
+      lastError: lastEntry?.error?.message ?? null,
       runsLast24h: last24h.length,
       errorsLast24h: errors24h,
       staleness: st.state,
@@ -281,4 +285,18 @@ export async function GET(req: Request): Promise<Response> {
     agents: statuses,
     degraded,
   });
+}
+
+function extractAuditSummary(entry: AuditLogEntry | null): string | null {
+  if (!entry) return null;
+  const after = entry.after;
+  if (!after || typeof after !== "object") return null;
+  const summary = (after as { summary?: unknown }).summary;
+  if (typeof summary === "string") return summary;
+  if (summary && typeof summary === "object") {
+    const nested = (summary as { summary?: unknown }).summary;
+    if (typeof nested === "string") return nested;
+  }
+  const nextHumanAction = (after as { nextHumanAction?: unknown }).nextHumanAction;
+  return typeof nextHumanAction === "string" ? nextHumanAction : null;
 }

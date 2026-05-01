@@ -54,6 +54,7 @@ describe("GET /api/ops/agents/status", () => {
         cadence: string;
         channel: string;
         notes?: string;
+        lastSummary: string | null;
         staleness: string;
         stalenessReason: string;
       }>;
@@ -67,7 +68,51 @@ describe("GET /api/ops/agents/status", () => {
     expect(watcher?.cadence).toMatch(/14:45 UTC/i);
     expect(watcher?.channel).toContain("OpenAI workspace tool");
     expect(watcher?.notes).toMatch(/Read-only heartbeat/i);
+    expect(watcher?.lastSummary).toBeNull();
     expect(watcher?.staleness).toBe("unknown");
+  });
+
+  it("surfaces the latest audit summary and error message", async () => {
+    recentMock.mockResolvedValueOnce([
+      {
+        id: "audit-1",
+        runId: "run-1",
+        division: "sales",
+        actorType: "agent",
+        actorId: "b2b-revenue-watcher",
+        action: "system.read",
+        entityType: "agent-heartbeat-run",
+        entityId: "run-1",
+        result: "error",
+        after: {
+          summary: {
+            summary:
+              "B2B Revenue Watcher found 2 stale B2B buyer(s). Top stale buyer: Retailer 1.",
+          },
+        },
+        error: { message: "staleBuyers: HubSpot rate limited" },
+        sourceCitations: [],
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+
+    const res = await GET(makeReq());
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      agents: Array<{
+        id: string;
+        lastResult: string | null;
+        lastSummary: string | null;
+        lastError: string | null;
+      }>;
+    };
+    const watcher = body.agents.find((a) => a.id === "b2b-revenue-watcher");
+    expect(watcher).toMatchObject({
+      lastResult: "error",
+      lastSummary:
+        "B2B Revenue Watcher found 2 stale B2B buyer(s). Top stale buyer: Retailer 1.",
+      lastError: "staleBuyers: HubSpot rate limited",
+    });
   });
 
   it("degrades honestly when the audit store fails", async () => {

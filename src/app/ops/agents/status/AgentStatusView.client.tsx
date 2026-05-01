@@ -29,6 +29,8 @@ interface Agent {
   lastRunAt: string | null;
   lastResult: "ok" | "error" | "skipped" | "stood-down" | null;
   lastAction: string | null;
+  lastSummary: string | null;
+  lastError: string | null;
   runsLast24h: number;
   errorsLast24h: number;
   staleness: "green" | "yellow" | "red" | "unknown";
@@ -275,6 +277,14 @@ export function AgentStatusView() {
               label="24h runs"
               value={`${a.runsLast24h}${a.errorsLast24h > 0 ? ` (${a.errorsLast24h} err)` : ""}`}
             />
+            {a.lastSummary && (
+              <Callout label="Last summary">{a.lastSummary}</Callout>
+            )}
+            {a.lastError && (
+              <Callout label="Last error" tone="error">
+                {a.lastError}
+              </Callout>
+            )}
             {a.notes && <Muted>{a.notes}</Muted>}
             <div style={{ fontSize: 11, color: DIM, marginTop: 10 }}>
               <Code>{a.runtimePath}</Code>
@@ -393,6 +403,35 @@ function Muted({ children }: { children: React.ReactNode }) {
         fontStyle: "italic",
       }}
     >
+      {children}
+    </div>
+  );
+}
+
+function Callout({
+  label,
+  children,
+  tone = "neutral",
+}: {
+  label: string;
+  children: React.ReactNode;
+  tone?: "neutral" | "error";
+}) {
+  const color = tone === "error" ? RED : NAVY;
+  return (
+    <div
+      style={{
+        border: `1px solid ${tone === "error" ? `${RED}44` : BORDER}`,
+        background: tone === "error" ? `${RED}0d` : "rgba(27,42,74,0.03)",
+        borderRadius: 8,
+        padding: "8px 10px",
+        marginTop: 10,
+        fontSize: 11,
+        lineHeight: 1.45,
+        color,
+      }}
+    >
+      <div style={{ fontWeight: 700, marginBottom: 3 }}>{label}</div>
       {children}
     </div>
   );

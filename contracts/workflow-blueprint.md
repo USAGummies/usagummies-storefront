@@ -431,6 +431,12 @@ Each row uses the schema:
 - **Hard rules locked by tests:** previews are capped, non-stale rows are dropped, missing timestamps are surfaced honestly, `recommendedHumanAction` names the first buyer/stage/action, and the watcher remains read-only with zero approval requests.
 - **Monday MVP:** 🟢 audit-only, but now actionable enough for a human or ChatGPT workspace agent to start in `/ops/sales` with the right buyer.
 
+#### Phase 6.10 — Agent status last-run handoff context (NEW)
+- **Why:** `/ops/agents/status` previously showed whether an agent ran but not what it found. That was enough for uptime, not enough for Codex/ChatGPT handoff. The status strip now exposes the last audit summary/error so a human can see the current blocker without opening the raw audit log.
+- **Architecture:** `GET /api/ops/agents/status` extracts a bounded `lastSummary` from the latest audit entry's `after.summary` (including the nested heartbeat summary shape) and `lastError` from the audit error envelope. `AgentStatusView.client.tsx` renders those as read-only callouts on each agent card.
+- **Hard rules locked by tests:** no audit writes, no source probes, no mutation; the route only reads the existing audit-store window and returns null when no summary exists.
+- **Monday MVP:** 🟢 read-only runtime handoff surface.
+
 #### Phase 7 — Receipt OCR extraction (prepare-for-review only) (NEW)
 - **Why:** `/ops/finance/review` already aggregates the receipt review queue, but Rene/Ben were doing field-by-field data entry by hand. Phase 7 attaches a *suggestion* to each captured receipt so reviewers see vendor/date/amount/currency/tax/last4/payment hints proposed before they fill in the canonical fields. Promotion remains 100% human — no auto-fill, no QBO write.
 - **Architecture:**
