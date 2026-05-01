@@ -27,7 +27,7 @@ export const EMAIL_AGENTS_READINESS_CONTRACT: AgentHeartbeatContract = {
     "shopify.price.update",
   ],
   memoryReads: [
-    "contracts/email-agents-system-proposal.md",
+    "contracts/email-agents-system.md",
     "contracts/email-agents-hubspot-property-spec.md",
     "contracts/incident-2026-04-30-email-intel.md",
     "contracts/agent-heartbeat.md",
@@ -108,7 +108,7 @@ export function buildEmailAgentsHeartbeatRun(input: {
     },
     doctrineRefs: [
       "contracts/agent-heartbeat.md",
-      "contracts/email-agents-system-proposal.md",
+      "contracts/email-agents-system.md",
       "contracts/incident-2026-04-30-email-intel.md",
     ],
     degradedSources:

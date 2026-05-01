@@ -141,7 +141,7 @@ export function deriveEmailAgentsStatus(
     blockers,
     nextSafeAction: nextSafeAction(readiness),
     sourceDocs: [
-      "contracts/email-agents-system-proposal.md",
+      "contracts/email-agents-system.md",
       "contracts/email-agents-hubspot-property-spec.md",
       "contracts/incident-2026-04-30-email-intel.md",
       "vercel.json",

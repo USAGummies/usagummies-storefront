@@ -31,7 +31,7 @@ export async function GET(req: Request): Promise<Response> {
       vercelJson,
     ] = await Promise.all([
       readText("contracts/incident-2026-04-30-email-intel.md"),
-      readText("contracts/email-agents-system-proposal.md"),
+      readText("contracts/email-agents-system.md"),
       readText("contracts/email-agents-hubspot-property-spec.md"),
       readText("vercel.json"),
     ]);

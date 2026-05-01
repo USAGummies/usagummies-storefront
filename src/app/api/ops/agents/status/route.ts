@@ -91,7 +91,7 @@ const AGENT_MANIFEST: AgentManifestEntry[] = [
   {
     id: "email-agents-readiness",
     name: "Email Agents Readiness",
-    contract: "/contracts/email-agents-system-proposal.md",
+    contract: "/contracts/email-agents-system.md",
     runtimePath: "/api/ops/agents/email-intel/run",
     cadence: "Manual readiness heartbeat; no cron while incident gate remains open",
     channel: "/ops/email-agents + OpenAI workspace tool",

@@ -87,7 +87,7 @@ async function run(req: Request): Promise<Response> {
                   }
                 : undefined,
             sourceCitations: [
-              { system: "contracts.email-agents-system-proposal" },
+              { system: "contracts.email-agents-system" },
               { system: "contracts.email-intel-incident" },
               { system: "contracts.email-agents-hubspot-schema" },
               { system: "vercel.crons" },
@@ -123,7 +123,7 @@ async function readStatusSources(): Promise<{
   const [incidentMarkdown, systemMarkdown, hubspotPropertyMarkdown, vercelJson] =
     await Promise.all([
       readText("contracts/incident-2026-04-30-email-intel.md"),
-      readText("contracts/email-agents-system-proposal.md"),
+      readText("contracts/email-agents-system.md"),
       readText("contracts/email-agents-hubspot-property-spec.md"),
       readText("vercel.json"),
     ]);
