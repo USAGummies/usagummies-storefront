@@ -107,7 +107,20 @@ describe("OpenAI workspace tool registry", () => {
     expect(t?.readOnly).toBe(true);
     expect(t?.requiresHumanApproval).toBe(false);
     expect(t?.backingRoute).toBe("/api/ops/finance/vendor-margin");
+    expect(t?.backingSurface).toBe("/ops/finance/vendor-margin");
     expect(t?.description).toMatch(/no QBO/i);
+  });
+
+  it("ops.agents.status exposes read-only runtime handoff state", () => {
+    const t = getOpenAIWorkspaceTool("ops.agents.status");
+    expect(t).toBeDefined();
+    expect(t?.status).toBe("ready");
+    expect(t?.mode).toBe("read");
+    expect(t?.readOnly).toBe(true);
+    expect(t?.requiresHumanApproval).toBe(false);
+    expect(t?.backingRoute).toBe("/api/ops/agents/status");
+    expect(t?.backingSurface).toBe("/ops/agents/status");
+    expect(t?.description).toMatch(/no heartbeat trigger/i);
   });
 
   it("all read tools are actually read-only and never require approval", () => {

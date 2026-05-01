@@ -224,12 +224,13 @@ Shipped in this change:
 - `ops.agents.b2b-revenue-watcher.run` is a ready read-only registry entry backed by `/api/ops/agents/b2b-revenue-watcher/run`.
 - `contracts/agent-heartbeat.md` and `src/lib/ops/agent-heartbeat/*` are the first repo-native heartbeat primitive layer. They define context, idempotency keys, allowed output states, and run-record completion only; no LLM execution or external writes are wired.
 - `/ops/agents/packs` now surfaces static heartbeat metadata for every registered agent: cadence, queue source, allowed output states, and budget guardrails. This is read-only operator context for future ChatGPT workspace-agent orchestration, not runtime activation.
+- `ops.agents.status` is a ready read-only registry entry backed by `/api/ops/agents/status` and `/ops/agents/status`, giving ChatGPT workspace agents the latest observed handoff summary/error without triggering a heartbeat.
 - `/api/ops/agents/b2b-revenue-watcher/run` is the first heartbeat dry-run for a revenue agent. It returns a canonical run record and next-human-action summary; it does not post Slack, send Gmail, mutate HubSpot, or open approvals.
 - `contracts/agents/b2b-revenue-watcher.md`, `/ops/agents/packs`, `/ops/agents/health`, and `/ops/agents/status` now all recognize the watcher as an active read-only dry-run agent.
 - Manual watcher dry-runs now append one fail-soft internal `system.read` audit entry, allowing `/ops/agents/status` to observe runs without adding any external write path.
 - The watcher now has an audit-only weekday cron at `14:45 UTC`; it still does not post Slack or mutate external systems.
 - Watcher run output now carries a bounded top-stale-buyer preview so ChatGPT workspace agents can name the first concrete buyer/stage/action while staying read-only.
-- `ops.finance.vendor-margin` is a ready read-only registry entry backed by `/api/ops/finance/vendor-margin`, giving ChatGPT/Codex agents sourced per-vendor margin context without QBO, HubSpot, Shopify, pricing, or invoice writes.
+- `ops.finance.vendor-margin` is a ready read-only registry entry backed by `/api/ops/finance/vendor-margin` and `/ops/finance/vendor-margin`, giving ChatGPT/Codex agents sourced per-vendor margin context without QBO, HubSpot, Shopify, pricing, or invoice writes.
 
 Acceptance:
 

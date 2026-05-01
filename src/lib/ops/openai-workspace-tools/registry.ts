@@ -150,7 +150,7 @@ export const OPENAI_WORKSPACE_TOOLS: readonly OpenAIWorkspaceTool[] = Object.fre
     readOnly: true,
     requiresHumanApproval: false,
     backingRoute: "/api/ops/finance/vendor-margin",
-    backingSurface: "/api/ops/finance/vendor-margin",
+    backingSurface: "/ops/finance/vendor-margin",
     safetyNotes: READ_ONLY_NOTES,
   },
   {
@@ -193,6 +193,20 @@ export const OPENAI_WORKSPACE_TOOLS: readonly OpenAIWorkspaceTool[] = Object.fre
     requiresHumanApproval: false,
     backingRoute: "/api/ops/agents/packs/snapshot",
     backingSurface: "/ops/agents/packs",
+    safetyNotes: READ_ONLY_NOTES,
+  },
+  {
+    id: "ops.agents.status",
+    name: "Agent runtime status",
+    description:
+      "Read the current runtime handoff state for registered agents, including latest observed audit summary/error when available. Read-only; no heartbeat trigger, Slack post, or external mutation.",
+    mode: "read",
+    status: "ready",
+    audience: "Ben",
+    readOnly: true,
+    requiresHumanApproval: false,
+    backingRoute: "/api/ops/agents/status",
+    backingSurface: "/ops/agents/status",
     safetyNotes: READ_ONLY_NOTES,
   },
   {
