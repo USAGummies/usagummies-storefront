@@ -187,8 +187,9 @@ When a mechanism graduates from one status to the next, update this doc + the ve
 - **Source:** `/contracts/per-vendor-margin-ledger.md`
 
 ### 6.2 `src/lib/finance/per-vendor-margin.ts` — markdown→TS parser
-- **Status:** 🔴 blueprint-only — Phase 36.1
-- **Spec:** Read `/contracts/per-vendor-margin-ledger.md` into a typed struct. Hot-reload on edit.
+- **Status:** ✅ shipped — Phase 36.1
+- **Spec:** Read `/contracts/per-vendor-margin-ledger.md` into a typed struct. Unknown/TBD cells stay `null` or `needsActual=true`; no QBO/HubSpot/Shopify/Gmail/Slack runtime integration.
+- **Code-side wire:** `src/lib/finance/per-vendor-margin.ts`; tests in `src/lib/finance/__tests__/per-vendor-margin.test.ts`.
 
 ### 6.3 `/api/ops/finance/vendor-margin?vendor=X` endpoint
 - **Status:** 🔴 blueprint-only — Phase 36.2
@@ -243,4 +244,5 @@ When Notion blueprint syncs with this doc:
 
 ## Version history
 
+- **v1.1 — 2026-04-30 PM** — Phase 36.1 shipped: per-vendor margin ledger parser with no-fabrication tests.
 - **v1.0 — 2026-04-30 PM** — Initial publication. Maps 30+ financial mechanisms to ✅ / 🟡 / 🔵 / 🔴 status. Phase 36 backlog of 6 code-side build targets (6.2–6.7). 5 open Ben + Rene decisions queued in §8.

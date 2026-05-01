@@ -437,6 +437,12 @@ Each row uses the schema:
 - **Hard rules locked by tests:** no audit writes, no source probes, no mutation; the route only reads the existing audit-store window and returns null when no summary exists.
 - **Monday MVP:** 🟢 read-only runtime handoff surface.
 
+#### Phase 6.11 — Per-vendor margin ledger parser (NEW)
+- **Why:** Rene asked for per-customer/channel revenue, COGS, freight, and gross-margin visibility in one place. The canonical ledger now exists in `contracts/per-vendor-margin-ledger.md`; the first safe code step is a read-only parser, not a QBO/HubSpot writer.
+- **Architecture:** `src/lib/finance/per-vendor-margin.ts` parses the markdown ledger into committed vendors, channel rows, and pending vendors. It extracts price/COGS/freight/GP ranges when present, preserves `[needs QBO actual]` as `needsActual=true`, and classifies margin alerts (`below_floor`, `thin`, `healthy`, `unknown`) without fetching external systems.
+- **Hard rules locked by tests:** actual contract parses, unknown/TBD figures remain null, below-floor distributor rows are flagged, negative channel rows stay below-floor, pending rows are context only, and the module imports no QBO/HubSpot/Shopify/Gmail/Slack runtime clients.
+- **Monday MVP:** 🟢 parser only. Next safe step is `/api/ops/finance/vendor-margin`.
+
 #### Phase 7 — Receipt OCR extraction (prepare-for-review only) (NEW)
 - **Why:** `/ops/finance/review` already aggregates the receipt review queue, but Rene/Ben were doing field-by-field data entry by hand. Phase 7 attaches a *suggestion* to each captured receipt so reviewers see vendor/date/amount/currency/tax/last4/payment hints proposed before they fill in the canonical fields. Promotion remains 100% human — no auto-fill, no QBO write.
 - **Architecture:**
