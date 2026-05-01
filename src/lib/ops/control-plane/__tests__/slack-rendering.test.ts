@@ -81,6 +81,27 @@ describe("ApprovalSurface", () => {
     expect(calls[0].body.channel).toBe("C0ATWJDHS74");
   });
 
+  it("renders approvals as a decision card instead of a raw payload dump", async () => {
+    const calls: Array<{ url: string; body: Record<string, unknown> }> = [];
+    mockSlackPostSuccess(calls);
+    const surface = new ApprovalSurface();
+    await surface.surfaceApproval({
+      ...baseRequest(),
+      payloadPreview: "To: buyer@example.com\nSubject: Vendor packet\nBody: Attached is the packet.",
+      targetEntity: { type: "email", id: "thread-1", label: "buyer@example.com" },
+    });
+
+    const blocksText = JSON.stringify(calls[0].body.blocks);
+    expect(blocksText).toContain("Needs decision");
+    expect(blocksText).toContain("Decision brief");
+    expect(blocksText).toContain("What will happen if approved");
+    expect(blocksText).toContain("Safety / rollback");
+    expect(blocksText).toContain("buyer@example.com");
+    expect(blocksText).toContain("Needs edit");
+    expect(blocksText).not.toContain("*Payload*");
+    expect(blocksText).not.toContain("*Claim*");
+  });
+
   it("updateApproval is a safe no-op when there is no slackThread yet", async () => {
     const surface = new ApprovalSurface();
     const req = baseRequest();

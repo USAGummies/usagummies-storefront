@@ -52,13 +52,16 @@ function renderApprovalMessage(r: ApprovalRequest): { text: string; blocks: unkn
   const icon = iconFor(r.status);
   const classLabel = r.class === "C" ? "Class C (dual approval)" : "Class B (single approval)";
   const approvers = r.requiredApprovers.join(" + ");
+  const target = targetLabel(r);
   const sources = r.evidence.sources
+    .slice(0, 5)
     .map((s) => {
       const parts = [s.system];
       if (s.id) parts.push(s.id);
-      return `• ${parts.join(":")} (retrieved ${s.retrievedAt})${s.url ? ` — ${s.url}` : ""}`;
+      return `• ${parts.join(":")} · ${s.retrievedAt}${s.url ? ` · ${s.url}` : ""}`;
     })
     .join("\n");
+  const hiddenSources = Math.max(0, r.evidence.sources.length - 5);
   const decisionLines = r.decisions
     .map((d) => {
       const icon = d.decision === "approve" ? "✅" : d.decision === "reject" ? "❌" : "💬";
@@ -71,40 +74,53 @@ function renderApprovalMessage(r: ApprovalRequest): { text: string; blocks: unkn
   const blocks: unknown[] = [
     {
       type: "header",
-      text: { type: "plain_text", text: `${icon} ${r.action}`, emoji: true },
+      text: { type: "plain_text", text: `${icon} ${statusTitle(r.status)} · ${r.action}`, emoji: true },
     },
     {
-      type: "section",
-      fields: [
-        { type: "mrkdwn", text: `*Status*\n${r.status}` },
-        { type: "mrkdwn", text: `*Class*\n${classLabel}` },
-        { type: "mrkdwn", text: `*Division*\n${r.division}` },
-        { type: "mrkdwn", text: `*Approvers*\n${approvers}` },
-        { type: "mrkdwn", text: `*Agent*\n${r.actorAgentId}` },
-        { type: "mrkdwn", text: `*Target*\n${r.targetSystem}` },
+      type: "context",
+      elements: [
+        {
+          type: "mrkdwn",
+          text: `*${classLabel}* · approver: *${approvers}* · target: *${target}*`,
+        },
       ],
     },
     {
       type: "section",
-      text: { type: "mrkdwn", text: `*Claim*\n${r.evidence.claim}` },
+      fields: [
+        { type: "mrkdwn", text: `*Status*\n${statusLabel(r.status)}` },
+        { type: "mrkdwn", text: `*Risk gate*\n${classLabel}` },
+        { type: "mrkdwn", text: `*Owner*\n${approvers}` },
+        { type: "mrkdwn", text: `*Agent / run*\n${r.actorAgentId} · ${shortId(r.runId)}` },
+        { type: "mrkdwn", text: `*System*\n${r.targetSystem}` },
+        { type: "mrkdwn", text: `*Entity*\n${target}` },
+      ],
+    },
+    {
+      type: "section",
+      text: { type: "mrkdwn", text: `*Decision brief*\n${truncate(r.evidence.claim, 900)}` },
     },
     {
       type: "section",
       text: {
         type: "mrkdwn",
-        text: `*Payload*\n${truncate(r.payloadPreview, 2500)}`,
+        text: `*What will happen if approved*\n${formatPayloadPreview(r.payloadPreview)}`,
       },
     },
     {
       type: "section",
       text: {
         type: "mrkdwn",
-        text: `*Evidence* (confidence ${(r.evidence.confidence * 100).toFixed(0)}%)\n${sources || "_no sources_"}`,
+        text: [
+          `*Evidence* · confidence ${(r.evidence.confidence * 100).toFixed(0)}%`,
+          sources || "_no sources_",
+          hiddenSources ? `_+${hiddenSources} more source${hiddenSources === 1 ? "" : "s"} in the stored payload_` : "",
+        ].filter(Boolean).join("\n"),
       },
     },
     {
       type: "section",
-      text: { type: "mrkdwn", text: `*Rollback*\n${r.rollbackPlan}` },
+      text: { type: "mrkdwn", text: `*Safety / rollback*\n${truncate(r.rollbackPlan, 700)}` },
     },
   ];
 
@@ -118,7 +134,7 @@ function renderApprovalMessage(r: ApprovalRequest): { text: string; blocks: unkn
   blocks.push({
     type: "context",
     elements: [
-      { type: "mrkdwn", text: `approval: \`${r.id}\`  •  run: \`${r.runId}\`  •  escalate \`${r.escalateAt}\`  •  expire \`${r.expiresAt}\`` },
+      { type: "mrkdwn", text: `approval \`${r.id}\` · run \`${r.runId}\` · escalates \`${r.escalateAt}\` · expires \`${r.expiresAt}\`` },
     ],
   });
 
@@ -144,7 +160,7 @@ function renderApprovalMessage(r: ApprovalRequest): { text: string; blocks: unkn
         },
         {
           type: "button",
-          text: { type: "plain_text", text: "Ask", emoji: true },
+          text: { type: "plain_text", text: "Needs edit", emoji: true },
           action_id: `approval::ask::${r.id}`,
           value: r.id,
         },
@@ -153,6 +169,49 @@ function renderApprovalMessage(r: ApprovalRequest): { text: string; blocks: unkn
   }
 
   return { text: fallbackText, blocks };
+}
+
+function targetLabel(r: ApprovalRequest): string {
+  const entity = r.targetEntity;
+  if (!entity) return r.targetSystem;
+  return entity.label ?? entity.id ?? entity.type;
+}
+
+function shortId(id: string): string {
+  return id.length > 12 ? `…${id.slice(-12)}` : id;
+}
+
+function statusTitle(status: ApprovalRequest["status"]): string {
+  switch (status) {
+    case "pending":
+      return "Needs decision";
+    case "approved":
+      return "Approved";
+    case "rejected":
+      return "Rejected";
+    case "expired":
+      return "Expired";
+    case "stood-down":
+      return "Stood down";
+    case "draft":
+      return "Draft";
+    default:
+      return status;
+  }
+}
+
+function statusLabel(status: ApprovalRequest["status"]): string {
+  return `${iconFor(status)} ${statusTitle(status)} (${status})`;
+}
+
+function formatPayloadPreview(payload: string): string {
+  const normalized = payload.trim();
+  if (!normalized) return "_no payload preview_";
+  const truncated = truncate(normalized, 1400);
+  if (truncated.includes("\n") || truncated.includes("{") || truncated.includes(":")) {
+    return `\`\`\`${truncated}\`\`\``;
+  }
+  return truncated;
 }
 
 function iconFor(status: ApprovalRequest["status"]): string {
