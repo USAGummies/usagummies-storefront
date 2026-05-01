@@ -181,6 +181,8 @@ export interface SalesCommandCenterInput {
   dispatchNotWiredReason?: string;
   /** HubSpot B2B pipeline snapshot. Read-only: no stage/task writes. */
   salesPipeline?: SourceState<SalesPipelineSummary>;
+  /** HubSpot stale-buyer hit list. Read-only: no email or CRM write. */
+  staleBuyers?: SourceState<StaleBuyerSummary>;
 }
 
 export interface SectionTodaysRevenueActions {
@@ -192,6 +194,7 @@ export interface SectionTodaysRevenueActions {
   pendingApprovals: number | null;
   retailDraftsNeedsReview: number | null;
   apPacketsActionRequired: number | null;
+  staleBuyersNeedingFollowUp: number | null;
   /** True when ANY source above is non-zero/actionable. */
   anyAction: boolean;
 }
@@ -215,6 +218,7 @@ export interface SectionWholesaleOnboarding {
   day1Prospects: SourceState<Day1ProspectCounts>;
   salesTour: SourceState<SalesTourCounts>;
   pipeline: SourceState<SalesPipelineSummary>;
+  staleBuyers: SourceState<StaleBuyerSummary>;
   apPackets: SourceState<ApPacketCounts>;
   links: Array<{ href: string; label: string }>;
 }
@@ -310,6 +314,7 @@ import {
   renderSalesPipelineBriefLine,
   type SalesPipelineSummary,
 } from "./sales-pipeline";
+import type { StaleBuyerSummary } from "@/lib/sales/stale-buyer";
 
 export type { SalesPipelineSummary } from "./sales-pipeline";
 
@@ -484,6 +489,10 @@ function wiredOrNull<T, R>(
   return state.status === "wired" ? pick(state.value) : null;
 }
 
+function staleBuyerCount(summary: StaleBuyerSummary): number {
+  return summary.staleByStage.reduce((sum, row) => sum + row.count, 0);
+}
+
 const TOP_ACTIONABLE_LIMIT = 5;
 
 // ---------------------------------------------------------------------------
@@ -517,6 +526,10 @@ export function buildSalesCommandCenter(
     input.apPackets,
     (c) => c.action_required,
   );
+  const staleBuyersNeedingFollowUp = wiredOrNull(
+    input.staleBuyers ?? sourceNotWired("HubSpot stale-buyers reader not wired."),
+    staleBuyerCount,
+  );
 
   const anyAction = [
     faireInvitesNeedsReview,
@@ -524,6 +537,7 @@ export function buildSalesCommandCenter(
     pendingApprovals,
     retailDraftsNeedsReview,
     apPacketsActionRequired,
+    staleBuyersNeedingFollowUp,
   ].some((n) => typeof n === "number" && n > 0);
 
   // ---- Faire follow-ups: keep pre-sorted order, slice top N -----------
@@ -558,6 +572,9 @@ export function buildSalesCommandCenter(
   if (input.salesPipeline) {
     checks.push(["salesPipeline", input.salesPipeline]);
   }
+  if (input.staleBuyers) {
+    checks.push(["staleBuyers", input.staleBuyers]);
+  }
   if (input.day1Prospects) {
     checks.push(["day1Prospects", input.day1Prospects]);
   }
@@ -578,6 +595,7 @@ export function buildSalesCommandCenter(
       pendingApprovals,
       retailDraftsNeedsReview,
       apPacketsActionRequired,
+      staleBuyersNeedingFollowUp,
       anyAction,
     },
     faireDirect: {
@@ -608,10 +626,14 @@ export function buildSalesCommandCenter(
       pipeline:
         input.salesPipeline ??
         sourceNotWired("HubSpot sales pipeline reader not wired."),
+      staleBuyers:
+        input.staleBuyers ??
+        sourceNotWired("HubSpot stale-buyers reader not wired."),
       apPackets: input.apPackets,
       links: [
         { href: "/ops/sales/tour", label: "May sales tour" },
         { href: "/ops/sales/prospects/day1", label: "Day 1 prospect playbook" },
+        { href: "/api/ops/sales/stale-buyers", label: "Stale buyers JSON" },
         { href: "/ops/ap-packets", label: "AP packet dashboard" },
         { href: "/ops/finance/review", label: "Finance review" },
       ],

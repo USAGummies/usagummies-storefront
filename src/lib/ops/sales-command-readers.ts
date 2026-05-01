@@ -36,6 +36,8 @@ import { listReceipts } from "@/lib/ops/docs";
 import { approvalStore } from "@/lib/ops/control-plane/stores";
 import { getWholesaleInquirySummary } from "@/lib/wholesale/inquiries";
 import {
+  HUBSPOT,
+  listRecentDeals,
   readB2BWholesaleStageCounts,
   readOpenHubSpotCallTasks,
   readStaleSampleShippedDeals,
@@ -56,6 +58,11 @@ import {
 } from "@/lib/ops/sales-command-center";
 import { buildProspectPlaybookReport } from "@/lib/sales/prospect-playbook";
 import { buildSalesTourPlaybookReport } from "@/lib/sales/tour-playbook";
+import {
+  summarizeStaleBuyers,
+  type HubSpotDealForStaleness,
+  type StaleBuyerSummary,
+} from "@/lib/sales/stale-buyer";
 import {
   classifyAgingInput,
   type AgingItem,
@@ -315,6 +322,31 @@ export async function readSalesPipeline(
   } catch (err) {
     return sourceError(
       `HubSpot sales pipeline read failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+}
+
+export async function readStaleBuyers(
+  now: Date,
+  options: { limit?: number } = {},
+): Promise<SourceState<StaleBuyerSummary>> {
+  try {
+    const limit = Math.min(Math.max(options.limit ?? 200, 1), 500);
+    const deals = await listRecentDeals({ limit });
+    const retrievedAt = new Date().toISOString();
+    const adapted: HubSpotDealForStaleness[] = deals.map((d) => ({
+      id: d.id,
+      dealname: d.dealname || null,
+      pipelineId: HUBSPOT.PIPELINE_B2B_WHOLESALE,
+      stageId: d.dealstage,
+      lastActivityAt: d.lastmodifieddate || null,
+      primaryContactId: null,
+      primaryCompanyName: null,
+    }));
+    return sourceWired(summarizeStaleBuyers(adapted, now, retrievedAt));
+  } catch (err) {
+    return sourceError(
+      `Stale buyers read failed: ${err instanceof Error ? err.message : String(err)}`,
     );
   }
 }

@@ -35,6 +35,7 @@ import {
   readPendingApprovals,
   readSalesPipeline,
   readSalesTourPlaybook,
+  readStaleBuyers,
   readWholesaleInquiries,
 } from "@/lib/ops/sales-command-readers";
 import { readAllChannelsLast7d } from "@/lib/ops/revenue-kpi-readers";
@@ -94,6 +95,7 @@ export async function GET(req: Request): Promise<Response> {
     day1Prospects,
     salesTour,
     salesPipeline,
+    staleBuyers,
   ] = await Promise.all([
     readFaireInvites(),
     readFaireFollowUps(now),
@@ -106,6 +108,7 @@ export async function GET(req: Request): Promise<Response> {
     readDay1Prospects(),
     readSalesTourPlaybook(),
     readSalesPipeline(now),
+    readStaleBuyers(now),
   ]);
 
   // Phase 28f — fetch the dispatch-board rows for the new tile on
@@ -167,6 +170,7 @@ export async function GET(req: Request): Promise<Response> {
       day1Prospects,
       salesTour,
       salesPipeline,
+      staleBuyers,
       missingEnv: readMissingEnv(),
       agingItems: aging.items,
       agingMissing: aging.missing,

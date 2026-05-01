@@ -350,6 +350,13 @@ Each row uses the schema:
 - **Tests (Phase 6.1):** `sales-pipeline.test.ts` covers open-count math, malformed-count normalization, preview caps, and brief copy. `sales-command-readers-pipeline.test.ts` covers wired success, HubSpot failure → `error`, and thrown-client isolation. `sales-command-center.test.ts` covers dashboard surfacing, blockers behavior, and slice projection. `daily-brief.test.ts` covers the rendered pipeline line. Focused suite: 118 green before full verification.
 - **Monday MVP:** 🟢 — Ben sees B2B pipeline state in `/ops/sales` and the morning Slack brief without a second daily digest and without introducing HubSpot mutations.
 
+##### Phase 6.1a — Stale buyer hit list in Sales Command (NEW)
+- **Why:** `GET /api/ops/sales/stale-buyers` and `scripts/sales/chase-stale-buyers.mjs` expose the full HubSpot stale-buyer hit list, but `/ops/sales` still only showed the narrower "stale Sample Shipped" count. Phase 6.1a brings the broader follow-up list into the command center so Ben can see total stale B2B buyers without running the CLI.
+- **Architecture:** `readStaleBuyers(now)` in `sales-command-readers.ts` wraps `listRecentDeals()` + `summarizeStaleBuyers()` into a `SourceState<StaleBuyerSummary>` with limit clamping `[1,500]`. `/api/ops/sales` reads it in parallel with the existing pipeline snapshot. `buildSalesCommandCenter()` surfaces `todaysRevenueActions.staleBuyersNeedingFollowUp` and `wholesaleOnboarding.staleBuyers`.
+- **UI:** `/ops/sales` adds a "Stale B2B buyers" stat card and a "Stale buyer hit list" subsection with stale count, scanned count, source timestamp, and top-5 deal preview. The deep link goes to the auth-gated JSON route; the CLI remains the prep surface for draft text.
+- **Hard rules locked by tests:** HubSpot failure returns `SourceState.error` (never fabricated zero); empty-but-wired HubSpot response renders `0`; stale buyer errors appear in blockers; no email/CRM write path is introduced.
+- **Monday MVP:** 🟢 — read-only visibility only. Follow-up action still happens through existing outreach/approval lanes; no auto-send.
+
 #### Phase 6.2 — May sales-tour playbook surface (NEW)
 - **Why:** The May 11–17 Ashford → Grand Canyon route plan is now a canonical contract (`contracts/sales-tour-may-2026-prospect-list.md`) plus a Notion mirror. Operators need a sortable internal view without turning the planning doc into an outreach sender. Notion explicitly says the repo contract wins on conflict, so the route reads the checked-in contract only.
 - **Architecture:**

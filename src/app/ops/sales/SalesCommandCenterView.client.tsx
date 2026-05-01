@@ -89,6 +89,24 @@ interface SalesPipelineSummary {
     }>;
   };
 }
+interface StaleBuyerSummary {
+  asOf: string;
+  stalest: Array<{
+    dealId: string;
+    dealName: string;
+    stageName: string;
+    daysSinceActivity: number;
+    thresholdDays: number;
+    nextAction: string;
+  }>;
+  staleByStage: Array<{
+    stageName: string;
+    count: number;
+    thresholdDays: number;
+  }>;
+  activeDealsScanned: number;
+  source: { system: "hubspot"; retrievedAt: string };
+}
 
 interface Report {
   generatedAt: string;
@@ -98,6 +116,7 @@ interface Report {
     pendingApprovals: number | null;
     retailDraftsNeedsReview: number | null;
     apPacketsActionRequired: number | null;
+    staleBuyersNeedingFollowUp: number | null;
     anyAction: boolean;
   };
   faireDirect: {
@@ -128,6 +147,7 @@ interface Report {
       callTasks: number;
     }>;
     pipeline: SourceState<SalesPipelineSummary>;
+    staleBuyers: SourceState<StaleBuyerSummary>;
     apPackets: SourceState<ApPacketCounts>;
     links: Array<{ href: string; label: string }>;
   };
@@ -371,6 +391,13 @@ function TodaysActions({ report }: { report: Report }) {
           href="/ops/ap-packets"
         />
         <Stat
+          label="Stale B2B buyers"
+          value={r.staleBuyersNeedingFollowUp}
+          highlightColor={RED}
+          actionable={(r.staleBuyersNeedingFollowUp ?? 0) > 0}
+          href="/api/ops/sales/stale-buyers"
+        />
+        <Stat
           label="Retail drafts to review"
           value={r.retailDraftsNeedsReview}
           highlightColor={AMBER}
@@ -601,6 +628,53 @@ function WholesaleOnboardingSection({ report }: { report: Report }) {
             )}
           </>
         ))}
+      </div>
+      <div style={{ marginBottom: 8 }}>
+        <SubLabel>Stale buyer hit list</SubLabel>
+        {renderSourceState(report.wholesaleOnboarding.staleBuyers, (v) => {
+          const totalStale = v.staleByStage.reduce(
+            (sum, row) => sum + row.count,
+            0,
+          );
+          return (
+            <>
+              <div style={{ display: "flex", gap: 16, fontSize: 13, flexWrap: "wrap" }}>
+                <span>
+                  Stale: <strong>{totalStale}</strong>
+                </span>
+                <span style={{ color: DIM }}>
+                  Scanned: <strong>{v.activeDealsScanned}</strong>
+                </span>
+                <span style={{ color: DIM }}>
+                  Source: HubSpot · {v.source.retrievedAt.slice(0, 10)}
+                </span>
+              </div>
+              {v.stalest.length > 0 ? (
+                <ul style={{ listStyle: "none", padding: 0, margin: "8px 0 0 0" }}>
+                  {v.stalest.slice(0, 5).map((d) => (
+                    <li
+                      key={d.dealId}
+                      style={{
+                        borderTop: `1px dashed ${BORDER}`,
+                        padding: "5px 4px",
+                        fontSize: 12,
+                      }}
+                    >
+                      <strong>{d.dealName}</strong>
+                      <span style={{ color: DIM, marginLeft: 8 }}>
+                        {d.stageName} · {Number.isFinite(d.daysSinceActivity) ? `${d.daysSinceActivity}d` : "no activity timestamp"} · {d.nextAction}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div style={{ fontSize: 12, color: DIM }}>
+                  (no stale B2B buyers)
+                </div>
+              )}
+            </>
+          );
+        })}
       </div>
       <div>
         <SubLabel>AP packets</SubLabel>

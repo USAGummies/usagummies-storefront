@@ -27,6 +27,7 @@ import {
   type FaireFollowUpRowSummary,
   type SalesCommandCenterInput,
 } from "../sales-command-center";
+import type { StaleBuyerSummary } from "@/lib/sales/stale-buyer";
 
 const NOW = new Date("2026-04-30T12:00:00Z");
 
@@ -51,6 +52,31 @@ function emptyInput(): SalesCommandCenterInput {
     apPackets: sourceNotWired("test"),
     locationDrafts: sourceNotWired("test"),
     wholesaleInquiries: sourceNotWired("test"),
+  };
+}
+
+function staleBuyerSummary(
+  overrides: Partial<StaleBuyerSummary> = {},
+): StaleBuyerSummary {
+  return {
+    asOf: NOW.toISOString(),
+    stalest: [
+      {
+        dealId: "d-old",
+        dealName: "Old Buyer",
+        stageName: "Contacted",
+        daysSinceActivity: 14,
+        thresholdDays: 5,
+        isStale: true,
+        nextAction: "Follow up",
+        primaryContactId: null,
+        primaryCompanyName: null,
+      },
+    ],
+    staleByStage: [{ stageName: "Contacted", count: 1, thresholdDays: 5 }],
+    activeDealsScanned: 3,
+    source: { system: "hubspot", retrievedAt: NOW.toISOString() },
+    ...overrides,
   };
 }
 
@@ -967,6 +993,60 @@ describe("buildSalesCommandCenter — HubSpot sales pipeline section", () => {
       salesPipeline: sourceError("HubSpot down"),
     });
     expect(slice.salesPipelineLine).toBeNull();
+  });
+});
+
+describe("buildSalesCommandCenter — stale buyers section", () => {
+  it("surfaces stale buyers under wholesale onboarding and top actions", () => {
+    const report = buildSalesCommandCenter(
+      {
+        ...emptyInput(),
+        staleBuyers: sourceWired(staleBuyerSummary()),
+      },
+      { now: NOW },
+    );
+    expect(report.todaysRevenueActions.staleBuyersNeedingFollowUp).toBe(1);
+    expect(report.todaysRevenueActions.anyAction).toBe(true);
+    expect(report.wholesaleOnboarding.staleBuyers.status).toBe("wired");
+    if (report.wholesaleOnboarding.staleBuyers.status !== "wired") return;
+    expect(report.wholesaleOnboarding.staleBuyers.value.stalest[0].dealName).toBe(
+      "Old Buyer",
+    );
+  });
+
+  it("stale buyer errors land in blockers instead of fabricated zero", () => {
+    const report = buildSalesCommandCenter(
+      {
+        ...emptyInput(),
+        staleBuyers: sourceError("HubSpot stale buyer read failed"),
+      },
+      { now: NOW },
+    );
+    expect(report.todaysRevenueActions.staleBuyersNeedingFollowUp).toBeNull();
+    expect(report.wholesaleOnboarding.staleBuyers.status).toBe("error");
+    expect(report.blockers.notes).toContainEqual({
+      source: "staleBuyers",
+      state: "error",
+      reason: "HubSpot stale buyer read failed",
+    });
+  });
+
+  it("empty stale-buyer summary is wired zero, not not_wired", () => {
+    const report = buildSalesCommandCenter(
+      {
+        ...emptyInput(),
+        staleBuyers: sourceWired(
+          staleBuyerSummary({
+            stalest: [],
+            staleByStage: [],
+            activeDealsScanned: 2,
+          }),
+        ),
+      },
+      { now: NOW },
+    );
+    expect(report.todaysRevenueActions.staleBuyersNeedingFollowUp).toBe(0);
+    expect(report.todaysRevenueActions.anyAction).toBe(false);
   });
 });
 
