@@ -632,6 +632,14 @@ export interface OnHandRow {
   byLocation: Array<{ locationId: string; locationName: string; onHand: number }>;
 }
 
+// `location.name` was removed 2026-04-30 — it required `read_locations` scope
+// which the production Shopify Admin API token lacks. The brief, ATP gate,
+// and inventory snapshot only consume `location.id` + on-hand quantity; the
+// human-readable name was never read in production code (only seeded into
+// fixtures in tests). Dropping the field eliminates a recurring "No snapshot
+// in KV" warning on every morning brief and lets the snapshot cron actually
+// populate. If we re-add the scope later, restore `name { id name }` and
+// surface it in the snapshot — see `byLocation.locationName` in OnHandRow.
 const ON_HAND_QUERY = /* GraphQL */ `
   query AllOnHand($first: Int!, $cursor: String) {
     products(first: $first, after: $cursor, query: "status:active") {
@@ -654,7 +662,6 @@ const ON_HAND_QUERY = /* GraphQL */ `
                       node {
                         location {
                           id
-                          name
                         }
                         quantities(names: ["on_hand"]) {
                           name
@@ -696,7 +703,11 @@ interface OnHandQueryResult {
                 inventoryLevels: {
                   edges: Array<{
                     node: {
-                      location: { id: string; name: string };
+                      // `name` removed 2026-04-30 — see comment on
+                      // ON_HAND_QUERY. We synthesize a placeholder name
+                      // from the id below so OnHandRow.byLocation
+                      // continues to carry a stable, readable string.
+                      location: { id: string };
                       quantities: Array<{ name: string; quantity: number }>;
                     };
                   }>;
@@ -732,9 +743,15 @@ export async function getAllOnHandInventory(): Promise<OnHandRow[]> {
         if (!variant.inventoryItem || !variant.inventoryItem.tracked) continue;
         const levels = variant.inventoryItem.inventoryLevels.edges.map(({ node }) => {
           const onHandQ = node.quantities.find((q) => q.name === "on_hand");
+          // Synthesize a short readable label from the location GID
+          // (e.g. `gid://shopify/Location/64278822978` → `Loc-64278822978`).
+          // Real names require `read_locations` scope; we don't read this
+          // field anywhere in production code (verified via grep) but
+          // OnHandRow tests + future UI surfaces want a stable string.
+          const locShort = node.location.id.split("/").pop() ?? node.location.id;
           return {
             locationId: node.location.id,
-            locationName: node.location.name,
+            locationName: `Loc-${locShort}`,
             onHand: Number(onHandQ?.quantity ?? 0),
           };
         });
