@@ -192,8 +192,9 @@ When a mechanism graduates from one status to the next, update this doc + the ve
 - **Code-side wire:** `src/lib/finance/per-vendor-margin.ts`; tests in `src/lib/finance/__tests__/per-vendor-margin.test.ts`.
 
 ### 6.3 `/api/ops/finance/vendor-margin?vendor=X` endpoint
-- **Status:** 🔴 blueprint-only — Phase 36.2
-- **Spec:** Return vendor row as JSON. Authenticated bearer `CRON_SECRET`. Used by daily morning brief + HubSpot deal-card webhook.
+- **Status:** ✅ shipped — Phase 36.2
+- **Spec:** Return full parsed ledger JSON, or one committed vendor row via `?vendor=<slug-or-name>`. Auth-gated by `isAuthorized()` (session OR `CRON_SECRET`). Used by daily morning brief + HubSpot deal-card webhook later.
+- **Code-side wire:** `src/app/api/ops/finance/vendor-margin/route.ts`; tests in `src/app/api/ops/finance/vendor-margin/__tests__/route.test.ts`.
 
 ### 6.4 Morning-brief vendor-margin alerts surface
 - **Status:** 🔴 blueprint-only — Phase 36.3
@@ -244,5 +245,6 @@ When Notion blueprint syncs with this doc:
 
 ## Version history
 
+- **v1.2 — 2026-04-30 PM** — Phase 36.2 shipped: auth-gated read-only vendor-margin JSON endpoint.
 - **v1.1 — 2026-04-30 PM** — Phase 36.1 shipped: per-vendor margin ledger parser with no-fabrication tests.
 - **v1.0 — 2026-04-30 PM** — Initial publication. Maps 30+ financial mechanisms to ✅ / 🟡 / 🔵 / 🔴 status. Phase 36 backlog of 6 code-side build targets (6.2–6.7). 5 open Ben + Rene decisions queued in §8.

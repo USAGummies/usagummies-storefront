@@ -443,6 +443,12 @@ Each row uses the schema:
 - **Hard rules locked by tests:** actual contract parses, unknown/TBD figures remain null, below-floor distributor rows are flagged, negative channel rows stay below-floor, pending rows are context only, and the module imports no QBO/HubSpot/Shopify/Gmail/Slack runtime clients.
 - **Monday MVP:** 🟢 parser only. Next safe step is `/api/ops/finance/vendor-margin`.
 
+#### Phase 6.12 — Per-vendor margin read API (NEW)
+- **Why:** The parsed ledger needs one stable internal read surface before the morning brief or future deal-card integrations consume it.
+- **Architecture:** `GET /api/ops/finance/vendor-margin` reads `contracts/per-vendor-margin-ledger.md`, parses it with `parsePerVendorMarginLedger`, and returns counts plus either the full ledger or one committed vendor via `?vendor=<slug-or-name>`. The route is auth-gated by `isAuthorized()` and exports no mutating methods.
+- **Hard rules locked by tests:** unauthenticated calls 401, full ledger returns sourced counts, vendor lookup returns one row without the full ledger payload, unknown vendors 404 instead of fake rows, and the route imports no QBO/HubSpot/Shopify/Gmail/Slack runtime clients.
+- **Monday MVP:** 🟢 read-only JSON endpoint. Next safe step is morning-brief margin alerts.
+
 #### Phase 7 — Receipt OCR extraction (prepare-for-review only) (NEW)
 - **Why:** `/ops/finance/review` already aggregates the receipt review queue, but Rene/Ben were doing field-by-field data entry by hand. Phase 7 attaches a *suggestion* to each captured receipt so reviewers see vendor/date/amount/currency/tax/last4/payment hints proposed before they fill in the canonical fields. Promotion remains 100% human — no auto-fill, no QBO write.
 - **Architecture:**
