@@ -122,6 +122,7 @@ The repo is already close to a ChatGPT workspace-agent architecture:
 - `/ops/sales`, `/ops/readiness`, `/ops/finance/review`, `/ops/faire-direct`, and receipt review-packet routes are already curated read surfaces.
 - `/ops/sales/prospects/day1` exposes the checked-in Day 1 wholesale prospect playbook as read-only context; sends still require the canonical validator + Class B approval path.
 - `/ops/sales/tour` exposes the checked-in May 2026 sales-tour contract as read-only context; it classifies route prospects, verified/generic contacts, research gaps, and call tasks without sending outreach or writing HubSpot.
+- `/api/ops/sales/stale-buyers` exposes the HubSpot-backed stale B2B buyer hit list for chase prep; ChatGPT may summarize who needs follow-up but cannot send outreach or mutate HubSpot.
 - Slack approval cards and closers already enforce Class B / Class C boundaries.
 - Operating-memory and agent-pack work is present in the active worktree and should become the second phase once stabilized.
 
@@ -219,6 +220,7 @@ Shipped in this change:
 - Browser-session probe of `GET /api/ops/openai-workspace-tools/mcp`.
 - `ops.agent.packs` and `ops.operating-memory.search` are ready registry entries with backing routes.
 - `ops.sales.tour-playbook` is a ready read-only registry entry backed by `/api/ops/sales/tour`.
+- `ops.sales.stale-buyers` is a ready read-only registry entry backed by `/api/ops/sales/stale-buyers`.
 - `contracts/agent-heartbeat.md` and `src/lib/ops/agent-heartbeat/*` are the first repo-native heartbeat primitive layer. They define context, idempotency keys, allowed output states, and run-record completion only; no LLM execution or external writes are wired.
 - `/ops/agents/packs` now surfaces static heartbeat metadata for every registered agent: cadence, queue source, allowed output states, and budget guardrails. This is read-only operator context for future ChatGPT workspace-agent orchestration, not runtime activation.
 

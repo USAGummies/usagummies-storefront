@@ -99,6 +99,20 @@ export const OPENAI_WORKSPACE_TOOLS: readonly OpenAIWorkspaceTool[] = Object.fre
     safetyNotes: READ_ONLY_NOTES,
   },
   {
+    id: "ops.sales.stale-buyers",
+    name: "Stale B2B buyer hit list",
+    description:
+      "Read the HubSpot-backed stale-buyer hit list used by the morning brief and Sales Command Center. Read-only; no outreach send, HubSpot write, or follow-up approval is opened.",
+    mode: "read",
+    status: "ready",
+    audience: "Ben",
+    readOnly: true,
+    requiresHumanApproval: false,
+    backingRoute: "/api/ops/sales/stale-buyers",
+    backingSurface: "/ops/sales",
+    safetyNotes: READ_ONLY_NOTES,
+  },
+  {
     id: "ops.readiness.snapshot",
     name: "Ops readiness snapshot",
     description:
