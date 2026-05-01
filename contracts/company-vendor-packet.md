@@ -21,8 +21,8 @@
 | Email (finance) | **rene@usagummies.com** | Rene Gonzalez, finance lead — CC on AP packets |
 | Email (operations) | **andrew@usagummies.com** | Drew Slater — production / supply chain only |
 | Website | **www.usagummies.com** | |
-| Tax ID / EIN | **🚩 BEN: fill in this doc — currently captured on signed W-9 PDF (Drive `04 — Finance > Document Templates`); not on any contract markdown** | Required on every AP form |
-| DUNS number | **🚩 BEN: confirm if we have one. None on file in any contract markdown.** If we don't have one, register at `dnb.com/duns-number/get-a-duns.html` (free). Most retail / distributor portals require it. |
+| Tax ID / EIN | **`33-4744824`** | Locked 2026-04-30 PM. Required on every AP / W-9 / portal form. |
+| DUNS number | **`13-863-5866`** | Locked 2026-04-30 PM. Required on most retail / distributor portals (UNFI, Bass Pro, KeHE, McLane, Core-Mark, etc.). |
 | NAICS code | **311340** — Nonchocolate Confectionery Manufacturing | Standard for gummy candy |
 | SIC code | **2064** — Candy and Other Confectionery Products | |
 
@@ -218,4 +218,5 @@ When Ben fills in EIN / DUNS / COA location / COI carrier / return policy:
 
 ## Version history
 
+- **v1.1 — 2026-04-30 PM (later)** — EIN (`33-4744824`) + DUNS (`13-863-5866`) locked by Ben. Removes the two highest-priority `🚩 BEN: fill` blockers. 3 remaining: COA location (Powers Confections issues per-batch — Drew can pull from Powers portal on demand), COI carrier (insurance carrier name + cert location), return policy canonical text. None of those gate P0 portal submissions.
 - **v1.0 — 2026-04-30 PM** — Initial publication. Built to be the single source of truth for every portal / vendor / RangeMe / new-account submission. 5 fields flagged `🚩 BEN: fill` (EIN, DUNS, COA location, COI carrier, return policy canonical text). All other 80+ fields canonicalized from existing contracts + code.
