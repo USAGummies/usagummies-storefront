@@ -1,7 +1,7 @@
 # Agent Contract — B2B Revenue Watcher
 
 **Status:** CANONICAL (audit-only heartbeat)
-**Version:** 1.2 — 2026-04-30
+**Version:** 1.3 — 2026-04-30
 **Division:** `sales`
 **Human owner:** Ben
 **Schema:** [`/contracts/governance.md`](../governance.md) §3
@@ -60,6 +60,7 @@ No other write scope is granted in v1.0.
 - Operator or OpenAI workspace tool may also call the same route on demand.
 - The route reads Sales Command sources in parallel.
 - The route returns a canonical `AgentHeartbeatRunRecord` plus a short next-human-action summary.
+- When stale buyers exist, the summary includes a bounded top-3 preview with deal id, deal name, stage, stale age, and next action so Ben can start with a concrete buyer instead of a raw count.
 
 The heartbeat remains audit-only. It does not post to Slack.
 
@@ -89,6 +90,7 @@ Graduates from audit-only heartbeat to operator-facing output only after:
 
 ## Version History
 
+- **1.3 — 2026-04-30** — Contract cadence aligned to cron RRULE; heartbeat output now includes a bounded top-stale-buyer action preview.
 - **1.2 — 2026-04-30** — Weekday audit-only cron added at `14:45 UTC`; still no Slack/Gmail/HubSpot/approval writes.
 - **1.1 — 2026-04-30** — Fail-soft internal audit persistence added for dry-runs; no scheduler or external writes.
 - **1.0 — 2026-04-30** — Canonical dry-run contract for the first B2B revenue heartbeat.

@@ -425,6 +425,12 @@ Each row uses the schema:
 - **Hard rules locked by tests:** the cron exists, runs before the morning brief (`0 15 * * 1-5`), and does not include `post=true`; agent-pack heartbeat cadence is `cron`; status manifest names `14:45 UTC`.
 - **Monday MVP:** 🟢 scheduled audit-only. Watch one week of runs before adding any Slack output.
 
+#### Phase 6.9 — B2B Revenue Watcher actionable stale-buyer preview (NEW)
+- **Why:** Counts are useful for dashboards but weak for an agent handoff. Slack/Notion direction points at stale buyer follow-up as the immediate revenue action, so the heartbeat needs to name the first concrete buyer without drafting or sending anything.
+- **Architecture:** `src/lib/ops/b2b-revenue-watcher.ts` now projects `StaleBuyerSummary.stalest` into a bounded `topStaleBuyers` array (max 3) with deal id, deal name, stage, stale age, company, and next-action copy. Missing activity timestamps are normalized to `null` and rendered as "no activity timestamp" rather than leaking `Infinity`. The contract cadence is aligned to the existing weekday cron RRULE.
+- **Hard rules locked by tests:** previews are capped, non-stale rows are dropped, missing timestamps are surfaced honestly, `recommendedHumanAction` names the first buyer/stage/action, and the watcher remains read-only with zero approval requests.
+- **Monday MVP:** 🟢 audit-only, but now actionable enough for a human or ChatGPT workspace agent to start in `/ops/sales` with the right buyer.
+
 #### Phase 7 — Receipt OCR extraction (prepare-for-review only) (NEW)
 - **Why:** `/ops/finance/review` already aggregates the receipt review queue, but Rene/Ben were doing field-by-field data entry by hand. Phase 7 attaches a *suggestion* to each captured receipt so reviewers see vendor/date/amount/currency/tax/last4/payment hints proposed before they fill in the canonical fields. Promotion remains 100% human — no auto-fill, no QBO write.
 - **Architecture:**
