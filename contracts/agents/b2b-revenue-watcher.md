@@ -70,7 +70,7 @@ Future cadence is intended to be weekday morning, but no cron is active in v1.0.
 
 ## Audit
 
-v1.0 does not write audit entries. The route returns audit-ready run records, but persistence is intentionally deferred until the heartbeat scheduler is approved.
+Every manual dry-run writes one fail-soft internal audit entry with `action=system.read`, `actorId=b2b-revenue-watcher`, and `entityType=agent-heartbeat-run`. Audit failure is degraded but not load-bearing; the route still returns the run record.
 
 ## Health States
 
@@ -83,10 +83,10 @@ v1.0 does not write audit entries. The route returns audit-ready run records, bu
 Graduates from dry-run to scheduled heartbeat only after:
 
 1. Ben approves cadence.
-2. Audit persistence is added fail-soft.
-3. The run appears on `/ops/agents/status`.
-4. Any outbound action remains routed through existing Class B approval surfaces.
+2. The run appears on `/ops/agents/status`.
+3. Any outbound action remains routed through existing Class B approval surfaces.
 
 ## Version History
 
+- **1.1 — 2026-04-30** — Fail-soft internal audit persistence added for dry-runs; no scheduler or external writes.
 - **1.0 — 2026-04-30** — Canonical dry-run contract for the first B2B revenue heartbeat.

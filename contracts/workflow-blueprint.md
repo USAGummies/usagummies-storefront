@@ -413,6 +413,12 @@ Each row uses the schema:
 - **Hard rules locked by tests:** the watcher belongs to the B2B Revenue pack, has heartbeat metadata, has a green doctrine-health row as an active Class A read-only task with dry-run justification, appears on `/api/ops/agents/status`, and still does not schedule itself or gain any write scope.
 - **Monday MVP:** 🟢 registered dry-run. Next phase is fail-soft audit persistence, then explicit cadence approval.
 
+#### Phase 6.7 — B2B Revenue Watcher audit persistence (NEW)
+- **Why:** `/ops/agents/status` reads the audit stream, so a manual heartbeat needs a persisted internal run marker before status can observe it.
+- **Architecture:** `GET/POST /api/ops/agents/b2b-revenue-watcher/run` appends a fail-soft `system.read` audit entry with `actorId=b2b-revenue-watcher`, `entityType=agent-heartbeat-run`, the heartbeat `outputState`, summary, and degraded-source list. `failed_degraded` maps to audit `result: "error"` so the status strip can count reader failures honestly.
+- **Hard rules locked by tests:** unauthenticated calls do not audit; successful dry-runs append exactly one audit entry; degraded readers append an error-shaped audit entry; audit-store failure adds `degraded: ["audit-store: append failed (soft)"]` and does not fail the heartbeat response.
+- **Monday MVP:** 🟢 internal audit only. Still no cron, Slack post, Gmail send, HubSpot mutation, approval opening, or external write.
+
 #### Phase 7 — Receipt OCR extraction (prepare-for-review only) (NEW)
 - **Why:** `/ops/finance/review` already aggregates the receipt review queue, but Rene/Ben were doing field-by-field data entry by hand. Phase 7 attaches a *suggestion* to each captured receipt so reviewers see vendor/date/amount/currency/tax/last4/payment hints proposed before they fill in the canonical fields. Promotion remains 100% human — no auto-fill, no QBO write.
 - **Architecture:**
