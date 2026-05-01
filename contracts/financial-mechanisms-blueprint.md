@@ -202,26 +202,33 @@ When a mechanism graduates from one status to the next, update this doc + the ve
 - **Code-side wire:** `BriefInput.vendorMargin`, `renderVendorMarginMarkdown`, and `/api/ops/daily-brief` direct parser read.
 
 ### 6.5 HubSpot deal ↔ vendor-row two-way reconcile
-- **Status:** 🔴 blueprint-only — Phase 36.4
-- **Spec:** When a deal stage advances to `Shipped`, post the GP/bag from the vendor row to the deal note. When a vendor row updates (price change), patch any open deals.
+- **Status:** ✅ shipped — Phase 36.4 — `252d443`
+- **Spec:** When a deal stage advances to `Shipped`, post the GP/bag from the vendor row to the deal note.
+- **Code-side wire:** `renderVendorMarginNoteLine()` in `src/lib/finance/per-vendor-margin.ts` (fuzzy slug + first-token vendor name match for parenthetical descriptors). Returns null on no match — no over-promising margin context we can't verify. Wired into HubSpot deal-stage-change webhook.
+- **Open follow-on (Phase 36.4b):** vendor-row → open-deals patch path (price change in ledger → deal note refresh on every open deal in that vendor's funnel).
 
 ### 6.6 Escalation language template injection
-- **Status:** 🟡 doctrine-locked, kernel + AP-packet shipped — Phase 36.5 — `748e53a`
-- **Spec:** Bake Rene's canonical escalation line into the booth-quote engine + invoice templates + AP packet templates. Currently ad-hoc.
-- **Code-side wire (shipped):**
+- **Status:** ✅ shipped — Phase 36.5 — `748e53a` (kernel + AP-packet) + `7f49ca6` (wholesale AP-packet email + booth-order QBO invoice CustomerMemo)
+- **Spec:** Bake Rene's canonical escalation line into the booth-quote engine + invoice templates + AP packet templates.
+- **Code-side wire:**
   - `src/lib/finance/escalation-language.ts` — `STANDARD_ESCALATION_CLAUSE` (Rene's verbatim 2026-04-29 wording) + 8-variant `ESCALATION_CLAUSES` + `pickEscalationClause()` + `renderEscalationBlock()`. Single source of truth.
   - `src/lib/sales-tour/escalation-clause.ts` — refactored to delegate to canonical (no string drift).
-  - `src/lib/ops/ap-packets/templates.ts` — Jungle Jim's AP-packet reply body now embeds the canonical clause between catalog details + signature.
-  - 24 tests in `src/lib/finance/__tests__/escalation-language.test.ts` pin every variant + cross-surface drift guard + AP-packet injection.
-- **Code-side wire (pending):** QBO invoice POST flow `customerMemo` injection (Phase 36.5b). Per-vendor margin ledger emits matching variant on row create (Phase 36.5c).
+  - `src/lib/ops/ap-packets/templates.ts` — Jungle Jim's AP-packet reply body embeds the canonical clause.
+  - `src/lib/wholesale/wholesale-ap-email.ts` — first-customer wholesale AP-packet email body now carries the canonical clause.
+  - `src/app/api/booth-order/route.ts` — every booth-order.invoice_me QBO invoice CustomerMemo now carries Net-10 + handoff + canonical escalation clause.
+  - 24 tests in `src/lib/finance/__tests__/escalation-language.test.ts` + 55/55 escalation + wholesale-ap-email tests pin every variant + cross-surface drift guard + injection coverage.
+- **Open follow-on:** per-vendor margin ledger row-create emits matching variant (Phase 36.5c) — incremental polish, low priority.
 
 ### 6.7 Off-grid pricing visibility flag in morning brief
-- **Status:** 🟡 doctrine-locked, kernel shipped — Phase 36.6 — `5626af3`
+- **Status:** ✅ shipped — Phase 36.6 — `5626af3` (kernel) + `bbffcc6` (full brief surface)
 - **Spec:** Surface every non-grid quote in the morning brief stack-down section. Forces operator review even on Class A/B autonomous actions.
-- **Code-side wire (shipped):**
-  - `src/lib/finance/pricing-grid-classifier.ts` — `PRICING_GRID` (canonical price set sourced from wholesale-pricing.md §2 v2.4 + distributor-pricing-commitments.md §1-§4 + pricing-route-governance.md §1) + `classifyPricePerBag()` (returns onGrid / nearestTier / signed deviation / matchesProposedTier flag) + `isFullyRatifiedPrice()` (strict canonical check).
-  - 32 tests in `src/lib/finance/__tests__/pricing-grid-classifier.test.ts` pin every B-tier + distributor + show-special + proposed-tier classification.
-- **Code-side wire (pending):** aggregator over recent quotes/orders + `BriefInput.offGridQuotes` slot + `renderOffGridQuotesMarkdown()` + brief-route fetcher. HubSpot deal property `pricing_grid_status` for deal-card visibility.
+- **Code-side wire:**
+  - `src/lib/finance/pricing-grid-classifier.ts` — `PRICING_GRID` + `classifyPricePerBag()` + `isFullyRatifiedPrice()` (32 tests).
+  - `src/lib/finance/off-grid-quotes.ts` — `ON_GRID_BAG_PRICES_USD` (canonical v2.4 grid + distributor commits) + `detectOffGridQuotes()` + severity classification (below_floor / below_distributor_floor / between_grid_lines) + `buildOffGridQuotesBriefSlice()`.
+  - `daily-brief.ts` — `BriefInput.offGridQuotes?` slot + `renderOffGridQuotesMarkdown()` (top 3 + "+N more in /ops/sales" footer).
+  - Daily-brief route fetches recent quotes + classifies + surfaces off-grid in the morning stack-down section.
+- **Open follow-on:** HubSpot deal property `pricing_grid_status` (on / off / proposed) for deal-card visibility — Phase 36.6c.
+- **Note on duplication:** Two parallel implementations of the grid classifier ship today (`pricing-grid-classifier.ts` with structured `PRICING_GRID` + tier metadata, and `off-grid-quotes.ts` with flat `ON_GRID_BAG_PRICES_USD`). They were built in parallel sessions on the same lane; both pass tests. Future cleanup: consolidate to a single source-of-truth — likely have `off-grid-quotes.ts` import `PRICING_GRID` from `pricing-grid-classifier.ts`. Tracked as Phase 36.6d.
 
 ### 6.8 Channel-level gross-margin canonical model — Phase 36.7 — `3a3fc40`
 - **Status:** ✅ shipped (was §8 #4 candidate — graduated)
@@ -261,6 +268,7 @@ When Notion blueprint syncs with this doc:
 
 ## Version history
 
+- **v1.7 — 2026-04-30 PM (late)** — *Phase 36 fully closed.* §6.5 (Phase 36.4) graduated 🔴 → ✅ via `252d443`. §6.6 (Phase 36.5) graduated 🟡 → ✅ via `7f49ca6` (wholesale AP-packet email + booth-order QBO invoice CustomerMemo injected). §6.7 (Phase 36.6) graduated 🟡 → ✅ via `bbffcc6` (full brief surface wired). Status tally: ✅ 28, 🟡 3 (§3.4 / §4.3 / §5.1 — all carry-overs from earlier doctrine, not Phase 36 work), 🔵 3, 🔴 0. **No 🔴 remain.** Phase 36.6d duplication cleanup (consolidate `pricing-grid-classifier.ts` + `off-grid-quotes.ts` to one source-of-truth) flagged as next-up polish.
 - **v1.6 — 2026-04-30 PM** — Phase 36.5 (kernel + AP-packet) + Phase 36.6 (kernel) shipped — `748e53a` + `5626af3`. §6.6 + §6.7 graduated 🔴 → 🟡 (kernels in code, brief-side surfaces still pending). §8 #1 + #4 closed (Q3 surcharge ratified, v23 COGS refresh shipped).
 - **v1.5 — 2026-04-30 PM** — Phase 36.7 shipped: `CHANNEL_GROSS_MARGINS` canonical per-bag margin model + 18 tests — `3a3fc40`. New §6.8 added.
 - **v1.4 — 2026-04-30 PM** — Q3 buyer-pays surcharge ratified by Ben (B3 → $3.50, B5 → $3.25). `wholesale-pricing.md` graduated to v2.4. Test fixtures + `pricing-tiers.ts` realigned.
