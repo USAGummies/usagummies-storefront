@@ -1,7 +1,8 @@
 /**
- * Phase 37.1 + 37.2 — Inbox Scanner + Classifier cron route (Viktor).
+ * Phase 37.1 + 37.2 + 37.3 — Inbox Scanner + Classifier + HubSpot
+ * Verification cron route (Viktor).
  *
- * Per /contracts/email-agents-system.md §2.1 + §2.2 + §9.1:
+ * Per /contracts/email-agents-system.md §2.1 + §2.2 + §2.9 + §9.1:
  *   - Runtime owner: Viktor (sales). NOT a new top-level agent.
  *   - Class A `system.read` only — no email send, no HubSpot write,
  *     no spam-cleaner delete (37.7 owns that lane).
@@ -14,11 +15,15 @@
  *   2. Classifier (Phase 37.2) — classify the new records into the
  *      22 v1 categories (whale HARD STOP first), persist back at the
  *      same key with status `classified` / `classified_whale`.
+ *   3. HubSpot Verification (Phase 37.3) — pre-classify enrich each
+ *      record with HubSpot contact context, hard-flag UNQUALIFIED + whale
+ *      contacts before any drafter ever sees the record. Persists the
+ *      `hubspot` metadata back at the same key.
  *
  * Auth: middleware whitelist + isAuthorized fallback (CRON_SECRET bearer).
  *
- * Kill switch: `INBOX_SCANNER_ENABLED=false` env var pauses both stages
- * without redeploy.
+ * Kill switch: `INBOX_SCANNER_ENABLED=false` env var pauses all three
+ * stages without redeploy.
  *
  * NOTE: this route does NOT draft replies or open approvals. Drafting is
  * Phase 37.5 + 37.6 + 37.11; approvals are §2.5a (Phase 37.6).
@@ -33,6 +38,10 @@ import {
   runClassifier,
   type ClassifierReport,
 } from "@/lib/sales/viktor/classifier";
+import {
+  runHubSpotVerification,
+  type VerificationReport,
+} from "@/lib/sales/viktor/hubspot-verification";
 import {
   runInboxScanner,
   type InboxScanReport,
@@ -101,6 +110,7 @@ async function run(req: Request): Promise<Response> {
 
   let report: InboxScanReport | null = null;
   let classifierReport: ClassifierReport | null = null;
+  let verificationReport: VerificationReport | null = null;
   let error: string | undefined;
 
   try {
@@ -133,6 +143,37 @@ async function run(req: Request): Promise<Response> {
           degraded: true,
           degradedNotes: [`runClassifier-threw: ${msg}`],
           classifiedRecords: [],
+        };
+      }
+    }
+
+    // Phase 37.3 — chain HubSpot verification on the just-classified
+    // records. Skipped categories (Z spam, N/O/P bounces, _unclassified)
+    // short-circuit inside verifyRecord so we don't burn HubSpot lookups
+    // on noise. Verification failure does NOT fail the run — degraded
+    // verification is signal, not error.
+    if (
+      classifierReport &&
+      classifierReport.classifiedRecords.length > 0
+    ) {
+      try {
+        verificationReport = await runHubSpotVerification({
+          records: classifierReport.classifiedRecords,
+          dryRun: body.dryRun,
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        verificationReport = {
+          examined: classifierReport.classifiedRecords.length,
+          verified: 0,
+          hardBlocked: 0,
+          missingContact: 0,
+          incomplete: 0,
+          degraded: classifierReport.classifiedRecords.length,
+          skipped: 0,
+          hubspotLookups: 0,
+          degradedNotes: [`runHubSpotVerification-threw: ${msg}`],
+          verifiedRecords: [],
         };
       }
     }
@@ -172,6 +213,18 @@ async function run(req: Request): Promise<Response> {
                       degraded: classifierReport.degraded,
                     }
                   : null,
+                verification: verificationReport
+                  ? {
+                      examined: verificationReport.examined,
+                      verified: verificationReport.verified,
+                      hardBlocked: verificationReport.hardBlocked,
+                      missingContact: verificationReport.missingContact,
+                      incomplete: verificationReport.incomplete,
+                      degraded: verificationReport.degraded,
+                      skipped: verificationReport.skipped,
+                      hubspotLookups: verificationReport.hubspotLookups,
+                    }
+                  : null,
               }
             : undefined,
           error: error
@@ -183,8 +236,11 @@ async function run(req: Request): Promise<Response> {
                 }
               : undefined,
           sourceCitations: [
-            { system: "contracts.email-agents-system", id: "§2.1+§2.2+§3.1" },
-            { system: "phase", id: "37.1+37.2" },
+            {
+              system: "contracts.email-agents-system",
+              id: "§2.1+§2.2+§2.9+§3.1+§11.6",
+            },
+            { system: "phase", id: "37.1+37.2+37.3" },
           ],
           confidence: 1,
         },
@@ -209,5 +265,6 @@ async function run(req: Request): Promise<Response> {
     runId: runCtx.runId,
     report,
     classifier: classifierReport,
+    verification: verificationReport,
   });
 }
