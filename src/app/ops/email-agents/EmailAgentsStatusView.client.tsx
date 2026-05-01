@@ -22,6 +22,29 @@ interface StatusResponse {
   code?: string;
 }
 
+interface HeartbeatRunRecord {
+  runId: string;
+  outputState: string;
+  summary: string;
+  nextHumanAction: string | null;
+  degradedSources: string[];
+  startedAt: string;
+  finishedAt: string;
+}
+
+interface HeartbeatResponse {
+  ok?: boolean;
+  runRecord?: HeartbeatRunRecord;
+  summary?: {
+    readiness: EmailAgentsStatus["readiness"];
+    gatesPassed: number;
+    gatesTotal: number;
+  };
+  degraded?: string[];
+  error?: string;
+  code?: string;
+}
+
 const READINESS_LABELS: Record<EmailAgentsStatus["readiness"], string> = {
   blocked: "Blocked",
   ready_for_dry_run: "Ready for dry-run",
@@ -41,6 +64,9 @@ export function EmailAgentsStatusView() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [heartbeat, setHeartbeat] = useState<HeartbeatResponse | null>(null);
+  const [heartbeatError, setHeartbeatError] = useState<string | null>(null);
+  const [heartbeatLoading, setHeartbeatLoading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -168,6 +194,104 @@ export function EmailAgentsStatusView() {
             </div>
 
             <section style={sectionStyle}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                <div>
+                  <h2 style={{ margin: 0 }}>Readiness heartbeat dry-run</h2>
+                  <p style={{ margin: "8px 0 0", color: DIM, maxWidth: 760 }}>
+                    Builds a canonical agent heartbeat run record from the
+                    readiness gates. This writes only a fail-soft internal audit
+                    row; it does not scan Gmail, draft replies, open approvals,
+                    or run the email-intel pipeline.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setHeartbeatLoading(true);
+                    setHeartbeatError(null);
+                    fetch("/api/ops/agents/email-intel/run", {
+                      method: "POST",
+                      cache: "no-store",
+                    })
+                      .then(async (res) => {
+                        const body = (await res.json().catch(() => null)) as
+                          | HeartbeatResponse
+                          | null;
+                        if (!res.ok || !body || body.ok !== true || !body.runRecord) {
+                          throw new Error(
+                            body?.error ??
+                              body?.code ??
+                              `HTTP ${res.status} ${res.statusText}`,
+                          );
+                        }
+                        setHeartbeat(body);
+                      })
+                      .catch((err) => {
+                        setHeartbeat(null);
+                        setHeartbeatError(
+                          err instanceof Error ? err.message : String(err),
+                        );
+                      })
+                      .finally(() => setHeartbeatLoading(false));
+                  }}
+                  disabled={heartbeatLoading}
+                  style={{
+                    ...buttonStyle,
+                    opacity: heartbeatLoading ? 0.55 : 1,
+                    cursor: heartbeatLoading ? "wait" : "pointer",
+                  }}
+                >
+                  {heartbeatLoading ? "Running..." : "Run dry-run"}
+                </button>
+              </div>
+
+              {heartbeatError ? (
+                <div style={{ marginTop: 12, color: RED, fontWeight: 800 }}>
+                  {heartbeatError}
+                </div>
+              ) : null}
+
+              {heartbeat?.runRecord ? (
+                <div
+                  style={{
+                    border: `1px solid ${BORDER}`,
+                    borderRadius: 14,
+                    padding: 14,
+                    marginTop: 14,
+                    background: "#fffaf0",
+                  }}
+                >
+                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+                    <Pill tone={heartbeat.runRecord.outputState === "failed_degraded" ? "bad" : "good"}>
+                      {heartbeat.runRecord.outputState}
+                    </Pill>
+                    <code style={{ color: DIM }}>{heartbeat.runRecord.runId}</code>
+                  </div>
+                  <p style={{ margin: "10px 0 0", color: NAVY, fontWeight: 800 }}>
+                    {heartbeat.runRecord.summary}
+                  </p>
+                  {heartbeat.runRecord.nextHumanAction ? (
+                    <p style={{ margin: "8px 0 0", color: DIM }}>
+                      Next: {heartbeat.runRecord.nextHumanAction}
+                    </p>
+                  ) : null}
+                  {heartbeat.summary ? (
+                    <p style={{ margin: "8px 0 0", color: DIM }}>
+                      Gates passed: {heartbeat.summary.gatesPassed}/
+                      {heartbeat.summary.gatesTotal} · Readiness:{" "}
+                      {READINESS_LABELS[heartbeat.summary.readiness]}
+                    </p>
+                  ) : null}
+                  {(heartbeat.degraded?.length ?? 0) > 0 ? (
+                    <p style={{ margin: "8px 0 0", color: GOLD, fontWeight: 800 }}>
+                      Soft degradation: {heartbeat.degraded?.join("; ")}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+            </section>
+
+            <section style={sectionStyle}>
               <h2 style={{ margin: 0 }}>Gates</h2>
               <div style={{ display: "grid", gap: 10, marginTop: 14 }}>
                 {status.gates.map((gate) => (
@@ -209,6 +333,33 @@ export function EmailAgentsStatusView() {
         ) : null}
       </section>
     </main>
+  );
+}
+
+function Pill({
+  tone,
+  children,
+}: {
+  tone: "good" | "bad";
+  children: React.ReactNode;
+}) {
+  return (
+    <span
+      style={{
+        borderRadius: 999,
+        padding: "5px 9px",
+        fontSize: 12,
+        fontWeight: 950,
+        color: tone === "good" ? "#1f7a3a" : RED,
+        background:
+          tone === "good" ? "rgba(31,122,58,0.08)" : "rgba(199,54,44,0.08)",
+        border: `1px solid ${
+          tone === "good" ? "rgba(31,122,58,0.18)" : "rgba(199,54,44,0.18)"
+        }`,
+      }}
+    >
+      {children}
+    </span>
   );
 }
 
