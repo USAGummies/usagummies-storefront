@@ -227,6 +227,7 @@ Shipped in this change:
 - `/api/ops/agents/b2b-revenue-watcher/run` is the first heartbeat dry-run for a revenue agent. It returns a canonical run record and next-human-action summary; it does not schedule itself, post Slack, send Gmail, mutate HubSpot, or open approvals.
 - `contracts/agents/b2b-revenue-watcher.md`, `/ops/agents/packs`, `/ops/agents/health`, and `/ops/agents/status` now all recognize the watcher as an active read-only dry-run agent. It remains manual until audit persistence and cadence approval land.
 - Manual watcher dry-runs now append one fail-soft internal `system.read` audit entry, allowing `/ops/agents/status` to observe runs without adding any external write path.
+- The watcher now has an audit-only weekday cron at `14:45 UTC`; it still does not post Slack or mutate external systems.
 
 Acceptance:
 

@@ -43,7 +43,7 @@ describe("GET /api/ops/agents/status", () => {
     expect(recentMock).not.toHaveBeenCalled();
   });
 
-  it("includes B2B Revenue Watcher with manual dry-run metadata", async () => {
+  it("includes B2B Revenue Watcher with audit-only cron metadata", async () => {
     const res = await GET(makeReq());
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
@@ -64,7 +64,7 @@ describe("GET /api/ops/agents/status", () => {
     expect(watcher?.runtimePath).toBe(
       "/api/ops/agents/b2b-revenue-watcher/run",
     );
-    expect(watcher?.cadence).toMatch(/Manual dry-run/i);
+    expect(watcher?.cadence).toMatch(/14:45 UTC/i);
     expect(watcher?.channel).toContain("OpenAI workspace tool");
     expect(watcher?.notes).toMatch(/Read-only heartbeat/i);
     expect(watcher?.staleness).toBe("unknown");

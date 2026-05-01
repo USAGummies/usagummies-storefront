@@ -83,10 +83,10 @@ const AGENT_MANIFEST: AgentManifestEntry[] = [
     name: "B2B Revenue Watcher",
     contract: "/contracts/agents/b2b-revenue-watcher.md",
     runtimePath: "/api/ops/agents/b2b-revenue-watcher/run",
-    cadence: "Manual dry-run; weekday cadence pending Ben approval",
+    cadence: "Weekday 14:45 UTC audit-only heartbeat",
     channel: "/ops/sales + OpenAI workspace tool",
     notes:
-      "Read-only heartbeat: no cron, Slack post, Gmail send, HubSpot mutation, or approval opening",
+      "Read-only heartbeat: no Slack post, Gmail send, HubSpot mutation, or approval opening",
   },
   {
     id: "reconciliation-specialist",

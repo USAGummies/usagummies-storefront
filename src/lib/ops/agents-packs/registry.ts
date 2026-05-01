@@ -593,12 +593,12 @@ export const AGENT_HEARTBEATS: Readonly<Record<string, AgentHeartbeatMetadata>> 
       outputStates: APPROVAL_OUTPUTS,
     }),
     "b2b-revenue-watcher": heartbeat({
-      cadence: "manual",
-      schedule: "Manual dry-run via OpenAI workspace tool; cron not approved",
+      cadence: "cron",
+      schedule: "Weekdays 14:45 UTC, before the morning brief",
       queueSource:
         "Sales Command readers: stale buyers, Faire follow-ups, pending approvals, wholesale inquiries",
       outputStates: TASK_OUTPUTS,
-      nextPhase: "Add fail-soft audit persistence, then seek cadence approval",
+      nextPhase: "Watch one week of audit-only runs before adding Slack output",
     }),
     "viktor-rene-capture": heartbeat({
       cadence: "event",

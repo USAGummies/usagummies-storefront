@@ -22,7 +22,7 @@
 | Ops Agent (now with Shopify inventory + Gmail vendor-thread freshness) | [agents/ops.md](agents/ops.md) | [`/api/ops/agents/ops/run`](../src/app/api/ops/agents/ops/run/route.ts) | Weekday 09:00 PT | `#operations` |
 | Compliance Specialist | [agents/compliance-specialist.md](agents/compliance-specialist.md) | [`/api/ops/agents/compliance/run`](../src/app/api/ops/agents/compliance/run/route.ts) | Weekday 11:00 PT | `#operations` (degraded → `#ops-audit` until `/Legal/Compliance Calendar` exists in Notion) |
 | Faire Specialist | [agents/faire-specialist.md](agents/faire-specialist.md) | [`/api/ops/agents/faire/run`](../src/app/api/ops/agents/faire/run/route.ts) | Thursday 11:00 PT | `#finance` (reconcile prep) + `#sales` (Direct-share). Degraded until `FAIRE_ACCESS_TOKEN` is set. |
-| B2B Revenue Watcher | [agents/b2b-revenue-watcher.md](agents/b2b-revenue-watcher.md) | [`/api/ops/agents/b2b-revenue-watcher/run`](../src/app/api/ops/agents/b2b-revenue-watcher/run/route.ts) | Manual dry-run (weekday cadence pending Ben approval) | `/ops/sales` + OpenAI workspace tool. No Slack/Gmail/HubSpot/approval writes. |
+| B2B Revenue Watcher | [agents/b2b-revenue-watcher.md](agents/b2b-revenue-watcher.md) | [`/api/ops/agents/b2b-revenue-watcher/run`](../src/app/api/ops/agents/b2b-revenue-watcher/run/route.ts) | Weekday 14:45 UTC audit-only heartbeat | `/ops/sales` + OpenAI workspace tool. No Slack/Gmail/HubSpot/approval writes. |
 | Research Librarian | [agents/research-librarian.md](agents/research-librarian.md) | [`/api/ops/agents/research/run`](../src/app/api/ops/agents/research/run/route.ts) + [`/api/ops/research/note`](../src/app/api/ops/research/note/route.ts) | Friday 11:00 PT | `#research` — weekly synthesis of notes captured via the note POST endpoint. |
 | Booke queue feed | [agents/booke.md](agents/booke.md) | [`/api/ops/booke/push`](../src/app/api/ops/booke/push/route.ts) | Event (Zapier / Make posts count) | Feeds Finance Exception Agent "Uncategorized" cell. |
 | ShipStation Health (BUILDs #8 + #9) | [integrations/shipstation.md](integrations/shipstation.md) §11–§12 | [`/api/ops/shipstation/wallet-check`](../src/app/api/ops/shipstation/wallet-check/route.ts) | Weekday 09:00 PT | `#operations` (only when below floor or stale void) |
@@ -79,6 +79,7 @@ The no-fabrication rule means every missing data point surfaces with an explicit
 | `/api/ops/control-plane/health` | `0 14 * * 1-5` | Weekday 07:00 |
 | `/api/ops/agents/finance-exception/run?post=true` | `15 14 * * 1-5` | Weekday 06:15 PT — Wait, that's wrong — 14:15 UTC is 06:15 PT (PDT 07:15). Check DST. |
 | `/api/ops/daily-brief?kind=morning&post=true` | `0 15 * * 1-5` | Weekday 08:00 PT (07:00 PST) |
+| `/api/ops/agents/b2b-revenue-watcher/run` | `45 14 * * 1-5` | Weekday audit-only B2B heartbeat before morning brief |
 | `/api/ops/shipstation/wallet-check?post=true` | `0 16 * * 1-5` | Weekday 09:00 PT (BUILD #8 + #9 — wallet floor + stale-void watcher) |
 | `/api/ops/agents/ops/run?post=true` | `0 17 * * 1-5` | Weekday 10:00 PT (09:00 PST) |
 | `/api/ops/agents/compliance/run?post=true` | `0 18 * * 1-5` | Weekday 11:00 PT |

@@ -419,6 +419,12 @@ Each row uses the schema:
 - **Hard rules locked by tests:** unauthenticated calls do not audit; successful dry-runs append exactly one audit entry; degraded readers append an error-shaped audit entry; audit-store failure adds `degraded: ["audit-store: append failed (soft)"]` and does not fail the heartbeat response.
 - **Monday MVP:** 🟢 internal audit only. Still no cron, Slack post, Gmail send, HubSpot mutation, approval opening, or external write.
 
+#### Phase 6.8 — B2B Revenue Watcher audit-only cron (NEW)
+- **Why:** The watcher now has contract, status, pack, and audit visibility. The next safe activation is cadence that only records heartbeat state before the morning brief.
+- **Architecture:** `vercel.json` schedules `GET /api/ops/agents/b2b-revenue-watcher/run` at `45 14 * * 1-5`. The route does not accept `post=true` and has no Slack/Gmail/HubSpot/approval side effect. The internal audit entry lets `/ops/agents/status` observe whether the heartbeat fired.
+- **Hard rules locked by tests:** the cron exists, runs before the morning brief (`0 15 * * 1-5`), and does not include `post=true`; agent-pack heartbeat cadence is `cron`; status manifest names `14:45 UTC`.
+- **Monday MVP:** 🟢 scheduled audit-only. Watch one week of runs before adding any Slack output.
+
 #### Phase 7 — Receipt OCR extraction (prepare-for-review only) (NEW)
 - **Why:** `/ops/finance/review` already aggregates the receipt review queue, but Rene/Ben were doing field-by-field data entry by hand. Phase 7 attaches a *suggestion* to each captured receipt so reviewers see vendor/date/amount/currency/tax/last4/payment hints proposed before they fill in the canonical fields. Promotion remains 100% human — no auto-fill, no QBO write.
 - **Architecture:**

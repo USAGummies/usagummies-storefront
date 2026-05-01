@@ -17,6 +17,10 @@
       "schedule": "0 15 * * 1-5"
     },
     {
+      "path": "/api/ops/agents/b2b-revenue-watcher/run",
+      "schedule": "45 14 * * 1-5"
+    },
+    {
       "path": "/api/ops/agents/ops/run?post=true",
       "schedule": "0 17 * * 1-5"
     },

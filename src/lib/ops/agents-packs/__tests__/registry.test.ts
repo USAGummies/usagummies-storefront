@@ -172,7 +172,10 @@ describe("Pack registry — member ids resolve", () => {
     expect(pack?.memberIds).toContain("b2b-revenue-watcher");
     const agent = getAgentById("b2b-revenue-watcher");
     expect(agent?.runtimePath).toBe("/api/ops/agents/b2b-revenue-watcher/run");
-    expect(AGENT_HEARTBEATS["b2b-revenue-watcher"]?.cadence).toBe("manual");
+    expect(AGENT_HEARTBEATS["b2b-revenue-watcher"]?.cadence).toBe("cron");
+    expect(AGENT_HEARTBEATS["b2b-revenue-watcher"]?.schedule).toContain(
+      "14:45 UTC",
+    );
   });
 });
 
