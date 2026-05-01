@@ -20,6 +20,16 @@ import { resolve } from "node:path";
 // and strip the fixed width/height so CSS controls the size and the inner
 // paths scale proportionally.
 //
+// 2026-04-30 hydration-fix (React #418): the source SVG starts with
+// `<?xml version="1.0" encoding="UTF-8" standalone="no"?>` — an XML
+// processing instruction. When emitted into HTML via dangerouslySetInnerHTML,
+// the SSR string contains the literal "<?xml ... ?>" text, but the browser's
+// HTML parser converts it into a comment node ("<!--?xml ... ?-->"), so
+// hydration sees a structural mismatch and React throws #418, which kills
+// every click handler on the page (confirmed via Microsoft Clarity: 100%
+// dead-clicks on /go). Strip the PI here. Also strip any leading whitespace
+// that would render as a stray text node before <svg>.
+//
 // File is read at module init time (server-side only). Vercel SSG inlines
 // the result during build, so there's no runtime cost.
 
@@ -29,6 +39,11 @@ const raw = readFileSync(
 );
 
 export const US_MAP_SVG = raw
+  // Strip the XML processing instruction (causes React hydration error #418
+  // — see header comment).
+  .replace(/<\?xml[^?]*\?>\s*/g, "")
+  // Strip any DOCTYPE declaration if present (same reason).
+  .replace(/<!DOCTYPE[^>]*>\s*/gi, "")
   // Strip the embedded stylesheet block (recreated per-consumer in CSS).
   .replace(/<defs>[\s\S]*?<\/defs>/, "")
   // Inject a viewBox + remove fixed pixel size so the SVG scales fluidly.
@@ -43,4 +58,8 @@ export const US_MAP_SVG = raw
     /<svg([^>]*?)\sheight="(\d+(?:\.\d+)?)"([^>]*?)\swidth="(\d+(?:\.\d+)?)"/,
     (_match, before, h, mid, w) =>
       `<svg${before}${mid} viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet"`,
-  );
+  )
+  // Trim any leading/trailing whitespace so dangerouslySetInnerHTML doesn't
+  // produce stray text nodes before <svg> (those would also mismatch
+  // between SSR and client renders).
+  .trim();

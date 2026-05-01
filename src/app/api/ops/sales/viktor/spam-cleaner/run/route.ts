@@ -278,8 +278,13 @@ async function run(req: Request): Promise<Response> {
 
 // ---------------------------------------------------------------------------
 // Lint-quiet helpers — kept around so future enhancements can reuse the
-// pattern. Currently unused inside this route but exported for future
-// per-domain HubSpot engagement bulk-lookup.
+// pattern. Currently unused inside this route but referenced via _voidUse
+// below to satisfy noUnusedLocals without re-exporting from a Next.js route
+// (Next 15 rejects any named export from a route file other than the
+// allowed runtime/dynamic/HTTP-method names — the previous
+// `export { fromEmailDomain }` broke the build with TS2344 because the
+// generated route.d.ts couldn't accept the extra field).
 // ---------------------------------------------------------------------------
 
-export { fromEmailDomain };
+const _voidUse = fromEmailDomain;
+void _voidUse;
