@@ -23,6 +23,11 @@
 import type { ApprovalRequest, AuditLogEntry } from "./types";
 import type { PausedAgentRecord } from "./enforcement";
 import type { VendorMarginAlert } from "@/lib/finance/per-vendor-margin";
+import type {
+  OffGridQuote,
+  OffGridQuotesBriefSlice,
+  OffGridSeverity,
+} from "@/lib/finance/off-grid-quotes";
 import type { SalesCommandSlice } from "@/lib/ops/sales-command-center";
 import type { EnrichmentOpportunitiesSummary } from "@/lib/sales/enrichment-opportunities";
 import type { OnboardingBlockersSummary } from "@/lib/sales/onboarding-blockers";
@@ -147,6 +152,21 @@ export interface BriefInput {
    * HubSpot, or pricing writes. Quiet-collapse when no alerts.
    */
   vendorMargin?: VendorMarginBriefSlice;
+  /**
+   * Morning-only: Phase 36.6 off-grid pricing visibility flag. Surfaces
+   * every quote / deal / invoice priced at anything OTHER than the
+   * canonical B1-B5 grid (or the locked distributor commitments) so
+   * Ben + Rene see them BEFORE they ship. Hard-block flag fires when
+   * any quote is below the $2.12 minimum-margin floor — Class C
+   * `pricing.change` ratification required to ship.
+   *
+   * Read-only: pure detection logic on candidates the caller fetched
+   * from HubSpot / booth-quote / sales-tour KV.
+   *
+   * Pairs with `/contracts/wholesale-pricing.md` v2.4 + `/contracts/financial-mechanisms-blueprint.md` §6.7.
+   * Quiet-collapse when no off-grid quotes in the window.
+   */
+  offGridQuotes?: OffGridQuotesBriefSlice;
   /**
    * Morning-only: Phase D1 stale-buyer detection. Populated by the
    * daily-brief route from `summarizeStaleBuyers(deals, now,
@@ -513,6 +533,20 @@ export function composeDailyBrief(input: BriefInput): BriefOutput {
       blocks.push({
         type: "section",
         text: { type: "mrkdwn", text: vendorMarginText },
+      });
+    }
+  }
+
+  // ---- Off-grid pricing visibility (Phase 36.6, morning only) ----
+  // Surfaces every quote / deal / invoice priced off the canonical B-tier
+  // grid in the last 24h. Hard-block flag fires when any quote is below
+  // the $2.12 minimum-margin floor. Quiet-collapses when zero off-grid.
+  if (input.kind === "morning" && input.offGridQuotes) {
+    const offGridText = renderOffGridQuotesMarkdown(input.offGridQuotes);
+    if (offGridText) {
+      blocks.push({
+        type: "section",
+        text: { type: "mrkdwn", text: offGridText },
       });
     }
   }
@@ -988,6 +1022,91 @@ function formatMaybeUsd(value: number | null): string {
  *  queue and a missing source. */
 function formatCount(value: number | null): string {
   return value === null ? "_not wired_" : `*${value}*`;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 36.6 — off-grid pricing visibility flag rendering
+// ---------------------------------------------------------------------------
+
+const OFF_GRID_TOP_N_IN_BRIEF = 5;
+const OFF_GRID_SEVERITY_LABELS: Record<OffGridSeverity, string> = {
+  below_floor: ":rotating_light: BELOW FLOOR",
+  below_distributor_floor: ":warning: distributor band drift",
+  between_grid_lines: ":information_source: between grid lines",
+  above_grid: ":heavy_dollar_sign: above grid",
+  approved_class_c: ":white_check_mark: Class-C approved",
+};
+
+/**
+ * Phase 36.6 — render the off-grid quotes slice into Markdown for the
+ * morning brief. Quiet-collapses to empty string when no off-grid quotes
+ * (the composer skips the section in that case).
+ *
+ * Layout:
+ *   *Off-grid pricing watch — N quote(s) flagged* _(window: last 24h, M evaluated)_
+ *   :rotating_light: HARD BLOCK: 1 quote below $2.12 floor
+ *   • BELOW FLOOR — ACME ($1.95/bag, −$0.55 vs $2.49 grid, 36 bags = −$19.80) [HubSpot 12345]
+ *   • between grid lines — Beta Co ($3.10/bag, +$0.10 vs $3.00 grid, 100 bags = +$10) [HubSpot 67890]
+ *   ...
+ *   _Source: hubspot_deal × 4, booth_quote × 1_
+ */
+export function renderOffGridQuotesMarkdown(
+  slice: OffGridQuotesBriefSlice,
+): string {
+  const total =
+    slice.countsBySeverity.below_floor +
+    slice.countsBySeverity.below_distributor_floor +
+    slice.countsBySeverity.between_grid_lines +
+    slice.countsBySeverity.above_grid +
+    slice.countsBySeverity.approved_class_c;
+
+  if (total === 0) return "";
+
+  const lines: string[] = [];
+  const flagWord = total === 1 ? "quote" : "quotes";
+  lines.push(
+    `*Off-grid pricing watch — ${total} ${flagWord} flagged* _(window: ${slice.windowDescription}, ${slice.candidatesEvaluated} evaluated)_`,
+  );
+
+  if (slice.hasHardBlock) {
+    const blockN = slice.countsBySeverity.below_floor;
+    lines.push(
+      `:rotating_light: *HARD BLOCK*: ${blockN} ${blockN === 1 ? "quote" : "quotes"} below the $2.12 minimum-margin floor — Class C \`pricing.change\` ratification required to ship.`,
+    );
+  }
+
+  for (const q of slice.topQuotes.slice(0, OFF_GRID_TOP_N_IN_BRIEF)) {
+    lines.push(formatOffGridLine(q));
+  }
+
+  if (slice.topQuotes.length < total) {
+    const more = total - slice.topQuotes.length;
+    lines.push(`_+${more} more — see /ops/finance/off-grid for full list_`);
+  }
+
+  // Source breakdown (so Ben + Rene know where the drift came from)
+  const bySource: Record<string, number> = {};
+  for (const q of slice.topQuotes) {
+    bySource[q.candidate.source] = (bySource[q.candidate.source] ?? 0) + 1;
+  }
+  const sourceLine = Object.entries(bySource)
+    .map(([k, v]) => `${k} × ${v}`)
+    .join(", ");
+  if (sourceLine) lines.push(`_Source: ${sourceLine}_`);
+
+  return lines.join("\n");
+}
+
+function formatOffGridLine(q: OffGridQuote): string {
+  const sevLabel = OFF_GRID_SEVERITY_LABELS[q.severity];
+  const devSign = q.deviationPerBagUsd >= 0 ? "+" : "−";
+  const devText = `${devSign}$${Math.abs(q.deviationPerBagUsd).toFixed(2)}/bag`;
+  const totalSign = q.totalDeviationUsd >= 0 ? "+" : "−";
+  const totalText = `${totalSign}$${Math.abs(q.totalDeviationUsd).toFixed(2)}`;
+  const dealRef = q.candidate.hubspotDealId
+    ? ` [HubSpot ${q.candidate.hubspotDealId}]`
+    : ` [${q.candidate.source}:${q.candidate.id}]`;
+  return `• ${sevLabel} — *${q.candidate.customerName}* ($${q.candidate.pricePerBagUsd.toFixed(2)}/bag, ${devText} vs $${q.nearestGridPrice.toFixed(2)} grid · ${q.candidate.bagCount} bags = ${totalText})${dealRef}`;
 }
 
 /**
