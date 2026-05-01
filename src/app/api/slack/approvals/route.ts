@@ -29,8 +29,14 @@ import {
 } from "@/lib/ops/control-plane/slack";
 import { recordDecision } from "@/lib/ops/control-plane/approvals";
 import { buildHumanAuditEntry } from "@/lib/ops/control-plane/audit";
-import type { ApprovalDecision, DivisionId } from "@/lib/ops/control-plane/types";
-import { postMessage } from "@/lib/ops/control-plane/slack/client";
+import type {
+  ApprovalDecision,
+  ApprovalRequest,
+  DivisionId,
+  HumanOwner,
+} from "@/lib/ops/control-plane/types";
+import { slackChannelRef } from "@/lib/ops/control-plane/channels";
+import { openView, postMessage } from "@/lib/ops/control-plane/slack/client";
 import { executeApprovedEmailReply } from "@/lib/ops/email-intelligence/approval-executor";
 import { executeApprovedShipmentCreate } from "@/lib/ops/sample-order-dispatch/approval-closer";
 import { executeApprovedVendorMasterCreate } from "@/lib/ops/vendor-onboarding";
@@ -46,6 +52,14 @@ interface SlackInteractivePayload {
   type?: string;
   actions?: Array<{ action_id?: string; value?: string }>;
   user?: { id?: string; username?: string; name?: string };
+  trigger_id?: string;
+  view?: {
+    callback_id?: string;
+    private_metadata?: string;
+    state?: {
+      values?: Record<string, Record<string, { value?: string }>>;
+    };
+  };
 }
 
 export async function POST(req: Request): Promise<Response> {
@@ -73,6 +87,10 @@ export async function POST(req: Request): Promise<Response> {
     payload = JSON.parse(payloadRaw) as SlackInteractivePayload;
   } catch {
     return NextResponse.json({ error: "Invalid payload JSON" }, { status: 400 });
+  }
+
+  if (payload.type === "view_submission" && payload.view?.callback_id === "approval_edit_request") {
+    return handleApprovalEditSubmission(payload);
   }
 
   if (payload.type !== "block_actions") {
@@ -120,15 +138,31 @@ export async function POST(req: Request): Promise<Response> {
     );
   }
 
+  if (decisionKind === "ask" && payload.trigger_id) {
+    const opened = await openView({
+      triggerId: payload.trigger_id,
+      view: buildApprovalEditRequestModal(existing),
+    });
+    if (opened.ok) {
+      return NextResponse.json({ ok: true, approvalId, modal: "opened" });
+    }
+    // If Slack refuses the modal, fall through to the legacy non-terminal
+    // ask decision so the request remains visible instead of becoming a
+    // dead button click.
+  }
+
   let next;
   try {
     next = await recordDecision(store, approvalSurface(), approvalId, {
       approver,
       decision: decisionKind,
-      reason: payload.user?.username
-        ? `via Slack interaction by ${payload.user.username}`
-        : undefined,
-    });
+    reason:
+      decisionKind === "ask"
+        ? "Needs edit clicked; modal was unavailable. Reply in thread with the requested changes."
+        : payload.user?.username
+          ? `via Slack interaction by ${payload.user.username}`
+          : undefined,
+  });
   } catch (err) {
     return NextResponse.json(
       {
@@ -158,6 +192,15 @@ export async function POST(req: Request): Promise<Response> {
   });
   await auditStore().append(auditEntry);
   await auditSurface().mirror(auditEntry).catch(() => void 0);
+
+  if (decisionKind === "ask") {
+    await postEditRequestThread({
+      request: existing,
+      approver,
+      editText:
+        "Modal was unavailable. Reply in this thread with the exact change needed before approval.",
+    });
+  }
 
   // ---- Approved-action closers ---------------------------------------------
   // Each closer is gated by its own targetEntity / payloadRef shape so we
@@ -269,7 +312,7 @@ export async function POST(req: Request): Promise<Response> {
 
     if (postedThreadText && existing.slackThread?.ts) {
       await postMessage({
-        channel: "#ops-approvals",
+        channel: slackChannelRef(existing.slackThread.channel),
         text: postedThreadText,
         threadTs: existing.slackThread.ts,
       }).catch(() => void 0);
@@ -287,7 +330,7 @@ export async function POST(req: Request): Promise<Response> {
     receiptReviewExecution = await executeApprovedReceiptReviewPromote(next);
     if (receiptReviewExecution.handled && existing.slackThread?.ts) {
       await postMessage({
-        channel: "#ops-approvals",
+        channel: slackChannelRef(existing.slackThread.channel),
         text: receiptReviewExecution.threadMessage,
         threadTs: existing.slackThread.ts,
       }).catch(() => void 0);
@@ -307,4 +350,139 @@ export async function POST(req: Request): Promise<Response> {
     shipmentExecution,
     vendorExecution,
   });
+}
+
+async function handleApprovalEditSubmission(
+  payload: SlackInteractivePayload,
+): Promise<Response> {
+  const approvalId = payload.view?.private_metadata?.trim() ?? "";
+  const editText = extractEditRequest(payload);
+  if (!approvalId) {
+    return NextResponse.json({ response_action: "errors", errors: { approval_edit_request: "Approval id missing." } });
+  }
+  if (!editText) {
+    return NextResponse.json({
+      response_action: "errors",
+      errors: { approval_edit_request: "Tell the agent exactly what needs to change." },
+    });
+  }
+
+  const userId = payload.user?.id ?? "";
+  const approver = slackUserIdToHumanOwner(userId);
+  if (!approver) {
+    return NextResponse.json({
+      response_action: "errors",
+      errors: { approval_edit_request: "Unknown Slack user." },
+    });
+  }
+
+  const store = approvalStore();
+  const existing = await store.get(approvalId);
+  if (!existing) {
+    return NextResponse.json({
+      response_action: "errors",
+      errors: { approval_edit_request: "Approval not found." },
+    });
+  }
+  if (!existing.requiredApprovers.includes(approver)) {
+    return NextResponse.json({
+      response_action: "errors",
+      errors: { approval_edit_request: `${approver} is not an approver for this request.` },
+    });
+  }
+
+  let next: ApprovalRequest;
+  try {
+    next = await recordDecision(store, approvalSurface(), approvalId, {
+      approver,
+      decision: "ask",
+      reason: `Edit requested: ${editText}`,
+    });
+  } catch (err) {
+    return NextResponse.json({
+      response_action: "errors",
+      errors: {
+        approval_edit_request: err instanceof Error ? err.message : "Could not record edit request.",
+      },
+    });
+  }
+
+  const auditEntry = buildHumanAuditEntry({
+    runId: existing.runId,
+    division: existing.division as DivisionId,
+    actorId: approver,
+    action: "approval.ask",
+    entityType: "approval",
+    entityId: approvalId,
+    before: { status: existing.status, decisions: existing.decisions.length },
+    after: { status: next.status, decisions: next.decisions.length },
+    result: "ok",
+    approvalId,
+    sourceCitations: [{ system: "slack", id: payload.user?.id }],
+  });
+  await auditStore().append(auditEntry);
+  await auditSurface().mirror(auditEntry).catch(() => void 0);
+  await postEditRequestThread({ request: existing, approver, editText });
+
+  return NextResponse.json({ response_action: "clear" });
+}
+
+function buildApprovalEditRequestModal(request: ApprovalRequest): Record<string, unknown> {
+  return {
+    type: "modal",
+    callback_id: "approval_edit_request",
+    private_metadata: request.id,
+    title: { type: "plain_text", text: "Request edits" },
+    submit: { type: "plain_text", text: "Send request" },
+    close: { type: "plain_text", text: "Cancel" },
+    blocks: [
+      {
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text:
+            `*${request.action}*\n` +
+            `Target: \`${request.targetEntity?.label ?? request.targetEntity?.id ?? request.targetSystem}\``,
+        },
+      },
+      {
+        type: "input",
+        block_id: "approval_edit_request",
+        label: { type: "plain_text", text: "What should change before approval?" },
+        element: {
+          type: "plain_text_input",
+          action_id: "approval_edit_request",
+          multiline: true,
+          placeholder: {
+            type: "plain_text",
+            text: "Example: soften the opener, remove the discount claim, and resend for approval.",
+          },
+        },
+      },
+    ],
+  };
+}
+
+function extractEditRequest(payload: SlackInteractivePayload): string {
+  return (
+    payload.view?.state?.values?.approval_edit_request?.approval_edit_request?.value?.trim() ??
+    ""
+  );
+}
+
+async function postEditRequestThread(args: {
+  request: ApprovalRequest;
+  approver: HumanOwner;
+  editText: string;
+}): Promise<void> {
+  if (!args.request.slackThread?.ts) return;
+  const text =
+    `:pencil2: *Needs edit* — ${args.approver} requested changes before approval.\n` +
+    `>${args.editText.replace(/\n/g, "\n>")}\n\n` +
+    "_Agent/operator: revise the draft or payload, then open a fresh approval card. This request remains pending for audit._";
+  await postMessage({
+    channel: slackChannelRef(args.request.slackThread.channel),
+    text,
+    threadTs: args.request.slackThread.ts,
+  }).catch(() => void 0);
 }

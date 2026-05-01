@@ -41,13 +41,18 @@ interface UpdateMessageParams {
   blocks?: unknown[];
 }
 
+interface OpenViewParams {
+  triggerId: string;
+  view: Record<string, unknown>;
+}
+
 function token(): string | null {
   const t = process.env.SLACK_BOT_TOKEN?.trim();
   return t && t.length > 0 ? t : null;
 }
 
 async function call(
-  method: "chat.postMessage" | "chat.update" | "chat.postEphemeral",
+  method: "chat.postMessage" | "chat.update" | "chat.postEphemeral" | "views.open",
   body: Record<string, unknown>,
 ): Promise<SlackResult> {
   const bot = token();
@@ -286,6 +291,13 @@ export async function updateMessage(params: UpdateMessageParams): Promise<SlackR
     ts: params.ts,
     text: params.text,
     blocks: params.blocks,
+  });
+}
+
+export async function openView(params: OpenViewParams): Promise<SlackResult> {
+  return call("views.open", {
+    trigger_id: params.triggerId,
+    view: params.view,
   });
 }
 
