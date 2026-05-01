@@ -109,9 +109,9 @@ When a mechanism graduates from one status to the next, update this doc + the ve
 - **Code-side wire:** QBO posts to `Freight Out` (op exp, not COGS) + `500030.05` / `500030.10` Samples - COGS sub-accounts
 
 ### 3.4 Escalation language locked into every quote/invoice template
-- **Status:** 🟡 doctrine-locked, code pending
+- **Status:** ✅ shipped (Phase 36.5 — booth-quote + AP-packet + QBO invoice CustomerMemo all carry the canonical clause)
 - **Source:** Rene 2026-04-30 AM Q5 — *"this pricing is for this order only; all reorders are quoted with each purchase request"*
-- **Action queued:** Phase 36.5 — bake the canonical escalation line into the booth-quote engine + invoice templates + AP packet templates. Currently surfaced ad-hoc per Rene's manual review.
+- **Code-side wire:** `src/lib/finance/escalation-language.ts` (canonical strings + 8-variant dispatch) · `src/lib/sales-tour/escalation-clause.ts` (booth-quote thin wrapper) · `src/lib/ops/ap-packets/templates.ts` (AP-packet body injection) · 24 tests pin every variant + cross-surface drift guard.
 
 ### 3.5 Multi-batch escalation clause requirement
 - **Status:** ✅ shipped (HARD BLOCK in `quote.py` if multi_batch=true and clause missing)
@@ -133,9 +133,9 @@ When a mechanism graduates from one status to the next, update this doc + the ve
 - **Code-side wire:** `scripts/sales/send-and-log.py` (default-OFF), `scripts/outreach-validate.mjs` (BLOCKED phrase list)
 
 ### 4.3 "No off-grid pricing without Class C" visibility flag
-- **Status:** 🟡 doctrine-locked, visibility surface pending
+- **Status:** ✅ shipped (Phase 36.6 + 36.6d — kernel + brief surface + finance UI + classifier consolidation)
 - **Source:** `/contracts/approval-taxonomy.md` Class C `pricing.change`
-- **Action queued:** Phase 36.6 — surface in morning brief whenever a non-grid quote enters the system. Currently relies on operator vigilance + `quote.py` flagging.
+- **Code-side wire:** `src/lib/finance/off-grid-quotes.ts` (severity classifier + brief slice) · `src/lib/finance/pricing-grid-classifier.ts` (canonical 12-tier `PRICING_GRID` with `b2bEligible` flag) · `/ops/finance/off-grid` UI surface · morning-brief `buildOffGridQuotesBriefSlice()` injection · Phase 36.6d: single source of truth (`B2B_GRID_PRICES_USD` derived from `PRICING_GRID`, no drift between modules).
 
 ### 4.4 Drew-doctrine guardrail (samples ≠ Drew's customer order)
 - **Status:** ✅ shipped (Phase 29)
@@ -321,6 +321,7 @@ When Notion blueprint syncs with this doc:
 
 ## Version history
 
+- **v1.8 — 2026-05-01** — *Stale-flag sweep + operator-surface pass.* §3.4 + §4.3 graduated 🟡 → ✅ to reflect ground truth (escalation language was wired in `7f49ca6` and the off-grid surface in `bbffcc6` + `3b2475e9`; the doctrine 🟡 was a paper artifact). Phase 36.6d shipped via `525450f` (single source of truth for `B2B_GRID_PRICES_USD` derived from `PRICING_GRID`). Operator nav wired for the four new surfaces (vendor-margin, off-grid, sample-queue, agent graduation, agent health, email-agents). New `/ops/sample-queue` desk form connects the lean endpoint to a UI. Manifest registers `email-agents-readiness` (proposed) + `sample-queue` (active) so the graduation gauge sees them. Status tally: ✅ 30, 🟡 1 (§5.1 — Rene's QBO CoA mapping, not engineering scope), 🔵 3, 🔴 0.
 - **v1.7c — 2026-04-30 PM (late)** — Phase 36.6b shipped: `/ops/finance/off-grid` replay surface over recent booth quote audit/KV records, plus read-only API and source projection tests. Missing quote payloads remain skipped, not falsely safe.
 - **v1.7b — 2026-04-30 PM (late)** — Phase 36.3b shipped: `/ops/finance/vendor-margin` operator surface over the existing read-only vendor-margin API. Adds tested view helpers for alert counts, risk sorting, and TBD-preserving formatting.
 - **v1.7 — 2026-04-30 PM (late)** — *Phase 36 fully closed.* §6.5 (Phase 36.4) graduated 🔴 → ✅ via `252d443`. §6.6 (Phase 36.5) graduated 🟡 → ✅ via `7f49ca6` (wholesale AP-packet email + booth-order QBO invoice CustomerMemo injected). §6.7 (Phase 36.6) graduated 🟡 → ✅ via `bbffcc6` (full brief surface wired). Status tally: ✅ 28, 🟡 3 (§3.4 / §4.3 / §5.1 — all carry-overs from earlier doctrine, not Phase 36 work), 🔵 3, 🔴 0. **No 🔴 remain.** Phase 36.6d duplication cleanup (consolidate `pricing-grid-classifier.ts` + `off-grid-quotes.ts` to one source-of-truth) flagged as next-up polish.

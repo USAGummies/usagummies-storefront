@@ -329,6 +329,32 @@ export const AGENT_MANIFEST: readonly AgentManifestEntry[] = [
     notes:
       "PARKED awaiting Rene's chart-of-accounts mapping (post-2026-03-29 QBO reset).",
   },
+  {
+    id: "email-agents-readiness",
+    name: "Email Agents Readiness",
+    contract: "/contracts/email-agents-system.md",
+    classification: "task",
+    approvalClass: "A",
+    owner: "ben",
+    approver: null,
+    lifecycle: "proposed",
+    purpose:
+      "Read-only readiness heartbeat for the email-agents subsystem. Surfaces gates (incident fix, schema ready, kill-switch off) without scanning Gmail or opening approvals.",
+    notes:
+      "Task by design — Phase 37 capabilities ship inside Viktor + S-08 + Finance Exception. This heartbeat exists only to surface readiness, never to send.",
+  },
+  {
+    id: "sample-queue",
+    name: "Sample Queue (operator drop)",
+    contract: "/contracts/agents/sample-order-dispatch.md",
+    classification: "job",
+    approvalClass: "B",
+    owner: "ben",
+    approver: "ben",
+    lifecycle: "active",
+    purpose:
+      "Lean operator-facing wrapper around sample-dispatch. Ben at his desk drops a sample → Class B shipment.create approval in #ops-approvals. Whale detection (Buc-ee's, KeHE, McLane, Eastern National, Xanterra, Delaware North, Aramark, Compass, Sodexo) flags high-stakes drops.",
+  },
 ] as const;
 
 // ---------------------------------------------------------------------------
