@@ -449,6 +449,12 @@ Each row uses the schema:
 - **Hard rules locked by tests:** unauthenticated calls 401, full ledger returns sourced counts, vendor lookup returns one row without the full ledger payload, unknown vendors 404 instead of fake rows, and the route imports no QBO/HubSpot/Shopify/Gmail/Slack runtime clients.
 - **Monday MVP:** 🟢 read-only JSON endpoint. Next safe step is morning-brief margin alerts.
 
+#### Phase 6.13 — Morning brief vendor margin watch (NEW)
+- **Why:** Rene's per-vendor margin ledger is only useful operationally if below-floor/thin/unknown committed-vendor rows surface during the morning operating loop.
+- **Architecture:** `BriefInput.vendorMargin` carries a `VendorMarginBriefSlice` from `/api/ops/daily-brief`, which reads the canonical ledger directly and uses `selectVendorMarginAlerts(ledger, 3)`. `renderVendorMarginMarkdown` emits a compact `VENDOR MARGIN WATCH` block on morning briefs only.
+- **Hard rules locked by tests:** EOD never renders it; empty alerts quiet-collapse; the cash/Plaid no-fabrication assertion scopes to the cash block so sourced margin dollars do not look like fabricated cash; no QBO/HubSpot/Shopify/Gmail/Slack writes are added.
+- **Monday MVP:** 🟢 top-3 margin alerts in the morning brief. AR aging and escalation-language template injection remain later Phase 36 items.
+
 #### Phase 7 — Receipt OCR extraction (prepare-for-review only) (NEW)
 - **Why:** `/ops/finance/review` already aggregates the receipt review queue, but Rene/Ben were doing field-by-field data entry by hand. Phase 7 attaches a *suggestion* to each captured receipt so reviewers see vendor/date/amount/currency/tax/last4/payment hints proposed before they fill in the canonical fields. Promotion remains 100% human — no auto-fill, no QBO write.
 - **Architecture:**

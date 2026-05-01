@@ -7,6 +7,7 @@ import {
   parsePercentRange,
   parsePerVendorMarginLedger,
   parseUsdRange,
+  selectVendorMarginAlerts,
   slugifyVendorName,
 } from "../per-vendor-margin";
 
@@ -56,6 +57,26 @@ describe("per-vendor margin ledger parser", () => {
     expect(inderbitzin?.gpPerBagUsd).toEqual({ min: -0.07, max: 0.13 });
     expect(inderbitzin?.gpPct).toEqual({ min: -3, max: 6 });
     expect(inderbitzin?.marginAlert).toBe("below_floor");
+  });
+
+  it("selects top vendor margin alerts without including healthy rows", () => {
+    const ledger = parsePerVendorMarginLedger(CONTRACT);
+    const alerts = selectVendorMarginAlerts(ledger, 3);
+    expect(alerts).toHaveLength(3);
+    expect(alerts[0]).toMatchObject({
+      name: expect.stringContaining("Inderbitzin"),
+      marginAlert: "below_floor",
+      reason: "below margin floor",
+    });
+    expect(alerts.some((row) => row.slug.includes("thanksgiving-point"))).toBe(
+      false,
+    );
+  });
+
+  it("caps vendor margin alerts", () => {
+    const ledger = parsePerVendorMarginLedger(CONTRACT);
+    expect(selectVendorMarginAlerts(ledger, 1)).toHaveLength(1);
+    expect(selectVendorMarginAlerts(ledger, 0)).toEqual([]);
   });
 
   it("parses channel rows and preserves NEG as below-floor instead of a number", () => {

@@ -62,6 +62,17 @@ export interface PerVendorMarginLedger {
   pendingVendors: PendingVendorMargin[];
 }
 
+export interface VendorMarginAlert {
+  slug: string;
+  name: string;
+  marginAlert: MarginAlert;
+  pricePerBagUsd: number | null;
+  gpPerBagUsd: MarginRange | null;
+  gpPct: MarginRange | null;
+  statusLabel: string | null;
+  reason: string;
+}
+
 export function parsePerVendorMarginLedger(
   markdown: string,
 ): PerVendorMarginLedger {
@@ -79,6 +90,17 @@ export function slugifyVendorName(name: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
+}
+
+export function selectVendorMarginAlerts(
+  ledger: PerVendorMarginLedger,
+  limit = 3,
+): VendorMarginAlert[] {
+  return ledger.committedVendors
+    .map(toMarginAlert)
+    .filter((alert): alert is VendorMarginAlert => alert !== null)
+    .sort((a, b) => alertRank(a.marginAlert) - alertRank(b.marginAlert))
+    .slice(0, Math.max(0, limit));
 }
 
 export function parseUsdRange(value: string): MarginRange | null {
@@ -251,6 +273,50 @@ function classifyMargin(range: MarginRange | null, raw: string): MarginAlert {
   if (range.min < 0) return "below_floor";
   if (range.max < 15) return "thin";
   return "healthy";
+}
+
+function toMarginAlert(vendor: CommittedVendorMargin): VendorMarginAlert | null {
+  if (vendor.marginAlert !== "healthy") {
+    return {
+      slug: vendor.slug,
+      name: vendor.name,
+      marginAlert: vendor.marginAlert,
+      pricePerBagUsd: vendor.pricePerBagUsd,
+      gpPerBagUsd: vendor.gpPerBagUsd,
+      gpPct: vendor.gpPct,
+      statusLabel: vendor.statusLabel,
+      reason: reasonForVendor(vendor),
+    };
+  }
+
+  const needsActual = Object.values(vendor.fields).some((field) => field.needsActual);
+  if (needsActual) {
+    return {
+      slug: vendor.slug,
+      name: vendor.name,
+      marginAlert: "unknown",
+      pricePerBagUsd: vendor.pricePerBagUsd,
+      gpPerBagUsd: vendor.gpPerBagUsd,
+      gpPct: vendor.gpPct,
+      statusLabel: vendor.statusLabel,
+      reason: "needs actuals before margin can be trusted",
+    };
+  }
+
+  return null;
+}
+
+function reasonForVendor(vendor: CommittedVendorMargin): string {
+  if (vendor.marginAlert === "below_floor") return "below margin floor";
+  if (vendor.marginAlert === "thin") return "thin margin";
+  return "missing margin actuals";
+}
+
+function alertRank(alert: MarginAlert): number {
+  if (alert === "below_floor") return 0;
+  if (alert === "thin") return 1;
+  if (alert === "unknown") return 2;
+  return 3;
 }
 
 function normalizeText(value: string): string {

@@ -18,6 +18,8 @@
  */
 
 import { NextResponse } from "next/server";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 
 import {
   composeDailyBrief,
@@ -28,7 +30,12 @@ import {
   type FulfillmentPreflightSlice,
   type FulfillmentTodayBriefSlice,
   type RevenueLine,
+  type VendorMarginBriefSlice,
 } from "@/lib/ops/control-plane/daily-brief";
+import {
+  parsePerVendorMarginLedger,
+  selectVendorMarginAlerts,
+} from "@/lib/finance/per-vendor-margin";
 import {
   getRecentShipments,
   isShipStationConfigured,
@@ -120,6 +127,11 @@ import { buildTrademarkRows } from "@/lib/ops/uspto-trademarks";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const VENDOR_MARGIN_LEDGER_PATH = join(
+  process.cwd(),
+  "contracts/per-vendor-margin-ledger.md",
+);
 
 interface BriefBodyOverrides {
   /**
@@ -341,6 +353,26 @@ async function composeAndPost(req: Request): Promise<Response> {
     } catch (err) {
       degradations.push(
         `sales-command: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
+  let vendorMargin: VendorMarginBriefSlice | undefined;
+  if (kind === "morning") {
+    try {
+      const markdown = await readFile(VENDOR_MARGIN_LEDGER_PATH, "utf8");
+      const ledger = parsePerVendorMarginLedger(markdown);
+      vendorMargin = {
+        generatedAt: now.toISOString(),
+        source: {
+          path: "contracts/per-vendor-margin-ledger.md",
+          version: ledger.version,
+        },
+        alerts: selectVendorMarginAlerts(ledger, 3),
+      };
+    } catch (err) {
+      degradations.push(
+        `vendor-margin: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
   }
@@ -640,6 +672,7 @@ async function composeAndPost(req: Request): Promise<Response> {
     preflight,
     fulfillmentToday,
     salesCommand,
+    vendorMargin,
     staleBuyers,
     sampleQueue,
     reorderFollowUps,

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { composeDailyBrief } from "../daily-brief";
+import { composeDailyBrief, renderVendorMarginMarkdown } from "../daily-brief";
 import { POST } from "@/app/api/ops/daily-brief/route";
 import { buildApprovalRequest, applyDecision } from "../approvals";
 import { buildAuditEntry } from "../audit";
@@ -128,6 +128,70 @@ describe("composeDailyBrief()", () => {
     expect(txt).toContain("Shopify DTC");
     expect(txt).toContain("444.96");
     expect(txt).toContain("SP-API credentials not rotated yet");
+  });
+
+  it("renders vendor margin alerts on the morning brief", () => {
+    const out = composeDailyBrief({
+      ...baseInput(),
+      vendorMargin: {
+        generatedAt: "2026-04-30T14:00:00.000Z",
+        source: {
+          path: "contracts/per-vendor-margin-ledger.md",
+          version: "v0.1",
+        },
+        alerts: [
+          {
+            slug: "inderbitzin",
+            name: "Inderbitzin",
+            marginAlert: "below_floor",
+            pricePerBagUsd: 2.1,
+            gpPerBagUsd: { min: -0.07, max: 0.13 },
+            gpPct: { min: -3, max: 6 },
+            statusLabel: null,
+            reason: "below margin floor",
+          },
+        ],
+      },
+    });
+    const txt = JSON.stringify(out.blocks);
+    expect(txt).toContain("VENDOR MARGIN WATCH");
+    expect(txt).toContain("Inderbitzin");
+    expect(txt).toContain("below floor");
+    expect(txt).toContain("contracts/per-vendor-margin-ledger.md");
+  });
+
+  it("omits vendor margin alerts from EOD", () => {
+    const out = composeDailyBrief({
+      ...baseInput(),
+      kind: "eod",
+      vendorMargin: {
+        generatedAt: "2026-04-30T14:00:00.000Z",
+        source: { path: "contracts/per-vendor-margin-ledger.md", version: "v0.1" },
+        alerts: [
+          {
+            slug: "inderbitzin",
+            name: "Inderbitzin",
+            marginAlert: "below_floor",
+            pricePerBagUsd: 2.1,
+            gpPerBagUsd: { min: -0.07, max: 0.13 },
+            gpPct: { min: -3, max: 6 },
+            statusLabel: null,
+            reason: "below margin floor",
+          },
+        ],
+      },
+    });
+    expect(JSON.stringify(out.blocks)).not.toContain("VENDOR MARGIN WATCH");
+  });
+
+  it("renderVendorMarginMarkdown quiet-collapses on no alerts", () => {
+    expect(
+      renderVendorMarginMarkdown({
+        generatedAt: "2026-04-30T14:00:00.000Z",
+        source: { path: "contracts/per-vendor-margin-ledger.md", version: "v0.1" },
+        alerts: [],
+      }),
+    ).toBe("");
   });
 
   it("counts audit activity in meta but slim mode suppresses the by-division block", () => {
@@ -818,8 +882,12 @@ describe("POST /api/ops/daily-brief", () => {
     const blocks = JSON.stringify(body.brief.blocks);
     expect(blocks).toContain("WAR CHEST");
     expect(blocks).toContain("Plaid not configured");
-    // No fabricated number.
-    expect(blocks).not.toMatch(/\$[0-9]+\.[0-9]{2}/);
+    const cashBlock = (body.brief.blocks as Array<{ text?: { text?: string } }>).find(
+      (block) => block.text?.text?.includes("WAR CHEST"),
+    )?.text?.text;
+    expect(cashBlock).toBeDefined();
+    // No fabricated cash number.
+    expect(cashBlock).not.toMatch(/\$[0-9]+\.[0-9]{2}/);
   });
 
   it("accepts POST-body overrides for revenueYesterday + cashPosition", async () => {

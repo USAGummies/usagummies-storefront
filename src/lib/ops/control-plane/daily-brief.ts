@@ -22,6 +22,7 @@
 
 import type { ApprovalRequest, AuditLogEntry } from "./types";
 import type { PausedAgentRecord } from "./enforcement";
+import type { VendorMarginAlert } from "@/lib/finance/per-vendor-margin";
 import type { SalesCommandSlice } from "@/lib/ops/sales-command-center";
 import type { EnrichmentOpportunitiesSummary } from "@/lib/sales/enrichment-opportunities";
 import type { OnboardingBlockersSummary } from "@/lib/sales/onboarding-blockers";
@@ -141,6 +142,12 @@ export interface BriefInput {
    */
   salesCommand?: SalesCommandSlice;
   /**
+   * Morning-only: top vendor-margin alerts from the canonical
+   * per-vendor margin ledger. Read-only contract parse; no QBO,
+   * HubSpot, or pricing writes. Quiet-collapse when no alerts.
+   */
+  vendorMargin?: VendorMarginBriefSlice;
+  /**
    * Morning-only: Phase D1 stale-buyer detection. Populated by the
    * daily-brief route from `summarizeStaleBuyers(deals, now,
    * retrievedAt)` over `listRecentDeals()`. Composer renders the
@@ -242,6 +249,12 @@ export interface DispatchBriefSlice {
   /** Age in whole days of the oldest open package vs. windowEnd.
    *  null when oldestOpenShipDate is null. Used to gate the callout. */
   oldestOpenAgeDays: number | null;
+}
+
+export interface VendorMarginBriefSlice {
+  generatedAt: string;
+  source: { path: string; version: string | null };
+  alerts: VendorMarginAlert[];
 }
 
 /** Threshold (in days) above which the morning brief callouts the
@@ -491,6 +504,17 @@ export function composeDailyBrief(input: BriefInput): BriefOutput {
         text: renderSalesCommandMarkdown(input.salesCommand),
       },
     });
+  }
+
+  // ---- Vendor margin watch (morning only) ----
+  if (input.kind === "morning" && input.vendorMargin) {
+    const vendorMarginText = renderVendorMarginMarkdown(input.vendorMargin);
+    if (vendorMarginText) {
+      blocks.push({
+        type: "section",
+        text: { type: "mrkdwn", text: vendorMarginText },
+      });
+    }
   }
 
   // ---- Stale buyers (Phase D1 + D6, morning only) ----
@@ -924,6 +948,39 @@ export function renderSalesCommandMarkdown(slice: SalesCommandSlice): string {
 
   lines.push(footer);
   return lines.join("\n");
+}
+
+export function renderVendorMarginMarkdown(
+  slice: VendorMarginBriefSlice,
+): string {
+  if (slice.alerts.length === 0) return "";
+  const lines = ["💰 *VENDOR MARGIN WATCH*"];
+  for (const alert of slice.alerts.slice(0, 3)) {
+    lines.push(
+      `• ${alert.name}: ${formatMarginAlert(alert.marginAlert)} — ${alert.reason}; GP ${formatRange(alert.gpPct, "%")}; price ${formatMaybeUsd(alert.pricePerBagUsd)}`,
+    );
+  }
+  lines.push(
+    `_Source: ${slice.source.path}${slice.source.version ? ` ${slice.source.version}` : ""}_`,
+  );
+  return lines.join("\n");
+}
+
+function formatMarginAlert(alert: VendorMarginAlert["marginAlert"]): string {
+  if (alert === "below_floor") return "*below floor*";
+  if (alert === "thin") return "*thin*";
+  if (alert === "unknown") return "*needs actuals*";
+  return "healthy";
+}
+
+function formatRange(range: { min: number; max: number } | null, suffix: string): string {
+  if (!range) return "_unknown_";
+  if (range.min === range.max) return `${range.min}${suffix}`;
+  return `${range.min}${suffix}-${range.max}${suffix}`;
+}
+
+function formatMaybeUsd(value: number | null): string {
+  return value === null ? "_unknown_" : `$${value.toFixed(2)}`;
 }
 
 /** Format a wired count or render "not wired" for null. NEVER returns

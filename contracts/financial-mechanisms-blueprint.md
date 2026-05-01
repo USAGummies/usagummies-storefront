@@ -197,8 +197,9 @@ When a mechanism graduates from one status to the next, update this doc + the ve
 - **Code-side wire:** `src/app/api/ops/finance/vendor-margin/route.ts`; tests in `src/app/api/ops/finance/vendor-margin/__tests__/route.test.ts`.
 
 ### 6.4 Morning-brief vendor-margin alerts surface
-- **Status:** 🔴 blueprint-only — Phase 36.3
-- **Spec:** Surface top-3 vendors with margin alerts (below-floor, escalation due, AR aging > 30d). Read from §6.2 endpoint. Drops into 09:00 PT brief above the Revenue section.
+- **Status:** ✅ shipped — Phase 36.3
+- **Spec:** Surface top-3 vendors with margin alerts (below-floor / thin / needs actuals) from the canonical ledger. AR aging joins remain future work.
+- **Code-side wire:** `BriefInput.vendorMargin`, `renderVendorMarginMarkdown`, and `/api/ops/daily-brief` direct parser read.
 
 ### 6.5 HubSpot deal ↔ vendor-row two-way reconcile
 - **Status:** 🔴 blueprint-only — Phase 36.4
@@ -245,6 +246,7 @@ When Notion blueprint syncs with this doc:
 
 ## Version history
 
+- **v1.3 — 2026-04-30 PM** — Phase 36.3 shipped: morning-brief vendor margin watch section.
 - **v1.2 — 2026-04-30 PM** — Phase 36.2 shipped: auth-gated read-only vendor-margin JSON endpoint.
 - **v1.1 — 2026-04-30 PM** — Phase 36.1 shipped: per-vendor margin ledger parser with no-fabrication tests.
 - **v1.0 — 2026-04-30 PM** — Initial publication. Maps 30+ financial mechanisms to ✅ / 🟡 / 🔵 / 🔴 status. Phase 36 backlog of 6 code-side build targets (6.2–6.7). 5 open Ben + Rene decisions queued in §8.
