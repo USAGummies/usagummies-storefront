@@ -11,76 +11,11 @@ import { NextResponse } from "next/server";
 import { isAuthorized } from "@/lib/ops/abra-auth";
 import { getChannel } from "@/lib/ops/control-plane/channels";
 import { postMessage } from "@/lib/ops/control-plane/slack/client";
-import { readAllChannelsLast7d } from "@/lib/ops/revenue-kpi-readers";
-import { buildSalesCommandCenter } from "@/lib/ops/sales-command-center";
-import {
-  readAllAgingItems,
-  readApPackets,
-  readDay1Prospects,
-  readFaireFollowUps,
-  readFaireInvites,
-  readLocationDrafts,
-  readPendingApprovals,
-  readSalesPipeline,
-  readSalesTourPlaybook,
-  readStaleBuyers,
-  readWholesaleInquiries,
-} from "@/lib/ops/sales-command-readers";
 import { renderSalesCommandCenterSlack } from "@/lib/ops/slack-command-center";
+import { buildSlackCommandCenterReport } from "@/lib/ops/slack-command-center-report";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-async function buildReport(now: Date) {
-  const [
-    faireInvites,
-    faireFollowUps,
-    pendingApprovals,
-    apPackets,
-    locationDrafts,
-    aging,
-    revenueChannels,
-    wholesaleInquiries,
-    day1Prospects,
-    salesTour,
-    salesPipeline,
-    staleBuyers,
-  ] = await Promise.all([
-    readFaireInvites(),
-    readFaireFollowUps(now),
-    readPendingApprovals(),
-    readApPackets(),
-    readLocationDrafts(),
-    readAllAgingItems(now),
-    readAllChannelsLast7d(now),
-    readWholesaleInquiries(),
-    readDay1Prospects(),
-    readSalesTourPlaybook(),
-    readSalesPipeline(now),
-    readStaleBuyers(now),
-  ]);
-
-  return buildSalesCommandCenter(
-    {
-      faireInvites,
-      faireFollowUps,
-      pendingApprovals,
-      apPackets,
-      locationDrafts,
-      agingItems: aging.items,
-      agingMissing: aging.missing,
-      revenueChannels,
-      wholesaleInquiries,
-      day1Prospects,
-      salesTour,
-      salesPipeline,
-      staleBuyers,
-      dispatchNotWiredReason:
-        "Dispatch summary is owned by /api/ops/sales; Slack card uses the compact sales read model.",
-    },
-    { now },
-  );
-}
 
 function defaultChannel(): string {
   const channel = getChannel("ops-daily");
@@ -94,7 +29,7 @@ async function handle(req: Request): Promise<Response> {
   const url = new URL(req.url);
   const shouldPost = url.searchParams.get("post") !== "false";
   const now = new Date();
-  const report = await buildReport(now);
+  const report = await buildSlackCommandCenterReport(now);
   const message = renderSalesCommandCenterSlack(report);
 
   if (!shouldPost) {

@@ -35,6 +35,8 @@ export const dynamic = "force-dynamic";
 
 const SAMPLE_TRIGGER_REGEX = /\bsample\s*(request|dispatch)\b/i;
 const DISPATCH_TRIGGER_REGEX = /^\/?dispatch\s+(shopify|amazon|hubspot|manual)\b/i;
+const COMMAND_CENTER_REGEX =
+  /^\/?(?:ops|operator|command)(?:\s+(?:dashboard|command|center|status|sales))?\s*$/i;
 
 /**
  * Reactions that count as "this package physically left the warehouse."
@@ -145,6 +147,9 @@ export async function POST(req: Request): Promise<Response> {
       ) {
         return handleDispatchTrigger(msg, text);
       }
+      if (COMMAND_CENTER_REGEX.test(text)) {
+        return handleCommandCenterTrigger(msg);
+      }
     }
     if (
       event?.type === "reaction_added" ||
@@ -162,6 +167,43 @@ function isChannel(channelId: string | undefined, name: ChannelId): boolean {
   if (!channelId) return false;
   const ch = getChannel(name);
   return ch?.slackChannelId === channelId || ch?.id === channelId;
+}
+
+async function handleCommandCenterTrigger(
+  event: SlackMessageEvent,
+): Promise<Response> {
+  if (!event.ts) {
+    return NextResponse.json({ ok: true, handled: "command-center", skipped: "no thread" });
+  }
+  try {
+    const [{ buildSlackCommandCenterReport }, { renderSalesCommandCenterSlack }] =
+      await Promise.all([
+        import("@/lib/ops/slack-command-center-report"),
+        import("@/lib/ops/slack-command-center"),
+      ]);
+    const report = await buildSlackCommandCenterReport(new Date());
+    const message = renderSalesCommandCenterSlack(report);
+    await postMessage({
+      channel: event.channel ?? slackChannelRef("ops-daily"),
+      text: message.text,
+      blocks: message.blocks,
+      threadTs: event.ts,
+    });
+    return NextResponse.json({ ok: true, handled: "command-center" });
+  } catch (err) {
+    try {
+      await postMessage({
+        channel: event.channel ?? slackChannelRef("ops-alerts"),
+        text:
+          ":warning: Command Center could not render. " +
+          (err instanceof Error ? err.message : String(err)),
+        threadTs: event.ts,
+      });
+    } catch {
+      /* best-effort */
+    }
+    return NextResponse.json({ ok: true, handled: "command-center", degraded: true });
+  }
 }
 
 async function handleSampleTrigger(

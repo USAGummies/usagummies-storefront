@@ -40,12 +40,24 @@ vi.mock("@vercel/kv", () => {
 // Stub Slack signing — verifySlackSignature returns "not configured"
 // when SLACK_SIGNING_SECRET is unset, which the route accepts.
 const postMessageMock = vi.fn();
+const buildSlackCommandCenterReportMock = vi.fn();
+const renderSalesCommandCenterSlackMock = vi.fn();
 vi.mock("@/lib/ops/control-plane/slack", () => ({
   verifySlackSignature: vi.fn(async () => ({
     ok: false,
     reason: "SLACK_SIGNING_SECRET not configured",
   })),
   postMessage: (...args: unknown[]) => postMessageMock(...args),
+}));
+
+vi.mock("@/lib/ops/slack-command-center-report", () => ({
+  buildSlackCommandCenterReport: (...args: unknown[]) =>
+    buildSlackCommandCenterReportMock(...args),
+}));
+
+vi.mock("@/lib/ops/slack-command-center", () => ({
+  renderSalesCommandCenterSlack: (...args: unknown[]) =>
+    renderSalesCommandCenterSlackMock(...args),
 }));
 
 // Channel registry — return shipping with the canonical Slack ID.
@@ -84,6 +96,13 @@ function makeReactionReq(payload: unknown): Request {
 beforeEach(async () => {
   postMessageMock.mockReset();
   postMessageMock.mockResolvedValue({ ok: true });
+  buildSlackCommandCenterReportMock.mockReset();
+  buildSlackCommandCenterReportMock.mockResolvedValue({ fake: "report" });
+  renderSalesCommandCenterSlackMock.mockReset();
+  renderSalesCommandCenterSlackMock.mockReturnValue({
+    text: "USA Gummies Command Center",
+    blocks: [{ type: "header", text: { type: "plain_text", text: "Command Center" } }],
+  });
   // Wipe KV between tests.
   const { kv } = (await import("@vercel/kv")) as unknown as {
     kv: { __store: Map<string, string> };
@@ -113,6 +132,32 @@ async function seedArtifact(opts: {
 }
 
 describe("reaction → dispatch flow", () => {
+  it("posts the command-center card in-thread when Ben asks for ops dashboard", async () => {
+    const { POST } = await import("../route");
+    const res = await POST(
+      makeReactionReq({
+        type: "event_callback",
+        event: {
+          type: "message",
+          text: "ops dashboard",
+          channel: "C_OPS",
+          ts: "1777300000.444444",
+        },
+      }),
+    );
+    const body = (await res.json()) as { handled?: string };
+
+    expect(body.handled).toBe("command-center");
+    expect(buildSlackCommandCenterReportMock).toHaveBeenCalledTimes(1);
+    expect(renderSalesCommandCenterSlackMock).toHaveBeenCalledWith({ fake: "report" });
+    expect(postMessageMock).toHaveBeenCalledWith({
+      channel: "C_OPS",
+      text: "USA Gummies Command Center",
+      blocks: [{ type: "header", text: { type: "plain_text", text: "Command Center" } }],
+      threadTs: "1777300000.444444",
+    });
+  });
+
   it("ignores non-:white_check_mark: reactions", async () => {
     const { POST } = await import("../route");
     await seedArtifact({
