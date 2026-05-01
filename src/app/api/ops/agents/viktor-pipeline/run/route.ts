@@ -20,7 +20,7 @@
 import { NextResponse } from "next/server";
 
 import { isAuthorized } from "@/lib/ops/abra-auth";
-import { getChannel } from "@/lib/ops/control-plane/channels";
+import { getChannel, slackChannelRef } from "@/lib/ops/control-plane/channels";
 import { postMessage } from "@/lib/ops/control-plane/slack";
 import {
   isHubSpotConfigured,
@@ -81,7 +81,8 @@ async function tryPost(text: string): Promise<boolean> {
   const channel = getChannel("sales") ?? getChannel("ops-daily");
   if (!channel) return false;
   try {
-    const res = await postMessage({ channel: channel.name, text });
+    const channelId = channel.id === "sales" ? "sales" : "ops-daily";
+    const res = await postMessage({ channel: slackChannelRef(channelId), text });
     return res.ok;
   } catch {
     return false;

@@ -43,7 +43,7 @@ import { kv } from "@vercel/kv";
 
 import { isAuthorized } from "@/lib/ops/abra-auth";
 import { buildAuditEntry } from "@/lib/ops/control-plane/audit";
-import { getChannel } from "@/lib/ops/control-plane/channels";
+import { getChannel, slackChannelRef } from "@/lib/ops/control-plane/channels";
 import { newRunContext } from "@/lib/ops/control-plane/run-id";
 import { auditSurface } from "@/lib/ops/control-plane/slack";
 import { postMessage } from "@/lib/ops/control-plane/slack/client";
@@ -237,7 +237,7 @@ async function autoShipOrder(
       const link = deeplink ? `\n<${deeplink}|Open in Seller Central>` : "";
       try {
         await postMessage({
-          channel: approvalsChannel.name,
+          channel: slackChannelRef("ops-approvals"),
           text:
             `:warning: *Order needs shipping review — ${order.orderNumber}* (${source})\n` +
             `${bags} bags · ${order.shipTo.city ?? "?"}, ${order.shipTo.state ?? "??"}\n` +
@@ -784,7 +784,7 @@ async function postAlertOnSlackUploadFailure(args: {
       lines.push(`Drive packing slip: <${args.packingSlipDriveLink}|open>`);
     }
     await postMessage({
-      channel: alertsChannel.name,
+      channel: slackChannelRef("ops-alerts"),
       text: lines.join("\n"),
     });
   } catch {

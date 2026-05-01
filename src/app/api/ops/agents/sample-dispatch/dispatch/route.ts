@@ -50,7 +50,7 @@
 import { NextResponse } from "next/server";
 
 import { isAuthorized } from "@/lib/ops/abra-auth";
-import { getChannel } from "@/lib/ops/control-plane/channels";
+import { getChannel, slackChannelRef } from "@/lib/ops/control-plane/channels";
 import { newRunContext } from "@/lib/ops/control-plane/run-id";
 import { requestApproval } from "@/lib/ops/control-plane/record";
 import { postMessage } from "@/lib/ops/control-plane/slack";
@@ -116,7 +116,7 @@ export async function POST(req: Request): Promise<Response> {
       if (alerts) {
         try {
           await postMessage({
-            channel: alerts.name,
+            channel: slackChannelRef("ops-alerts"),
             text:
               `:no_entry: *Dispatch refused — ${body.channel}:${body.orderNumber ?? body.sourceId}*\n` +
               `${classification.refuseReason}\n` +

@@ -24,7 +24,7 @@ import { NextResponse } from "next/server";
 import { kv } from "@vercel/kv";
 
 import { isAuthorized } from "@/lib/ops/abra-auth";
-import { getChannel } from "@/lib/ops/control-plane/channels";
+import { getChannel, slackChannelRef } from "@/lib/ops/control-plane/channels";
 import { postMessage } from "@/lib/ops/control-plane/slack";
 import {
   fetchUnshippedFbmOrders,
@@ -148,7 +148,7 @@ export async function GET(req: Request): Promise<Response> {
         lines.push(`  … and ${toAlert.length - 25} more`);
       }
       try {
-        const res = await postMessage({ channel: channel.name, text: lines.join("\n") });
+        const res = await postMessage({ channel: slackChannelRef("operations"), text: lines.join("\n") });
         if (res.ok) {
           posted = true;
           postedTo = channel.name;

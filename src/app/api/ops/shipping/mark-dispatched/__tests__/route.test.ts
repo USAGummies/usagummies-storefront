@@ -37,6 +37,7 @@ vi.mock("@/lib/ops/control-plane/channels", () => ({
     id === "shipping"
       ? { id: "shipping", name: "shipping", slackChannelId: "C0AS4635HFG" }
       : null,
+  slackChannelRef: (id: string) => (id === "shipping" ? "C0AS4635HFG" : `#${id}`),
 }));
 
 import { POST } from "../route";
@@ -140,7 +141,7 @@ describe("POST /api/ops/shipping/mark-dispatched", () => {
     expect(body.dispatchedAt).toBe("2026-04-26T18:00:00Z");
     expect(postMessageMock).toHaveBeenCalledTimes(1);
     const call = postMessageMock.mock.calls[0][0];
-    expect(call.channel).toBe("shipping");
+    expect(call.channel).toBe("C0AS4635HFG");
     expect(call.threadTs).toBe("1745000000.123456");
     expect(call.text).toMatch(/Dispatched/);
   });

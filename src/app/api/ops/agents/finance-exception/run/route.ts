@@ -22,7 +22,7 @@ import { NextResponse } from "next/server";
 import { kv } from "@vercel/kv";
 
 import { isAuthorized } from "@/lib/ops/abra-auth";
-import { getChannel } from "@/lib/ops/control-plane/channels";
+import { getChannel, slackChannelRef } from "@/lib/ops/control-plane/channels";
 import { postMessage } from "@/lib/ops/control-plane/slack";
 import { newRunContext } from "@/lib/ops/control-plane/run-id";
 import { auditStore } from "@/lib/ops/control-plane/stores";
@@ -149,7 +149,7 @@ async function runAgent(req: Request): Promise<Response> {
     if (channel) {
       try {
         const res = await postMessage({
-          channel: channel.name,
+          channel: slackChannelRef("finance"),
           text: rendered,
         });
         if (res.ok) postedTo = channel.name;

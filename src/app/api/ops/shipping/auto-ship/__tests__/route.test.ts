@@ -44,12 +44,18 @@ vi.mock("@/lib/ops/control-plane/slack/client", () => ({
 vi.mock("@/lib/ops/control-plane/channels", () => ({
   getChannel: (id: string) =>
     id === "ops-alerts"
-      ? { id: "ops-alerts", name: "#ops-alerts" }
+      ? { id: "ops-alerts", name: "#ops-alerts", slackChannelId: "C0ATUGGUZL6" }
       : id === "ops-approvals"
-        ? { id: "ops-approvals", name: "#ops-approvals" }
+        ? { id: "ops-approvals", name: "#ops-approvals", slackChannelId: "C0ATWJDHS74" }
         : id === "operations"
-          ? { id: "operations", name: "#operations" }
+          ? { id: "operations", name: "#operations", slackChannelId: "C0AR75M63Q9" }
           : null,
+  slackChannelRef: (id: string) => {
+    if (id === "ops-alerts") return "C0ATUGGUZL6";
+    if (id === "ops-approvals") return "C0ATWJDHS74";
+    if (id === "operations") return "C0AR75M63Q9";
+    return `#${id}`;
+  },
 }));
 
 // ----- Audit + run-id mocks -----------------------------------------------
@@ -249,7 +255,7 @@ describe("POST /api/ops/shipping/auto-ship — artifact handling", () => {
     const allCalls = postMessageMock.mock.calls as unknown as Array<
       [{ channel: string; text: string }]
     >;
-    const alertCalls = allCalls.filter((c) => c[0].channel === "#ops-alerts");
+    const alertCalls = allCalls.filter((c) => c[0].channel === "C0ATUGGUZL6");
     expect(alertCalls.length).toBeGreaterThanOrEqual(1);
     const alertText = alertCalls[0][0].text;
     expect(alertText).toContain("Slack file upload FAILED");

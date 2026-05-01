@@ -35,7 +35,7 @@ import { NextResponse } from "next/server";
 import { kv } from "@vercel/kv";
 
 import { isAuthorized } from "@/lib/ops/abra-auth";
-import { getChannel } from "@/lib/ops/control-plane/channels";
+import { getChannel, slackChannelRef } from "@/lib/ops/control-plane/channels";
 import { postMessage } from "@/lib/ops/control-plane/slack";
 import { auditDispatch } from "@/lib/ops/dispatch-audit";
 import {
@@ -161,7 +161,7 @@ export async function POST(req: Request): Promise<Response> {
       if (alerts) {
         try {
           await postMessage({
-            channel: alerts.name,
+            channel: slackChannelRef("ops-alerts"),
             text:
               `:no_entry: *Amazon FBM dispatch refused — ${body.orderId}*\n` +
               `${classification.refuseReason}`,
@@ -203,7 +203,7 @@ export async function POST(req: Request): Promise<Response> {
     } else {
       try {
         const res = await postMessage({
-          channel: approvals.name,
+          channel: slackChannelRef("ops-approvals"),
           text: proposal.renderedMarkdown,
         });
         if (res.ok) proposalTs = res.ts ?? null;

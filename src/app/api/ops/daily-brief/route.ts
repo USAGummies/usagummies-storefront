@@ -89,7 +89,7 @@ import {
 } from "@/lib/sales/onboarding-blockers";
 import { listRecentFlows } from "@/lib/wholesale/onboarding-store";
 import { listDivisions } from "@/lib/ops/control-plane/divisions";
-import { getChannel } from "@/lib/ops/control-plane/channels";
+import { slackChannelRef } from "@/lib/ops/control-plane/channels";
 import {
   approvalStore,
   auditStore,
@@ -697,7 +697,7 @@ async function composeAndPost(req: Request): Promise<Response> {
     degraded?: boolean;
   } | null = null;
   if (postToSlack) {
-    const channel = getChannel("ops-daily")?.name ?? "#ops-daily";
+    const channel = slackChannelRef("ops-daily");
     const res = await postMessage({ channel, text: brief.text, blocks: brief.blocks });
     postResult = { ok: res.ok, ts: res.ts, error: res.error, degraded: res.degraded };
     if (!res.ok) {

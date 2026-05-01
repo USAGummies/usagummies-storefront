@@ -27,7 +27,7 @@ import { NextResponse } from "next/server";
 
 import { isAuthorized } from "@/lib/ops/abra-auth";
 import { buildAuditEntry } from "@/lib/ops/control-plane/audit";
-import { getChannel } from "@/lib/ops/control-plane/channels";
+import { slackChannelRef } from "@/lib/ops/control-plane/channels";
 import { newRunContext } from "@/lib/ops/control-plane/run-id";
 import { postMessage } from "@/lib/ops/control-plane/slack/client";
 import { auditStore } from "@/lib/ops/control-plane/stores";
@@ -197,7 +197,7 @@ async function run(req: Request): Promise<Response> {
     });
 
     // 4. Post the daily digest to #ops-audit (or operator-supplied channel).
-    const channelOverride = body.slackChannel || getChannel("ops-audit")?.name || "#ops-audit";
+    const channelOverride = body.slackChannel || slackChannelRef("ops-audit");
     const digestText = renderSpamCleanerDigest(report);
     try {
       const slackRes = await postMessage({

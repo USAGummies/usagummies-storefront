@@ -246,3 +246,8 @@ export function listChannels(state?: Channel["state"]): readonly Channel[] {
 export function getChannel(id: ChannelId): Channel | undefined {
   return BY_ID.get(id);
 }
+
+export function slackChannelRef(id: ChannelId, fallback = `#${id}`): string {
+  const channel = getChannel(id);
+  return channel?.slackChannelId ?? channel?.name ?? fallback;
+}

@@ -20,7 +20,7 @@
  */
 import { NextResponse } from "next/server";
 
-import { getChannel } from "@/lib/ops/control-plane/channels";
+import { getChannel, slackChannelRef } from "@/lib/ops/control-plane/channels";
 import { postMessage, verifySlackSignature } from "@/lib/ops/control-plane/slack";
 import type { ChannelId } from "@/lib/ops/control-plane/types";
 import {
@@ -161,7 +161,7 @@ export async function POST(req: Request): Promise<Response> {
 function isChannel(channelId: string | undefined, name: ChannelId): boolean {
   if (!channelId) return false;
   const ch = getChannel(name);
-  return ch?.id === channelId;
+  return ch?.slackChannelId === channelId || ch?.id === channelId;
 }
 
 async function handleSampleTrigger(
@@ -200,7 +200,7 @@ async function handleSampleTrigger(
     "\n```\n_Class B proposal appears in `#ops-approvals` — approve there to buy the label._";
   try {
     await postMessage({
-      channel: channel.name,
+      channel: slackChannelRef("operations"),
       text: reply,
       threadTs: event.ts,
     });
@@ -214,10 +214,10 @@ async function handleDispatchTrigger(
   event: SlackMessageEvent,
   text: string,
 ): Promise<Response> {
-  const channelForPost =
-    (event.channel && getChannel("operations")?.id === event.channel
-      ? getChannel("operations")
-      : getChannel("sales")) ?? null;
+  const channelForPostId: ChannelId = isChannel(event.channel, "operations")
+    ? "operations"
+    : "sales";
+  const channelForPost = getChannel(channelForPostId) ?? null;
   if (!channelForPost || !event.ts) {
     return NextResponse.json({ ok: true, handled: "dispatch", skipped: "no channel" });
   }
@@ -234,7 +234,7 @@ async function handleDispatchTrigger(
           : "POST to `/api/ops/agents/sample-dispatch/dispatch` with the OrderIntent payload. See `#ops-daily` pinned doc.");
   try {
     await postMessage({
-      channel: channelForPost.name,
+      channel: slackChannelRef(channelForPostId),
       text: reply,
       threadTs: event.ts,
     });
@@ -323,7 +323,7 @@ async function handleReaction(
   if (result.ok && !result.before) {
     try {
       await postMessage({
-        channel: shipping.name,
+        channel: slackChannelRef("shipping"),
         text:
           `:package: *Dispatched* — physically left WA Warehouse ` +
           (event.user ? `by <@${event.user}>` : "") +

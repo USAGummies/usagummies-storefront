@@ -17,7 +17,7 @@
 import { NextResponse } from "next/server";
 
 import { isCronAuthorized, unauthorized } from "@/lib/ops/control-plane/admin-auth";
-import { getChannel } from "@/lib/ops/control-plane/channels";
+import { getChannel, slackChannelRef } from "@/lib/ops/control-plane/channels";
 import { postMessage } from "@/lib/ops/control-plane/slack";
 import {
   renderFulfillmentDriftMarkdown,
@@ -57,7 +57,7 @@ export async function GET(req: Request): Promise<Response> {
       degraded.push("slack-post: #ops-audit channel not registered");
     } else {
       try {
-        const res = await postMessage({ channel: channel.name, text: rendered });
+        const res = await postMessage({ channel: slackChannelRef("ops-audit"), text: rendered });
         if (res.ok) {
           posted = true;
           postedTo = channel.name;

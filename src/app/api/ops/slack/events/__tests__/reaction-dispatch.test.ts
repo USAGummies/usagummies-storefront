@@ -62,6 +62,12 @@ vi.mock("@/lib/ops/control-plane/channels", () => ({
     }
     return null;
   },
+  slackChannelRef: (id: string) => {
+    if (id === "shipping") return "C0AS4635HFG";
+    if (id === "operations") return "C_OPS";
+    if (id === "sales") return "C_SALES";
+    return `#${id}`;
+  },
 }));
 
 const SHIPPING_CHANNEL = "C0AS4635HFG";

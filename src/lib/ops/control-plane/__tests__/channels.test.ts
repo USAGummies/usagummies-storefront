@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { getChannel, listChannels } from "../channels";
+import { getChannel, listChannels, slackChannelRef } from "../channels";
 import type { ChannelId } from "../types";
 
 const EXPECTED_ACTIVE_CHANNEL_IDS: Record<string, string> = {
@@ -50,5 +50,10 @@ describe("control-plane channel registry", () => {
     for (const [id, slackChannelId] of Object.entries(EXPECTED_ACTIVE_CHANNEL_IDS)) {
       expect(byId.get(id)?.slack_channel_id).toBe(slackChannelId);
     }
+  });
+
+  it("slackChannelRef prefers live channel ids over names", () => {
+    expect(slackChannelRef("ops-approvals")).toBe("C0ATWJDHS74");
+    expect(slackChannelRef("finance")).toBe("C0ATF50QQ1M");
   });
 });

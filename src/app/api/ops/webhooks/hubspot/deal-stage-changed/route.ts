@@ -17,7 +17,7 @@
 import { NextResponse } from "next/server";
 import crypto from "node:crypto";
 
-import { getChannel } from "@/lib/ops/control-plane/channels";
+import { getChannel, slackChannelRef } from "@/lib/ops/control-plane/channels";
 import { postMessage } from "@/lib/ops/control-plane/slack";
 import { auditDispatch } from "@/lib/ops/dispatch-audit";
 import {
@@ -164,7 +164,7 @@ export async function POST(req: Request): Promise<Response> {
       if (alerts) {
         try {
           await postMessage({
-            channel: alerts.name,
+            channel: slackChannelRef("ops-alerts"),
             text:
               `:no_entry: *HubSpot dispatch refused — deal ${dealId} (${deal.dealname})*\n` +
               `${classification.refuseReason}`,
@@ -201,7 +201,7 @@ export async function POST(req: Request): Promise<Response> {
     if (approvals) {
       try {
         const res = await postMessage({
-          channel: approvals.name,
+          channel: slackChannelRef("ops-approvals"),
           text: proposal.renderedMarkdown,
         });
         posted = res.ok;

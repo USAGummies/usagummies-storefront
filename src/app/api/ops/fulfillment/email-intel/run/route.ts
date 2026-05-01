@@ -56,7 +56,7 @@ import {
 } from "@/lib/ops/email-intelligence/report";
 import { record, requestApproval } from "@/lib/ops/control-plane/record";
 import { newRunContext } from "@/lib/ops/control-plane/run-id";
-import { getChannel } from "@/lib/ops/control-plane/channels";
+import { getChannel, slackChannelRef } from "@/lib/ops/control-plane/channels";
 import { postMessage } from "@/lib/ops/control-plane/slack/client";
 import { listEmails, createGmailDraft } from "@/lib/ops/gmail-reader";
 import { evaluateSampleRequest } from "@/lib/ops/email-intelligence/sample-request";
@@ -466,7 +466,7 @@ async function runOnce(opts: RunBody): Promise<RunResult> {
     if (channel) {
       try {
         const res = await postMessage({
-          channel: channel.name,
+          channel: slackChannelRef(channelKey),
           text: reportText,
         });
         if (res.ok) postedTo = channel.name;

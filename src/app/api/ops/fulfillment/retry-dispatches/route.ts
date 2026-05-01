@@ -14,7 +14,7 @@
 import { NextResponse } from "next/server";
 
 import { isAuthorized } from "@/lib/ops/abra-auth";
-import { getChannel } from "@/lib/ops/control-plane/channels";
+import { getChannel, slackChannelRef } from "@/lib/ops/control-plane/channels";
 import { postMessage } from "@/lib/ops/control-plane/slack";
 import {
   drainRetryQueue,
@@ -51,7 +51,7 @@ async function run(req: Request): Promise<Response> {
   const results = await drainRetryQueue(async (entry) => {
     try {
       const res = await postMessage({
-        channel: approvals.name,
+        channel: slackChannelRef("ops-approvals"),
         text: entry.proposal.renderedMarkdown,
       });
       return {
@@ -93,7 +93,7 @@ async function run(req: Request): Promise<Response> {
         ),
       ];
       try {
-        await postMessage({ channel: alerts.name, text: lines.join("\n") });
+        await postMessage({ channel: slackChannelRef("ops-alerts"), text: lines.join("\n") });
       } catch {
         /* best-effort */
       }

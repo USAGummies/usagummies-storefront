@@ -26,7 +26,7 @@
 import { NextResponse } from "next/server";
 
 import { isAuthorized } from "@/lib/ops/abra-auth";
-import { getChannel } from "@/lib/ops/control-plane/channels";
+import { getChannel, slackChannelRef } from "@/lib/ops/control-plane/channels";
 import { postMessage } from "@/lib/ops/control-plane/slack";
 import {
   digestContentFingerprint,
@@ -315,7 +315,7 @@ async function emitResult(
         result.degraded.push(`slack-post: dedup-skip (content unchanged in last 24h)`);
       } else {
         try {
-          const res = await postMessage({ channel: channel.name, text: result.rendered });
+          const res = await postMessage({ channel: slackChannelRef(target), text: result.rendered });
           if (res.ok) result.postedTo = channel.name;
         } catch (err) {
           result.degraded.push(

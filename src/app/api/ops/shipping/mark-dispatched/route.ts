@@ -33,7 +33,7 @@
 import { NextResponse } from "next/server";
 
 import { isAuthorized } from "@/lib/ops/abra-auth";
-import { getChannel } from "@/lib/ops/control-plane/channels";
+import { getChannel, slackChannelRef } from "@/lib/ops/control-plane/channels";
 import { postMessage } from "@/lib/ops/control-plane/slack";
 import {
   clearDispatched,
@@ -141,7 +141,7 @@ export async function POST(req: Request): Promise<Response> {
       const shipping = getChannel("shipping");
       if (messageTs && shipping) {
         await postMessage({
-          channel: shipping.name,
+          channel: slackChannelRef("shipping"),
           text:
             ":package: *Dispatched* — physically left WA Warehouse " +
             `by ${dispatchedBy} at ${formatStamp(result.after)}.`,

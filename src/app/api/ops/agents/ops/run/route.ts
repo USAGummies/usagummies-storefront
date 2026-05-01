@@ -21,7 +21,7 @@ import { NextResponse } from "next/server";
 import { kv } from "@vercel/kv";
 
 import { isAuthorized } from "@/lib/ops/abra-auth";
-import { getChannel } from "@/lib/ops/control-plane/channels";
+import { getChannel, slackChannelRef } from "@/lib/ops/control-plane/channels";
 import { postMessage } from "@/lib/ops/control-plane/slack";
 import {
   digestContentFingerprint,
@@ -183,7 +183,7 @@ async function runAgent(req: Request): Promise<Response> {
         digest.degraded.push("slack-post: dedup-skip (digest unchanged in last 24h)");
       } else {
         try {
-          const res = await postMessage({ channel: channel.name, text: rendered });
+          const res = await postMessage({ channel: slackChannelRef("operations"), text: rendered });
           if (res.ok) postedTo = channel.name;
         } catch (err) {
           digest.degraded.push(

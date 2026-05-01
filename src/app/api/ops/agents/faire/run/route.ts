@@ -19,7 +19,7 @@
 import { NextResponse } from "next/server";
 
 import { isAuthorized } from "@/lib/ops/abra-auth";
-import { getChannel } from "@/lib/ops/control-plane/channels";
+import { getChannel, slackChannelRef } from "@/lib/ops/control-plane/channels";
 import { postMessage } from "@/lib/ops/control-plane/slack";
 import { newRunContext } from "@/lib/ops/control-plane/run-id";
 import { auditStore } from "@/lib/ops/control-plane/stores";
@@ -101,7 +101,7 @@ async function runAgent(req: Request): Promise<Response> {
         continue;
       }
       try {
-        const res = await postMessage({ channel: channel.name, text: target.text });
+        const res = await postMessage({ channel: slackChannelRef(target.key), text: target.text });
         postResults.push({ channel: channel.name, ok: res.ok });
       } catch (err) {
         postResults.push({

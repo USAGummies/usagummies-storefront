@@ -40,7 +40,7 @@ import {
   postMessage,
   type SlackHistoryMessage,
 } from "@/lib/ops/control-plane/slack";
-import { getChannel } from "@/lib/ops/control-plane/channels";
+import { slackChannelRef } from "@/lib/ops/control-plane/channels";
 import { logDecision } from "@/lib/ops/decision-log";
 import { matchW7Message, type W7Match } from "./matcher";
 
@@ -223,7 +223,7 @@ async function captureOne(input: {
   //    the mirror survives even if the audit store is unreachable.
   //    The brain log above is the authoritative record.
   try {
-    const auditChannel = getChannel("ops-audit")?.name ?? "#ops-audit";
+    const auditChannel = slackChannelRef("ops-audit");
     const auditLine = [
       `✓ \`financials\` \`agent:viktor-w7-runtime\``,
       `→ \`viktor.w7.rene-capture\` decision:${match.id} conf=1.00`,

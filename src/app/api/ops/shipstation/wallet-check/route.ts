@@ -16,7 +16,7 @@
 import { NextResponse } from "next/server";
 
 import { isCronAuthorized, unauthorized } from "@/lib/ops/control-plane/admin-auth";
-import { getChannel } from "@/lib/ops/control-plane/channels";
+import { getChannel, slackChannelRef } from "@/lib/ops/control-plane/channels";
 import { postMessage } from "@/lib/ops/control-plane/slack";
 import {
   digestContentFingerprint,
@@ -215,7 +215,7 @@ export async function GET(req: Request): Promise<Response> {
       } else {
         try {
           const res = await postMessage({
-            channel: channel.name,
+            channel: slackChannelRef("operations"),
             text: rendered,
           });
           if (res.ok) {
