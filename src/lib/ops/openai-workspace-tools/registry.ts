@@ -140,6 +140,20 @@ export const OPENAI_WORKSPACE_TOOLS: readonly OpenAIWorkspaceTool[] = Object.fre
     safetyNotes: READ_ONLY_NOTES,
   },
   {
+    id: "ops.finance.vendor-margin",
+    name: "Per-vendor margin ledger",
+    description:
+      "Read the canonical per-vendor margin ledger: committed-vendor economics, channel rows, pending vendors, and below-floor/thin/unknown margin alerts. Read-only; no QBO, HubSpot, Shopify, pricing, or invoice writes.",
+    mode: "read",
+    status: "ready",
+    audience: "Ben+Rene",
+    readOnly: true,
+    requiresHumanApproval: false,
+    backingRoute: "/api/ops/finance/vendor-margin",
+    backingSurface: "/api/ops/finance/vendor-margin",
+    safetyNotes: READ_ONLY_NOTES,
+  },
+  {
     id: "ops.receipts.review-packets",
     name: "Receipt review packets",
     description:

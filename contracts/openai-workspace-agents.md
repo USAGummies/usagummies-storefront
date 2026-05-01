@@ -229,6 +229,7 @@ Shipped in this change:
 - Manual watcher dry-runs now append one fail-soft internal `system.read` audit entry, allowing `/ops/agents/status` to observe runs without adding any external write path.
 - The watcher now has an audit-only weekday cron at `14:45 UTC`; it still does not post Slack or mutate external systems.
 - Watcher run output now carries a bounded top-stale-buyer preview so ChatGPT workspace agents can name the first concrete buyer/stage/action while staying read-only.
+- `ops.finance.vendor-margin` is a ready read-only registry entry backed by `/api/ops/finance/vendor-margin`, giving ChatGPT/Codex agents sourced per-vendor margin context without QBO, HubSpot, Shopify, pricing, or invoice writes.
 
 Acceptance:
 

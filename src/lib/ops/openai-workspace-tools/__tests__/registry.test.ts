@@ -98,6 +98,18 @@ describe("OpenAI workspace tool registry", () => {
     expect(t?.description).toMatch(/no outreach send/i);
   });
 
+  it("ops.finance.vendor-margin exposes the read-only margin ledger", () => {
+    const t = getOpenAIWorkspaceTool("ops.finance.vendor-margin");
+    expect(t).toBeDefined();
+    expect(t?.status).toBe("ready");
+    expect(t?.mode).toBe("read");
+    expect(t?.audience).toBe("Ben+Rene");
+    expect(t?.readOnly).toBe(true);
+    expect(t?.requiresHumanApproval).toBe(false);
+    expect(t?.backingRoute).toBe("/api/ops/finance/vendor-margin");
+    expect(t?.description).toMatch(/no QBO/i);
+  });
+
   it("all read tools are actually read-only and never require approval", () => {
     const readTools = OPENAI_WORKSPACE_TOOLS.filter((tool) => tool.mode === "read");
     expect(readTools.length).toBeGreaterThan(0);
