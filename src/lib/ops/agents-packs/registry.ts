@@ -179,6 +179,19 @@ export const AGENT_REGISTRY: readonly AgentEntry[] = Object.freeze([
     channel: "#sales",
   },
   {
+    id: "b2b-revenue-watcher",
+    name: "B2B Revenue Watcher",
+    contractPath: "contracts/agents/b2b-revenue-watcher.md",
+    division: "sales",
+    humanOwner: "Ben",
+    role: "Read-only heartbeat over stale buyers, Faire follow-ups, approvals, and wholesale inquiries",
+    lifecycle: "partial",
+    blocker: "Dry-run route is live; no cron or audit persistence until cadence is approved",
+    approvalSlugs: ["system.read"],
+    runtimePath: "/api/ops/agents/b2b-revenue-watcher/run",
+    channel: "/ops/sales + OpenAI workspace tool",
+  },
+  {
     id: "viktor-rene-capture",
     name: "Viktor W-7 — Rene Response Capture",
     contractPath: "contracts/agents/viktor-rene-capture.md",
@@ -579,6 +592,14 @@ export const AGENT_HEARTBEATS: Readonly<Record<string, AgentHeartbeatMetadata>> 
       queueSource: "KV faire:invites + follow-up buckets",
       outputStates: APPROVAL_OUTPUTS,
     }),
+    "b2b-revenue-watcher": heartbeat({
+      cadence: "manual",
+      schedule: "Manual dry-run via OpenAI workspace tool; cron not approved",
+      queueSource:
+        "Sales Command readers: stale buyers, Faire follow-ups, pending approvals, wholesale inquiries",
+      outputStates: TASK_OUTPUTS,
+      nextPhase: "Add fail-soft audit persistence, then seek cadence approval",
+    }),
     "viktor-rene-capture": heartbeat({
       cadence: "event",
       schedule: "#finance decision replies",
@@ -739,7 +760,7 @@ export const PACK_REGISTRY: readonly PackDef[] = Object.freeze([
     description:
       "Wholesale + Faire Direct + Slack-native sales intelligence. Per-send approval gate on every outbound; HubSpot is system of record.",
     primaryOwner: "Ben",
-    memberIds: ["viktor", "faire-specialist"],
+    memberIds: ["viktor", "faire-specialist", "b2b-revenue-watcher"],
   },
   {
     id: "executive-control",

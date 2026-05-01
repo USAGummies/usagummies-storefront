@@ -188,6 +188,20 @@ export const AGENT_MANIFEST: readonly AgentManifestEntry[] = [
       "Send-on-approve closer for Faire Direct invites + follow-ups. Closes the invite loop end-to-end.",
   },
   {
+    id: "b2b-revenue-watcher",
+    name: "B2B Revenue Watcher",
+    contract: "/contracts/agents/b2b-revenue-watcher.md",
+    classification: "task",
+    approvalClass: "A",
+    owner: "ben",
+    approver: null,
+    lifecycle: "active",
+    purpose:
+      "Reads stale buyers, Faire follow-ups, pending approvals, and wholesale inquiries to recommend Ben's next B2B revenue action.",
+    notes:
+      "Task by design in v1 — dry-run only; no cron, Slack post, Gmail send, HubSpot mutation, or approval opening.",
+  },
+  {
     id: "reconciliation-specialist",
     name: "Reconciliation Specialist",
     contract: "/contracts/agents/reconciliation-specialist.md",

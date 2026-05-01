@@ -166,6 +166,14 @@ describe("Pack registry — member ids resolve", () => {
     const orphans = AGENT_REGISTRY.filter((a) => !inPack.has(a.id));
     expect(orphans.map((a) => a.id)).toEqual([]);
   });
+
+  it("B2B Revenue pack includes the watcher heartbeat as a member", () => {
+    const pack = getPackById("b2b-revenue");
+    expect(pack?.memberIds).toContain("b2b-revenue-watcher");
+    const agent = getAgentById("b2b-revenue-watcher");
+    expect(agent?.runtimePath).toBe("/api/ops/agents/b2b-revenue-watcher/run");
+    expect(AGENT_HEARTBEATS["b2b-revenue-watcher"]?.cadence).toBe("manual");
+  });
 });
 
 // =========================================================================

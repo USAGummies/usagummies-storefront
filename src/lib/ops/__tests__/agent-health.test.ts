@@ -69,6 +69,18 @@ describe("AGENT_MANIFEST — doctrinal invariants", () => {
       expect(e.purpose.trim().length).toBeGreaterThan(0);
     }
   });
+
+  it("registers B2B Revenue Watcher as an active read-only task with justification", () => {
+    const watcher = AGENT_MANIFEST.find((e) => e.id === "b2b-revenue-watcher");
+    expect(watcher).toBeDefined();
+    expect(watcher?.classification).toBe("task");
+    expect(watcher?.approvalClass).toBe("A");
+    expect(watcher?.owner).toBe("ben");
+    expect(watcher?.approver).toBeNull();
+    expect(watcher?.lifecycle).toBe("active");
+    expect(watcher?.notes).toMatch(/dry-run only/i);
+    expect(evaluateAgentDoctrine(watcher!).health).toBe("green");
+  });
 });
 
 describe("evaluateAgentDoctrine — individual flags", () => {

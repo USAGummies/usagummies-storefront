@@ -407,6 +407,12 @@ Each row uses the schema:
 - **Hard rules locked by tests:** no Slack post, no Gmail send, no HubSpot write, no approval opened, no QBO/Shopify/Faire API write. Actionable queues produce `outputState: "task_created"` with `/ops/sales` as the next human action; source failures produce `failed_degraded` with explicit reasons; quiet wired sources produce `no_action`.
 - **Monday MVP:** 🟢 dry-run only. No cron. No autonomous execution. This is the first heartbeat-shaped revenue agent output that can later be scheduled once Ben approves cadence.
 
+#### Phase 6.6 — B2B Revenue Watcher registry graduation (NEW)
+- **Why:** A callable heartbeat is not enough; the operator surfaces need to know the agent exists, who owns it, and why it is still dry-run. Phase 6.6 promotes the watcher into the canonical registries without scheduling it.
+- **Architecture:** New contract `contracts/agents/b2b-revenue-watcher.md`; B2B pack membership in `src/lib/ops/agents-packs/registry.ts`; heartbeat metadata (`cadence: "manual"`, queue source, output states); doctrine health manifest entry in `src/lib/ops/agent-health.ts`; runtime status manifest row in `GET /api/ops/agents/status`.
+- **Hard rules locked by tests:** the watcher belongs to the B2B Revenue pack, has heartbeat metadata, has a green doctrine-health row as an active Class A read-only task with dry-run justification, appears on `/api/ops/agents/status`, and still does not schedule itself or gain any write scope.
+- **Monday MVP:** 🟢 registered dry-run. Next phase is fail-soft audit persistence, then explicit cadence approval.
+
 #### Phase 7 — Receipt OCR extraction (prepare-for-review only) (NEW)
 - **Why:** `/ops/finance/review` already aggregates the receipt review queue, but Rene/Ben were doing field-by-field data entry by hand. Phase 7 attaches a *suggestion* to each captured receipt so reviewers see vendor/date/amount/currency/tax/last4/payment hints proposed before they fill in the canonical fields. Promotion remains 100% human — no auto-fill, no QBO write.
 - **Architecture:**

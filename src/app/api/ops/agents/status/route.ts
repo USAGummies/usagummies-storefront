@@ -79,6 +79,16 @@ const AGENT_MANIFEST: AgentManifestEntry[] = [
     notes: "Degraded until FAIRE_ACCESS_TOKEN is set",
   },
   {
+    id: "b2b-revenue-watcher",
+    name: "B2B Revenue Watcher",
+    contract: "/contracts/agents/b2b-revenue-watcher.md",
+    runtimePath: "/api/ops/agents/b2b-revenue-watcher/run",
+    cadence: "Manual dry-run; weekday cadence pending Ben approval",
+    channel: "/ops/sales + OpenAI workspace tool",
+    notes:
+      "Read-only heartbeat: no cron, Slack post, Gmail send, HubSpot mutation, or approval opening",
+  },
+  {
     id: "reconciliation-specialist",
     name: "Reconciliation Specialist",
     contract: "/contracts/agents/reconciliation-specialist.md",

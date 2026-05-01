@@ -225,6 +225,7 @@ Shipped in this change:
 - `contracts/agent-heartbeat.md` and `src/lib/ops/agent-heartbeat/*` are the first repo-native heartbeat primitive layer. They define context, idempotency keys, allowed output states, and run-record completion only; no LLM execution or external writes are wired.
 - `/ops/agents/packs` now surfaces static heartbeat metadata for every registered agent: cadence, queue source, allowed output states, and budget guardrails. This is read-only operator context for future ChatGPT workspace-agent orchestration, not runtime activation.
 - `/api/ops/agents/b2b-revenue-watcher/run` is the first heartbeat dry-run for a revenue agent. It returns a canonical run record and next-human-action summary; it does not schedule itself, post Slack, send Gmail, mutate HubSpot, or open approvals.
+- `contracts/agents/b2b-revenue-watcher.md`, `/ops/agents/packs`, `/ops/agents/health`, and `/ops/agents/status` now all recognize the watcher as an active read-only dry-run agent. It remains manual until audit persistence and cadence approval land.
 
 Acceptance:
 
