@@ -89,6 +89,16 @@ const AGENT_MANIFEST: AgentManifestEntry[] = [
       "Read-only heartbeat: no Slack post, Gmail send, HubSpot mutation, or approval opening",
   },
   {
+    id: "email-agents-readiness",
+    name: "Email Agents Readiness",
+    contract: "/contracts/email-agents-system-proposal.md",
+    runtimePath: "/api/ops/agents/email-intel/run",
+    cadence: "Manual readiness heartbeat; no cron while incident gate remains open",
+    channel: "/ops/email-agents + OpenAI workspace tool",
+    notes:
+      "Read-only heartbeat: no Gmail scan, draft creation, Slack approval, HubSpot mutation, or direct email-intel runner",
+  },
+  {
     id: "reconciliation-specialist",
     name: "Reconciliation Specialist",
     contract: "/contracts/agents/reconciliation-specialist.md",

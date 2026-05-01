@@ -72,6 +72,27 @@ describe("GET /api/ops/agents/status", () => {
     expect(watcher?.staleness).toBe("unknown");
   });
 
+  it("includes Email Agents Readiness as a manual read-only heartbeat", async () => {
+    const res = await GET(makeReq());
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      agents: Array<{
+        id: string;
+        runtimePath: string;
+        cadence: string;
+        channel: string;
+        notes?: string;
+      }>;
+    };
+    const agent = body.agents.find((a) => a.id === "email-agents-readiness");
+    expect(agent).toBeDefined();
+    expect(agent?.runtimePath).toBe("/api/ops/agents/email-intel/run");
+    expect(agent?.cadence).toMatch(/manual/i);
+    expect(agent?.channel).toContain("/ops/email-agents");
+    expect(agent?.notes).toMatch(/no Gmail scan/i);
+    expect(agent?.notes).toMatch(/direct email-intel runner/i);
+  });
+
   it("surfaces the latest audit summary and error message", async () => {
     recentMock.mockResolvedValueOnce([
       {
@@ -112,6 +133,44 @@ describe("GET /api/ops/agents/status", () => {
       lastSummary:
         "B2B Revenue Watcher found 2 stale B2B buyer(s). Top stale buyer: Retailer 1.",
       lastError: "staleBuyers: HubSpot rate limited",
+    });
+  });
+
+  it("surfaces latest email readiness heartbeat audit entries", async () => {
+    recentMock.mockResolvedValueOnce([
+      {
+        id: "audit-email-1",
+        runId: "email-run-1",
+        division: "platform-data-automation",
+        actorType: "agent",
+        actorId: "email-agents-readiness",
+        action: "system.read",
+        entityType: "agent-heartbeat-run",
+        entityId: "email-run-1",
+        result: "ok",
+        after: {
+          summary: "Email agents remain blocked (5/6 gates passed).",
+        },
+        sourceCitations: [],
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+
+    const res = await GET(makeReq());
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      agents: Array<{
+        id: string;
+        lastResult: string | null;
+        lastSummary: string | null;
+        lastError: string | null;
+      }>;
+    };
+    const agent = body.agents.find((a) => a.id === "email-agents-readiness");
+    expect(agent).toMatchObject({
+      lastResult: "ok",
+      lastSummary: "Email agents remain blocked (5/6 gates passed).",
+      lastError: null,
     });
   });
 
