@@ -27,31 +27,34 @@
  * - `/contracts/wholesale-pricing.md` v2.4 — locked B-tier grid
  * - `/contracts/distributor-pricing-commitments.md` v1.0 — distributor commitments
  * - `/contracts/financial-mechanisms-blueprint.md` §6.7 — Phase 36.6 spec
+ *
+ * Phase 36.6d (2026-04-30 PM) — consolidation:
+ *   The hardcoded grid array used to live here AND in `pricing-grid-classifier.ts`.
+ *   Both are now derived from one source: `PRICING_GRID` in the classifier
+ *   module. This file re-exports `ON_GRID_BAG_PRICES_USD` as an alias for
+ *   `B2B_GRID_PRICES_USD` so existing import sites don't break, but the
+ *   numbers are owned by the classifier's tier metadata.
  */
 
+import { B2B_GRID_PRICES_USD } from "./pricing-grid-classifier";
+
 // ---------------------------------------------------------------------------
-// Canonical pricing grid (LOCKED 2026-04-30 PM v2.4)
+// Canonical pricing grid (LOCKED 2026-04-30 PM v2.4 — derived from PRICING_GRID)
 // ---------------------------------------------------------------------------
 
 /**
  * Per-bag prices that ARE on-grid. Any quote at one of these prices is
  * considered canonical and is NOT flagged.
  *
- * Source: `/contracts/wholesale-pricing.md` v2.4 §2 + `pricing-tiers.ts`
- *         BAG_PRICE_USD constant.
+ * Source: `pricing-grid-classifier.ts` — `B2B_GRID_PRICES_USD`, derived
+ * from every `PRICING_GRID` tier with `b2bEligible: true`. DTC retail
+ * MSRP ($5.99) is excluded — a B2B prospect quoted at retail is OFF
+ * the wholesale grid and should be flagged.
+ *
+ * Phase 36.6d consolidation: re-exported here as a stable alias so
+ * existing call sites (morning brief, booth-quote, tests) keep working.
  */
-export const ON_GRID_BAG_PRICES_USD: ReadonlyArray<number> = [
-  3.49, // B1 (local case, Ben delivers — internal only) + B2 (master carton landed)
-  3.5, // B3 (master carton + buyer freight) — v2.4 +$0.25 surcharge
-  3.25, // B4 (pallet landed) + B5 (pallet + buyer freight, v2.4 surcharge)
-  3.0, // 3+ pallet free-freight tier (existing per /contracts/wholesale-pricing.md §3)
-  // Distributor commitments per /contracts/distributor-pricing-commitments.md
-  2.49, // Sell-sheet 90+ pallet delivered
-  2.5, // Option A distributor
-  2.1, // Option B distributor (Inderbitzin / Glacier)
-  // Strategic-credential floor / pickup-only (off-grid by design but pre-approved)
-  2.0, // Pickup / FOB Ashford floor (Class C — see pricing-grid-v2.3 proposal)
-];
+export const ON_GRID_BAG_PRICES_USD: ReadonlyArray<number> = B2B_GRID_PRICES_USD;
 
 /** Tolerance for floating-point price comparison (1 cent). */
 const PRICE_EPSILON_USD = 0.005;

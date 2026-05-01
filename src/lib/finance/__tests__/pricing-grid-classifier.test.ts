@@ -20,11 +20,13 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  B2B_GRID_PRICES_USD,
   classifyPricePerBag,
   isFullyRatifiedPrice,
   PRICING_GRID,
   DEFAULT_GRID_TOLERANCE_USD,
 } from "../pricing-grid-classifier";
+import { ON_GRID_BAG_PRICES_USD } from "../off-grid-quotes";
 
 describe("PRICING_GRID — canonical contents", () => {
   it("contains the v2.4 B-tier prices (B1-B5)", () => {
@@ -222,6 +224,60 @@ describe("classifyPricePerBag — tolerance + edge cases", () => {
 
   it("throws on Infinity price", () => {
     expect(() => classifyPricePerBag(Number.POSITIVE_INFINITY)).toThrow();
+  });
+});
+
+describe("Phase 36.6d — consolidation invariants (B2B_GRID_PRICES_USD ↔ off-grid-quotes)", () => {
+  it("B2B_GRID_PRICES_USD is derived from b2bEligible tiers in PRICING_GRID", () => {
+    const expected = new Set<number>();
+    for (const t of PRICING_GRID) {
+      if (t.b2bEligible) expected.add(Math.round(t.pricePerBag * 100) / 100);
+    }
+    const actual = new Set(B2B_GRID_PRICES_USD.map((p) => Math.round(p * 100) / 100));
+    expect(actual).toEqual(expected);
+  });
+
+  it("DTC-Single (retail MSRP $5.99) is NOT in B2B_GRID_PRICES_USD", () => {
+    expect(B2B_GRID_PRICES_USD).not.toContain(5.99);
+  });
+
+  it("DTC-Single tier has b2bEligible=false; every other tier b2bEligible=true", () => {
+    for (const t of PRICING_GRID) {
+      if (t.id === "DTC-Single") {
+        expect(t.b2bEligible).toBe(false);
+      } else {
+        expect(t.b2bEligible).toBe(true);
+      }
+    }
+  });
+
+  it("ON_GRID_BAG_PRICES_USD (off-grid-quotes) is the same array as B2B_GRID_PRICES_USD (no drift)", () => {
+    // Phase 36.6d: off-grid-quotes re-exports from pricing-grid-classifier.
+    // If a future edit adds a B2B tier here without updating off-grid logic,
+    // this test fails — that's the point.
+    expect(ON_GRID_BAG_PRICES_USD).toBe(B2B_GRID_PRICES_USD);
+  });
+
+  it("contains all v2.4 canonical B2B prices ($3.49, $3.50, $3.25, $3.00, $2.50, $2.49, $2.10, $2.00)", () => {
+    expect(B2B_GRID_PRICES_USD).toContain(3.49);
+    expect(B2B_GRID_PRICES_USD).toContain(3.5);
+    expect(B2B_GRID_PRICES_USD).toContain(3.25);
+    expect(B2B_GRID_PRICES_USD).toContain(3.0);
+    expect(B2B_GRID_PRICES_USD).toContain(2.5);
+    expect(B2B_GRID_PRICES_USD).toContain(2.49);
+    expect(B2B_GRID_PRICES_USD).toContain(2.1);
+    expect(B2B_GRID_PRICES_USD).toContain(2.0);
+  });
+
+  it("dedupes prices that appear on multiple tiers (B1+B2 share $3.49; B4+B5+Reunion share $3.25)", () => {
+    const counts = new Map<number, number>();
+    for (const p of B2B_GRID_PRICES_USD) {
+      const cents = Math.round(p * 100);
+      counts.set(cents, (counts.get(cents) ?? 0) + 1);
+    }
+    for (const [cents, n] of counts.entries()) {
+      expect(n, `price ${(cents / 100).toFixed(2)} appears ${n}× — should be 1`).toBe(1);
+    }
   });
 });
 

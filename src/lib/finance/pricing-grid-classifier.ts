@@ -44,6 +44,17 @@ export interface GridTier {
    * "show-special" — one-off event price, expires after the event.
    */
   status: "ratified" | "proposed" | "show-special";
+  /**
+   * True iff this tier is part of the B2B / wholesale / distributor
+   * pricing grid that the off-grid-quote detector uses as its "is this
+   * a canonical B2B price?" reference. DTC retail prices are excluded
+   * (a $5.99 Shopify single-bag isn't a wholesale leak — it's the MSRP).
+   *
+   * Phase 36.6d (2026-04-30 PM) — single source of truth across:
+   *   - pricing-grid-classifier.ts (this file, full B2B+DTC coverage)
+   *   - off-grid-quotes.ts (B2B-only — derives its grid from filter(b2bEligible))
+   */
+  b2bEligible: boolean;
 }
 
 /**
@@ -57,27 +68,55 @@ export interface GridTier {
  */
 export const PRICING_GRID: ReadonlyArray<GridTier> = [
   // Wholesale tiers — /contracts/wholesale-pricing.md §2 v2.4 + v2.3 lock
-  { id: "B1", pricePerBag: 3.49, label: "B1 — Local case (internal only, Ben delivers)", source: "/contracts/wholesale-pricing.md §2", status: "ratified" },
-  { id: "B2", pricePerBag: 3.49, label: "B2 — Master carton, landed", source: "/contracts/wholesale-pricing.md §2", status: "ratified" },
-  { id: "B3", pricePerBag: 3.50, label: "B3 — Master carton, buyer-pays (v2.4 +$0.25 Q3 surcharge)", source: "/contracts/wholesale-pricing.md §2 v2.4", status: "ratified" },
-  { id: "B4", pricePerBag: 3.25, label: "B4 — Pallet, landed", source: "/contracts/wholesale-pricing.md §2", status: "ratified" },
-  { id: "B5", pricePerBag: 3.25, label: "B5 — Pallet, buyer-pays (v2.4 +$0.25 Q3 surcharge)", source: "/contracts/wholesale-pricing.md §2 v2.4", status: "ratified" },
+  { id: "B1", pricePerBag: 3.49, label: "B1 — Local case (internal only, Ben delivers)", source: "/contracts/wholesale-pricing.md §2", status: "ratified", b2bEligible: true },
+  { id: "B2", pricePerBag: 3.49, label: "B2 — Master carton, landed", source: "/contracts/wholesale-pricing.md §2", status: "ratified", b2bEligible: true },
+  { id: "B3", pricePerBag: 3.50, label: "B3 — Master carton, buyer-pays (v2.4 +$0.25 Q3 surcharge)", source: "/contracts/wholesale-pricing.md §2 v2.4", status: "ratified", b2bEligible: true },
+  { id: "B4", pricePerBag: 3.25, label: "B4 — Pallet, landed", source: "/contracts/wholesale-pricing.md §2", status: "ratified", b2bEligible: true },
+  { id: "B5", pricePerBag: 3.25, label: "B5 — Pallet, buyer-pays (v2.4 +$0.25 Q3 surcharge)", source: "/contracts/wholesale-pricing.md §2 v2.4", status: "ratified", b2bEligible: true },
 
   // Distributor — /contracts/distributor-pricing-commitments.md §1, §2
-  { id: "Sell-Sheet-A", pricePerBag: 2.50, label: "Distributor Option A (with counter display, delivered)", source: "/contracts/distributor-pricing-commitments.md §2", status: "ratified" },
-  { id: "Sell-Sheet", pricePerBag: 2.49, label: "Distributor sell-sheet (delivered)", source: "/contracts/distributor-pricing-commitments.md §1", status: "ratified" },
-  { id: "Option-B", pricePerBag: 2.10, label: "Distributor Option B (loose, delivered) — Inderbitzin / Glacier", source: "/contracts/distributor-pricing-commitments.md §2", status: "ratified" },
+  { id: "Sell-Sheet-A", pricePerBag: 2.50, label: "Distributor Option A (with counter display, delivered)", source: "/contracts/distributor-pricing-commitments.md §2", status: "ratified", b2bEligible: true },
+  { id: "Sell-Sheet", pricePerBag: 2.49, label: "Distributor sell-sheet (delivered)", source: "/contracts/distributor-pricing-commitments.md §1", status: "ratified", b2bEligible: true },
+  { id: "Option-B", pricePerBag: 2.10, label: "Distributor Option B (loose, delivered) — Inderbitzin / Glacier", source: "/contracts/distributor-pricing-commitments.md §2", status: "ratified", b2bEligible: true },
 
   // Trade-show specials — /contracts/distributor-pricing-commitments.md §3
-  { id: "Reunion-2026", pricePerBag: 3.25, label: "Reunion 2026 trade-show special (free freight, MC MOQ)", source: "/contracts/distributor-pricing-commitments.md §3", status: "show-special" },
+  { id: "Reunion-2026", pricePerBag: 3.25, label: "Reunion 2026 trade-show special (free freight, MC MOQ)", source: "/contracts/distributor-pricing-commitments.md §3", status: "show-special", b2bEligible: true },
 
   // PROPOSED — /contracts/pricing-route-governance.md §1 + proposals/pricing-grid-v2.3-route-reconciliation.md
-  { id: "C-ANCH", pricePerBag: 3.00, label: "C-ANCH — Route-anchor (3-pallet min, landed) — PROPOSED awaits Class C", source: "/contracts/pricing-route-governance.md §1", status: "proposed" },
-  { id: "C-PU", pricePerBag: 2.00, label: "C-PU — Pickup floor — PROPOSED awaits Class C", source: "/contracts/pricing-route-governance.md §1", status: "proposed" },
+  { id: "C-ANCH", pricePerBag: 3.00, label: "C-ANCH — Route-anchor (3-pallet min, landed) — PROPOSED awaits Class C", source: "/contracts/pricing-route-governance.md §1", status: "proposed", b2bEligible: true },
+  { id: "C-PU", pricePerBag: 2.00, label: "C-PU — Pickup floor — PROPOSED awaits Class C", source: "/contracts/pricing-route-governance.md §1", status: "proposed", b2bEligible: true },
 
   // DTC — /contracts/distributor-pricing-commitments.md §4 + outreach-pitch-spec.md
-  { id: "DTC-Single", pricePerBag: 5.99, label: "DTC single-bag MSRP (Shopify + Amazon retail)", source: "/contracts/distributor-pricing-commitments.md §4", status: "ratified" },
+  // NOT b2bEligible — DTC retail MSRP isn't a wholesale grid price; a
+  // $5.99 quote to a B2B prospect is OFF the wholesale grid and should
+  // be flagged.
+  { id: "DTC-Single", pricePerBag: 5.99, label: "DTC single-bag MSRP (Shopify + Amazon retail)", source: "/contracts/distributor-pricing-commitments.md §4", status: "ratified", b2bEligible: false },
 ];
+
+/**
+ * Canonical B2B per-bag price set — derived from `PRICING_GRID` so the
+ * off-grid-quotes detector and the pricing-grid classifier never drift.
+ *
+ * Filter rule: any tier with `b2bEligible: true` (any status) is on the
+ * B2B grid. DTC retail MSRP is excluded.
+ *
+ * Deduplication: when two tiers share a price (B1+B2 = $3.49,
+ * B4+B5+Reunion-2026 = $3.25), the price appears once. Order matches
+ * the first occurrence in `PRICING_GRID` for stable rendering.
+ */
+export const B2B_GRID_PRICES_USD: ReadonlyArray<number> = (() => {
+  const seen = new Set<number>();
+  const out: number[] = [];
+  for (const t of PRICING_GRID) {
+    if (!t.b2bEligible) continue;
+    // Round to cents to avoid float-precision dupes (3.5 vs 3.50).
+    const cents = Math.round(t.pricePerBag * 100);
+    if (seen.has(cents)) continue;
+    seen.add(cents);
+    out.push(t.pricePerBag);
+  }
+  return Object.freeze(out);
+})();
 
 /** Default per-bag tolerance for "matches a grid tier." One cent. */
 export const DEFAULT_GRID_TOLERANCE_USD = 0.01;
