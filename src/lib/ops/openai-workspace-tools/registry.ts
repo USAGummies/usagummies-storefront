@@ -141,6 +141,20 @@ export const OPENAI_WORKSPACE_TOOLS: readonly OpenAIWorkspaceTool[] = Object.fre
     safetyNotes: READ_ONLY_NOTES,
   },
   {
+    id: "ops.email-agents.status",
+    name: "Email agents readiness",
+    description:
+      "Read the email-agent system readiness gates: incident checklist, HubSpot schema gate, kill switch, and cron state. Read-only; never triggers email-intel, Gmail draft creation, Slack approvals, or HubSpot writes.",
+    mode: "read",
+    status: "ready",
+    audience: "Ben",
+    readOnly: true,
+    requiresHumanApproval: false,
+    backingRoute: "/api/ops/email-agents/status",
+    backingSurface: "/ops/email-agents",
+    safetyNotes: READ_ONLY_NOTES,
+  },
+  {
     id: "ops.finance.review",
     name: "Finance review queue",
     description:

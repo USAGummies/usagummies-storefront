@@ -160,6 +160,18 @@ describe("OpenAI workspace tool registry", () => {
     expect(t?.description).toMatch(/2026-04-30 incident/i);
   });
 
+  it("ops.email-agents.status exposes readiness gates without runner access", () => {
+    const t = getOpenAIWorkspaceTool("ops.email-agents.status");
+    expect(t).toBeDefined();
+    expect(t?.status).toBe("ready");
+    expect(t?.mode).toBe("read");
+    expect(t?.readOnly).toBe(true);
+    expect(t?.requiresHumanApproval).toBe(false);
+    expect(t?.backingRoute).toBe("/api/ops/email-agents/status");
+    expect(t?.backingSurface).toBe("/ops/email-agents");
+    expect(t?.description).toMatch(/never triggers email-intel/i);
+  });
+
   it("all read tools are actually read-only and never require approval", () => {
     const readTools = OPENAI_WORKSPACE_TOOLS.filter((tool) => tool.mode === "read");
     expect(readTools.length).toBeGreaterThan(0);

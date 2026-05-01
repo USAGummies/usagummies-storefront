@@ -467,6 +467,12 @@ Each row uses the schema:
 - **Hard rules locked by tests:** malformed/missing KV payloads are skipped and reported, never counted as safe; zero-dollar/non-finite quote lines do not become candidates; the route exports only GET and has no KV writes, approval opens, Slack posts, QBO clients, or HubSpot stage writes.
 - **Monday MVP:** 🟢 off-grid quote audit trail is visible in ops UI. It remains visibility-only; Class C price changes still require the existing approval doctrine.
 
+#### Phase 6.16 — Email-agent readiness dashboard (NEW)
+- **Why:** The email-agent group has a real proposal, HubSpot schema gate, and incident postmortem, but the operational state was split across docs. Operators and ChatGPT workspace agents need one read-only answer to "can email-intel run yet?"
+- **Architecture:** `src/lib/ops/email-agents-status.ts` derives readiness from three contract docs, `vercel.json`, and the boolean `EMAIL_INTEL_ENABLED` flag. `GET /api/ops/email-agents/status` returns the derived gates, and `/ops/email-agents` renders them. `ops.email-agents.status` exposes the same read model to ChatGPT workspace tools.
+- **Hard rules locked by tests:** no raw secrets are returned, unreadiness remains blocked until the approval-gate audit is checked, enabled-without-gates is `misconfigured`, and the route exports only GET with no Gmail/HubSpot/Slack/QBO/Shopify runner imports.
+- **Monday MVP:** 🟢 the email-agent system is visible without being re-enabled. Direct `/api/ops/fulfillment/email-intel/run` remains a prohibited OpenAI workspace tool.
+
 #### Phase 7 — Receipt OCR extraction (prepare-for-review only) (NEW)
 - **Why:** `/ops/finance/review` already aggregates the receipt review queue, but Rene/Ben were doing field-by-field data entry by hand. Phase 7 attaches a *suggestion* to each captured receipt so reviewers see vendor/date/amount/currency/tax/last4/payment hints proposed before they fill in the canonical fields. Promotion remains 100% human — no auto-fill, no QBO write.
 - **Architecture:**
