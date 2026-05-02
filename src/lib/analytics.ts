@@ -285,10 +285,18 @@ export async function setEnhancedConversionUserData(data: {
 
 export function trackPurchase(order: { id: string; value: number; currency?: string; items?: Array<{ id: string; name: string; price: number; quantity: number }> }) {
   const currency = order.currency || "USD";
-  const eventId = `pu_${order.id}_${Date.now()}`;
+  // Deterministic event_id (no Date.now()) so this browser fire dedups
+  // against the server-side CAPI fire from the Shopify orders/paid webhook
+  // (`/api/ga4/purchase` uses the same `pu_${tid}` shape). Mismatched
+  // event_ids cause Meta to count each order twice.
+  const eventId = `pu_${order.id}`;
 
-  // Meta Pixel: Purchase
-  fbq("track", "Purchase", {
+  // Website pixel ONLY (not Shopify pixel — Shopify auto-fires Purchase
+  // on its own order-status page via the Shopify Marketing pixel
+  // integration, so we'd double-count the Shopify pixel if we used the
+  // unscoped fbq("track", ...) which fans out to BOTH initialized pixels).
+  const META_WEBSITE_PIXEL = "26033875762978520";
+  fbq("trackSingle", META_WEBSITE_PIXEL, "Purchase", {
     value: order.value,
     currency,
     content_ids: order.items?.map((i) => i.id) || [],

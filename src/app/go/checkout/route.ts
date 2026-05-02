@@ -61,8 +61,8 @@ const ATTRIBUTION_KEYS = [
 const GA4_ATTRIBUTION_KEYS = ATTRIBUTION_KEYS.filter((k) => k !== "_gl");
 
 const CART_CREATE_WITH_LINES = /* GraphQL */ `
-  mutation CartCreate($lines: [CartLineInput!]!) {
-    cartCreate(input: { lines: $lines }) {
+  mutation CartCreate($lines: [CartLineInput!]!, $attributes: [AttributeInput!]) {
+    cartCreate(input: { lines: $lines, attributes: $attributes }) {
       cart {
         checkoutUrl
       }
@@ -73,6 +73,38 @@ const CART_CREATE_WITH_LINES = /* GraphQL */ `
     }
   }
 `;
+
+/**
+ * Build cart attributes that carry the buyer's identity bits across the
+ * domain hop into Shopify checkout / Shop Pay. These end up on the order as
+ * `note_attributes` and are read by `/api/ga4/purchase` to populate the
+ * Meta Conversions API `user_data` block (fbp, fbc, IP, UA). Without these,
+ * Meta receives the Purchase event but can't match it to a click — the
+ * optimizer sees it as unattributable noise and never scales delivery.
+ */
+function buildCartAttributes(req: NextRequest): Array<{ key: string; value: string }> {
+  const out: Array<{ key: string; value: string }> = [];
+  const fbp = req.cookies.get("_fbp")?.value;
+  const fbc = req.cookies.get("_fbc")?.value;
+  const userIp =
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    req.headers.get("x-real-ip") ||
+    "";
+  const userAgent = req.headers.get("user-agent") || "";
+  if (fbp) out.push({ key: "fbp", value: fbp });
+  if (fbc) out.push({ key: "fbc", value: fbc });
+  if (userIp) out.push({ key: "client_ip", value: userIp });
+  if (userAgent) out.push({ key: "client_ua", value: userAgent.slice(0, 500) });
+  // Also stash the GCLID + fbclid if present so Google Ads / Meta offline
+  // conversion backfills can attribute later if needed.
+  const fbclid = req.nextUrl.searchParams.get("fbclid");
+  const gclid = req.nextUrl.searchParams.get("gclid") ||
+                req.nextUrl.searchParams.get("gbraid") ||
+                req.nextUrl.searchParams.get("wbraid");
+  if (fbclid) out.push({ key: "fbclid", value: fbclid.slice(0, 200) });
+  if (gclid) out.push({ key: "gclid", value: gclid.slice(0, 200) });
+  return out;
+}
 
 /** Extract numeric ID from GID for Shopify cart permalink */
 const NUMERIC_VARIANT_ID = SINGLE_BAG_VARIANT_ID.split("/").pop()!;
@@ -334,6 +366,7 @@ export async function GET(req: NextRequest) {
         query: CART_CREATE_WITH_LINES,
         variables: {
           lines: [{ merchandiseId: SINGLE_BAG_VARIANT_ID, quantity: qty }],
+          attributes: buildCartAttributes(req),
         },
       }),
       cache: "no-store",

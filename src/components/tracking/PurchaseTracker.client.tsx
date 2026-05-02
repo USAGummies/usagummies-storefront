@@ -17,12 +17,16 @@ export default function PurchaseTracker() {
     const valueParam = params.get("value");
     const orderParam = params.get("order") || params.get("order_id");
 
-    // Only fire a Purchase event when we actually have order data in the
-    // URL — without this guard, hitting /thank-you directly (e.g. test
-    // load, refresh, returning visitor) would fire a phantom $25 / qty 5
-    // conversion and pollute Meta + Google Ads attribution. Fixed
-    // 2026-04-29.
-    if (!totalParam && !valueParam && !orderParam) return;
+    // Only fire a Purchase event when we have BOTH a real order ID AND
+    // a numeric value. Without an order ID we'd generate a synthetic
+    // `order_${Date.now()}` transaction_id that can't dedup against the
+    // server-side CAPI/GA4-MP fire from the Shopify orders/paid webhook —
+    // Meta + GA4 would count each order twice (once with the real Shopify
+    // order ID, once with our synthetic ID). Fixed 2026-04-29 (phantom
+    // $25 fires) and 2026-05-01 (synthetic-id dedup hole).
+    if (!orderParam) return;
+    const parsedValue = Number(totalParam || valueParam);
+    if (!Number.isFinite(parsedValue) || parsedValue <= 0) return;
 
     // Check if we already tracked this session
     try {
@@ -33,9 +37,7 @@ export default function PurchaseTracker() {
       // continue anyway
     }
 
-    const orderId = orderParam || `order_${Date.now()}`;
-    const parsedValue = Number(totalParam || valueParam);
-    if (!Number.isFinite(parsedValue) || parsedValue <= 0) return;
+    const orderId = orderParam;
     const value = parsedValue;
 
     // Reverse-engineer qty from order total against the canonical bundle pricing.
