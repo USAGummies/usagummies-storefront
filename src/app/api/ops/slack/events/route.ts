@@ -50,6 +50,7 @@ const PROPOSALS_REGEX = /^\/?proposals\s*$/i;
 const SHIPPING_TODAY_REGEX = /^\/?shipping\s+today\s*$/i;
 const WHAT_NEEDS_BEN_REGEX =
   /^\/?(?:what\s+needs\s+ben|ben\s+queue|ben\s+today)\s*$/i;
+const AGENTS_STATUS_REGEX = /^\/?agents\s+status\s*$/i;
 
 /**
  * Reactions that count as "this package physically left the warehouse."
@@ -157,6 +158,7 @@ export async function POST(req: Request): Promise<Response> {
       const isProposals = PROPOSALS_REGEX.test(text);
       const isShippingToday = SHIPPING_TODAY_REGEX.test(text);
       const isWhatNeedsBen = WHAT_NEEDS_BEN_REGEX.test(text);
+      const isAgentsStatus = AGENTS_STATUS_REGEX.test(text);
       const recordReceipt = (input: {
         recognizedCommand?: string | null;
         skippedReason?: string | null;
@@ -185,7 +187,8 @@ export async function POST(req: Request): Promise<Response> {
         !isMarketingToday &&
         !isProposals &&
         !isShippingToday &&
-        !isWhatNeedsBen
+        !isWhatNeedsBen &&
+        !isAgentsStatus
       ) {
         await recordReceipt({ skippedReason: "non-new-message" });
         return NextResponse.json({ ok: true, skipped: "non-new-message" });
@@ -232,6 +235,10 @@ export async function POST(req: Request): Promise<Response> {
       if (isWhatNeedsBen) {
         await recordReceipt({ recognizedCommand: "what-needs-ben" });
         return handleWhatNeedsBenTrigger(msg);
+      }
+      if (isAgentsStatus) {
+        await recordReceipt({ recognizedCommand: "agents-status" });
+        return handleAgentsStatusTrigger(msg);
       }
       if (workpackCommand) {
         await recordReceipt({ recognizedCommand: "workpack" });
@@ -578,6 +585,55 @@ async function handleProposalsTrigger(
     return NextResponse.json({
       ok: true,
       handled: "proposals",
+      degraded: true,
+    });
+  }
+}
+
+async function handleAgentsStatusTrigger(
+  event: SlackMessageEvent,
+): Promise<Response> {
+  if (!event.ts) {
+    return NextResponse.json({
+      ok: true,
+      handled: "agents-status",
+      skipped: "no thread",
+    });
+  }
+  try {
+    const [
+      { WORKPACK_PROMPT_PACKS, PROHIBITED_GLOBAL },
+      { renderAgentsStatusCard },
+    ] = await Promise.all([
+      import("@/lib/ops/workpack-prompts"),
+      import("@/lib/ops/slack-agents-status-card"),
+    ]);
+    const card = renderAgentsStatusCard({
+      packs: WORKPACK_PROMPT_PACKS,
+      prohibitedGlobal: PROHIBITED_GLOBAL,
+    });
+    await postMessage({
+      channel: event.channel ?? slackChannelRef("ops-daily"),
+      text: card.text,
+      blocks: card.blocks,
+      threadTs: event.thread_ts ?? event.ts,
+    });
+    return NextResponse.json({ ok: true, handled: "agents-status" });
+  } catch (err) {
+    try {
+      await postMessage({
+        channel: event.channel ?? slackChannelRef("ops-alerts"),
+        text:
+          ":warning: Agents status could not render. " +
+          (err instanceof Error ? err.message : String(err)),
+        threadTs: event.thread_ts ?? event.ts,
+      });
+    } catch {
+      /* best-effort */
+    }
+    return NextResponse.json({
+      ok: true,
+      handled: "agents-status",
       degraded: true,
     });
   }
