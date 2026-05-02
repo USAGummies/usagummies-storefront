@@ -613,6 +613,37 @@ Acceptance:
 - Claude/Codex can resume from a structured prompt instead of session-history soup.
 - No automated writes happen.
 
+### Build 14 — Slack Slash Command Fallback — SHIPPED
+
+**Goal:** give Ben a reliable command path even if Slack Events do not deliver connector/app-origin messages.
+
+**Status:** shipped after the event-ledger diagnosis showed zero Events receipts for connector-origin `ask codex...` messages.
+
+Files:
+
+- `src/app/api/ops/slack/commands/route.ts`
+- `src/app/api/ops/slack/commands/__tests__/route.test.ts`
+
+Configure in Slack App Admin:
+
+- Command: `/ops`
+- Request URL: `https://www.usagummies.com/api/ops/slack/commands`
+- Usage hint: `ask codex <task>` or `ask claude <task>`
+
+Behavior:
+
+- Verifies Slack signature when `SLACK_SIGNING_SECRET` is configured.
+- Parses the same workpack commands as the Events route.
+- Creates a safe read-only workpack.
+- Returns an ephemeral Block Kit “Workpack queued” card.
+- Does not execute the workpack or mutate Gmail/HubSpot/QBO/Shopify/shipping/approvals.
+
+Acceptance:
+
+- `/ops ask codex <task>` can queue work from Slack without Events API delivery.
+- Work appears in `/ops/workpacks`.
+- Execution remains human/agent driven through the workpack lifecycle controls.
+
 ---
 
 ## 5. Slack UX Standard For All Future Cards
