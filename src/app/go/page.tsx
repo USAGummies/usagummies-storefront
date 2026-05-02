@@ -111,9 +111,35 @@ export default function GoLandingPage() {
           padding: 12px 16px;
           display: flex;
           gap: 8px;
+          /* 2026-05-01: removed mobile-only gate. Clarity showed a 57% scroll
+             drop between 15% and 20% of /go — visitors leave once the BUY
+             CTA scrolls out of view. Persistent bottom CTA on every device
+             keeps the offer one tap away from anywhere on the page. */
         }
         @media (min-width: 768px) {
-          .lp-sticky-bar { display: none; }
+          .lp-sticky-bar {
+            justify-content: center;
+            padding: 14px 20px;
+          }
+          .lp-sticky-bar > a { max-width: 360px; }
+        }
+        /* Headline + trust-badge interactive cues — Clarity 2026-05-01:
+           these elements were silent dead-click targets before. Subtle
+           transition tells the user they're tappable without changing the
+           visual rhythm of the hero. */
+        .lp-headline-link { transition: opacity 0.18s ease, transform 0.18s ease; }
+        .lp-headline-link:hover,
+        .lp-headline-link:focus-visible { opacity: 0.86; transform: translateY(-1px); }
+        .lp-trust-badge {
+          padding: 4px 8px;
+          margin: -4px -8px;
+          border-radius: 6px;
+          transition: background 0.15s ease, color 0.15s ease;
+        }
+        .lp-trust-badge:hover,
+        .lp-trust-badge:focus-visible {
+          background: #f0ede6;
+          color: #c7362c !important;
         }
         /* Supply-chain US map — base styles + highlight the 5 active states.
            The SVG's internal defs/stylesheet block was stripped (hydration
@@ -218,17 +244,38 @@ export default function GoLandingPage() {
               </span>
             </div>
 
-            <h1
-              className="lp-display"
+            {/* Headline is clickable → /ingredients (Clarity 2026-05-01: this
+                element was the #3 most-tapped target on /go with 16 dead
+                clicks/day; users were treating it as interactive). */}
+            <Link
+              href="/ingredients"
+              className="lp-display lp-headline-link"
               style={{
-                fontSize: "clamp(28px, 4.5vw, 48px)",
-                lineHeight: 1.05,
-                color: "#1B2A4A",
-                margin: 0,
+                display: "inline-block",
+                textDecoration: "none",
+                color: "inherit",
+                cursor: "pointer",
               }}
+              aria-label="Read our ingredient story — no Red 40, Yellow 5, or Blue 1"
             >
-              No Red 40. <span style={{ color: "#c7362c" }}>No Yellow 5. No Blue 1.</span>
-            </h1>
+              <h1
+                className="lp-display"
+                style={{
+                  fontSize: "clamp(28px, 4.5vw, 48px)",
+                  lineHeight: 1.05,
+                  color: "#1B2A4A",
+                  margin: 0,
+                }}
+              >
+                No Red 40. <span style={{ color: "#c7362c" }}>No Yellow 5. No Blue 1.</span>
+                <span
+                  aria-hidden
+                  style={{ display: "inline-block", marginLeft: 8, fontSize: "0.45em", color: "#c7a062", verticalAlign: "middle" }}
+                >
+                  ›
+                </span>
+              </h1>
+            </Link>
             <p style={{ fontSize: 14, lineHeight: 1.5, color: "#5f5b56", marginTop: 12, maxWidth: 460, marginLeft: "auto", marginRight: "auto" }}>
               American gummy bears, made across the country.
             </p>
@@ -262,20 +309,38 @@ export default function GoLandingPage() {
           </div>
         </div>
 
-        {/* Trust bar */}
+        {/* Trust bar — each badge is now an actual link (Clarity 2026-05-01:
+            this row was a dead-click target; users were tapping the badges
+            expecting more info). Reviews badge does an in-page anchor scroll. */}
         <div className="lp-animate-d1" style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "12px 24px", marginTop: 20, padding: "14px 20px", background: "#ffffff", borderRadius: 12, border: "1px solid #e0dcd6" }}>
-          <span style={{ fontSize: 12, fontWeight: 600, color: "#1B2A4A", display: "flex", alignItems: "center", gap: 5 }}>
+          <Link
+            href="/made-in-usa"
+            className="lp-trust-badge"
+            style={{ fontSize: 12, fontWeight: 600, color: "#1B2A4A", display: "flex", alignItems: "center", gap: 5, textDecoration: "none", cursor: "pointer" }}
+          >
             🇺🇸 Made in the USA
-          </span>
-          <span style={{ fontSize: 12, fontWeight: 600, color: "#1B2A4A", display: "flex", alignItems: "center", gap: 5 }}>
+          </Link>
+          <Link
+            href="/ingredients"
+            className="lp-trust-badge"
+            style={{ fontSize: 12, fontWeight: 600, color: "#1B2A4A", display: "flex", alignItems: "center", gap: 5, textDecoration: "none", cursor: "pointer" }}
+          >
             🌿 No artificial dyes
-          </span>
-          <span style={{ fontSize: 12, fontWeight: 600, color: "#1B2A4A", display: "flex", alignItems: "center", gap: 5 }}>
+          </Link>
+          <a
+            href="#reviews"
+            className="lp-trust-badge"
+            style={{ fontSize: 12, fontWeight: 600, color: "#1B2A4A", display: "flex", alignItems: "center", gap: 5, textDecoration: "none", cursor: "pointer" }}
+          >
             ⭐ {AMAZON_REVIEWS.aggregate.rating.toFixed(1)} from {AMAZON_REVIEWS.aggregate.count} real reviews
-          </span>
-          <span style={{ fontSize: 12, fontWeight: 600, color: "#1B2A4A", display: "flex", alignItems: "center", gap: 5 }}>
+          </a>
+          <Link
+            href="/policies/shipping"
+            className="lp-trust-badge"
+            style={{ fontSize: 12, fontWeight: 600, color: "#1B2A4A", display: "flex", alignItems: "center", gap: 5, textDecoration: "none", cursor: "pointer" }}
+          >
             🚚 Ships in 24 hours
-          </span>
+          </Link>
         </div>
 
         {/* Inline CTA section — visible above fold on mobile */}
@@ -561,7 +626,7 @@ export default function GoLandingPage() {
       </section>
 
       {/* Social Proof — Reviews */}
-      <section style={{ background: "#ffffff", borderTop: "1px solid #e0dcd6", borderBottom: "1px solid #e0dcd6", padding: "36px 20px" }}>
+      <section id="reviews" style={{ background: "#ffffff", borderTop: "1px solid #e0dcd6", borderBottom: "1px solid #e0dcd6", padding: "36px 20px", scrollMarginTop: "80px" }}>
         <div style={{ maxWidth: 800, margin: "0 auto", textAlign: "center" }}>
           <div className="lp-display" style={{ fontSize: 22, letterSpacing: "1px", color: "#1B2A4A" }}>
             CUSTOMERS LOVE US
