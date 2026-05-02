@@ -45,9 +45,32 @@ interface SelfTestPostResult {
   degraded: boolean;
 }
 
+interface SlackEventReceipt {
+  id: string;
+  eventType: string;
+  channel?: string;
+  messageTs?: string;
+  subtype?: string;
+  botIdPresent: boolean;
+  recognized: boolean;
+  recognizedCommand?: string;
+  skippedReason?: string;
+  textSnippet?: string;
+  createdAt: string;
+}
+
+interface SlackEventLedgerResponse {
+  ok: true;
+  count: number;
+  receipts: SlackEventReceipt[];
+  totals: { recognized: number; skipped: number };
+}
+
 export function SlackControlBoard() {
   const [data, setData] = useState<SelfTestReadiness | null>(null);
+  const [ledger, setLedger] = useState<SlackEventLedgerResponse | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [ledgerError, setLedgerError] = useState<string | null>(null);
   const [selectedChannel, setSelectedChannel] = useState("ops-daily");
   const [posting, setPosting] = useState(false);
   const [postResult, setPostResult] = useState<SelfTestPostResult | null>(null);
@@ -57,11 +80,16 @@ export function SlackControlBoard() {
     let cancelled = false;
     (async () => {
       setLoadError(null);
+      setLedgerError(null);
       setData(null);
+      setLedger(null);
       try {
-        const res = await fetch("/api/ops/slack/self-test", {
-          cache: "no-store",
-        });
+        const [res, ledgerRes] = await Promise.all([
+          fetch("/api/ops/slack/self-test", { cache: "no-store" }),
+          fetch("/api/ops/slack/events/ledger?limit=25", {
+            cache: "no-store",
+          }),
+        ]);
         const body = (await res.json().catch(() => ({}))) as
           | SelfTestReadiness
           | { error?: string };
@@ -71,6 +99,16 @@ export function SlackControlBoard() {
           return;
         }
         setData(body as SelfTestReadiness);
+        const ledgerBody = (await ledgerRes.json().catch(() => ({}))) as
+          | SlackEventLedgerResponse
+          | { error?: string };
+        if (!ledgerRes.ok || (ledgerBody as SlackEventLedgerResponse).ok !== true) {
+          setLedgerError(
+            (ledgerBody as { error?: string }).error ?? `HTTP ${ledgerRes.status}`,
+          );
+          return;
+        }
+        setLedger(ledgerBody as SlackEventLedgerResponse);
       } catch (err) {
         if (!cancelled)
           setLoadError(err instanceof Error ? err.message : String(err));
@@ -334,6 +372,109 @@ export function SlackControlBoard() {
               </table>
             </div>
           </Card>
+
+          <section style={{ marginTop: 16 }}>
+            <Card title="Recent Slack Events">
+              {ledgerError && (
+                <Banner tone="warn">
+                  Slack event ledger unavailable: {ledgerError}
+                </Banner>
+              )}
+              {ledger && (
+                <>
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 10,
+                      flexWrap: "wrap",
+                      marginBottom: 10,
+                    }}
+                  >
+                    <MiniPill
+                      label="Receipts"
+                      value={ledger.count}
+                      color={NAVY}
+                    />
+                    <MiniPill
+                      label="Recognized"
+                      value={ledger.totals.recognized}
+                      color={GREEN}
+                    />
+                    <MiniPill
+                      label="Skipped"
+                      value={ledger.totals.skipped}
+                      color={AMBER}
+                    />
+                  </div>
+                  {ledger.receipts.length === 0 ? (
+                    <p style={bodyCopy}>
+                      No Slack Events receipts recorded yet. If self-test posts
+                      work but this table stays empty after a real Slack
+                      message, Slack App Event Subscriptions are not delivering
+                      to production.
+                    </p>
+                  ) : (
+                    <div style={{ overflowX: "auto" }}>
+                      <table
+                        style={{
+                          width: "100%",
+                          borderCollapse: "collapse",
+                          fontSize: 12,
+                        }}
+                      >
+                        <thead>
+                          <tr style={{ color: DIM, textAlign: "left" }}>
+                            <Th>Time</Th>
+                            <Th>Channel</Th>
+                            <Th>Type</Th>
+                            <Th>Command</Th>
+                            <Th>Skipped</Th>
+                            <Th>Snippet</Th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {ledger.receipts.map((receipt) => (
+                            <tr
+                              key={receipt.id}
+                              style={{ borderTop: `1px dashed ${BORDER}` }}
+                            >
+                              <Td>{formatDate(receipt.createdAt)}</Td>
+                              <Td>
+                                <code>{receipt.channel ?? "—"}</code>
+                              </Td>
+                              <Td>
+                                {receipt.eventType}
+                                {receipt.subtype ? ` · ${receipt.subtype}` : ""}
+                                {receipt.botIdPresent ? " · bot" : ""}
+                              </Td>
+                              <Td
+                                style={{
+                                  color: receipt.recognized ? GREEN : DIM,
+                                  fontWeight: receipt.recognized ? 800 : 500,
+                                }}
+                              >
+                                {receipt.recognizedCommand ?? "—"}
+                              </Td>
+                              <Td
+                                style={{
+                                  color: receipt.skippedReason ? AMBER : DIM,
+                                }}
+                              >
+                                {receipt.skippedReason ?? "—"}
+                              </Td>
+                              <Td style={{ color: DIM }}>
+                                {receipt.textSnippet ?? "—"}
+                              </Td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </>
+              )}
+            </Card>
+          </section>
         </>
       )}
     </main>
@@ -446,6 +587,46 @@ function UrlRow({ label, value }: { label: string; value: string }) {
       </code>
     </div>
   );
+}
+
+function MiniPill({
+  label,
+  value,
+  color,
+}: {
+  label: string;
+  value: number;
+  color: string;
+}) {
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "baseline",
+        gap: 6,
+        border: `1px solid ${color}33`,
+        background: `${color}0f`,
+        color,
+        borderRadius: 999,
+        padding: "5px 9px",
+        fontSize: 12,
+        fontWeight: 800,
+      }}
+    >
+      {label}: {value}
+    </span>
+  );
+}
+
+function formatDate(iso: string): string {
+  const date = new Date(iso);
+  if (!Number.isFinite(date.getTime())) return iso;
+  return date.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
 
 function Th({ children }: { children: React.ReactNode }) {

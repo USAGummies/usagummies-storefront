@@ -237,6 +237,46 @@ describe("reaction → dispatch flow", () => {
         sourceText: "smoke-test workpacks",
       }),
     );
+    const { listSlackEventReceipts } = await import("@/lib/ops/slack-event-ledger");
+    const receipts = await listSlackEventReceipts();
+    expect(receipts[0]).toEqual(
+      expect.objectContaining({
+        recognized: true,
+        recognizedCommand: "workpack",
+        subtype: "bot_message",
+        botIdPresent: true,
+      }),
+    );
+  });
+
+  it("records normal bot chatter as skipped without blocking the handler", async () => {
+    const { POST } = await import("../route");
+    const res = await POST(
+      makeReactionReq({
+        type: "event_callback",
+        event_id: "Ev_bot_chatter",
+        event: {
+          type: "message",
+          subtype: "bot_message",
+          bot_id: "B_OTHER",
+          text: "generic bot update",
+          channel: "C_OPS",
+          ts: "1777300000.777777",
+        },
+      }),
+    );
+    const body = (await res.json()) as { skipped?: string };
+    expect(body.skipped).toBe("non-new-message");
+
+    const { listSlackEventReceipts } = await import("@/lib/ops/slack-event-ledger");
+    const receipts = await listSlackEventReceipts();
+    expect(receipts[0]).toEqual(
+      expect.objectContaining({
+        id: "slackevt_Ev_bot_chatter",
+        recognized: false,
+        skippedReason: "non-new-message",
+      }),
+    );
   });
 
   it("allows workpack commands inside existing threads and replies to the parent", async () => {

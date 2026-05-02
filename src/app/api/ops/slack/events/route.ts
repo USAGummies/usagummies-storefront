@@ -24,6 +24,7 @@ import { getChannel, slackChannelRef } from "@/lib/ops/control-plane/channels";
 import { postMessage, verifySlackSignature } from "@/lib/ops/control-plane/slack";
 import type { ChannelId } from "@/lib/ops/control-plane/types";
 import type { WorkpackInput } from "@/lib/ops/workpacks";
+import { appendSlackEventReceipt } from "@/lib/ops/slack-event-ledger";
 import {
   parseSlackWorkpackCommand,
   renderWorkpackCreatedSlackCard,
@@ -130,7 +131,8 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   if (body.type === "event_callback") {
-    const event = (body as SlackEventCallback).event;
+    const callback = body as SlackEventCallback;
+    const event = callback.event;
     if (event?.type === "message") {
       const msg = event as SlackMessageEvent;
       const text = msg.text ?? "";
@@ -142,11 +144,27 @@ export async function POST(req: Request): Promise<Response> {
         user: msg.user,
       });
       const isCommandCenter = COMMAND_CENTER_REGEX.test(text);
+      const recordReceipt = (input: {
+        recognizedCommand?: string | null;
+        skippedReason?: string | null;
+      }) =>
+        appendSlackEventReceipt({
+          eventId: callback.event_id,
+          teamId: callback.team_id,
+          eventType: msg.type,
+          channel: msg.channel,
+          messageTs: msg.ts,
+          subtype: msg.subtype,
+          botIdPresent: Boolean(msg.bot_id),
+          text,
+          ...input,
+        }).catch(() => undefined);
       // Skip normal bot replies + edits so we don't infinite-loop on
       // our own responses. Explicit operator commands are allowed even
       // when posted from another app integration (e.g. ChatGPT Slack
       // connector), because Ben uses those tools from the road.
       if ((msg.subtype || msg.bot_id) && !workpackCommand && !isCommandCenter) {
+        await recordReceipt({ skippedReason: "non-new-message" });
         return NextResponse.json({ ok: true, skipped: "non-new-message" });
       }
 
@@ -154,25 +172,44 @@ export async function POST(req: Request): Promise<Response> {
       const inSalesChannel = isChannel(msg.channel, "sales");
 
       if (inOperationsChannel && SAMPLE_TRIGGER_REGEX.test(text)) {
+        await recordReceipt({ recognizedCommand: "sample" });
         return handleSampleTrigger(msg);
       }
       if (
         (inOperationsChannel || inSalesChannel) &&
         DISPATCH_TRIGGER_REGEX.test(text)
       ) {
+        await recordReceipt({ recognizedCommand: "dispatch" });
         return handleDispatchTrigger(msg, text);
       }
       if (isCommandCenter) {
+        await recordReceipt({ recognizedCommand: "command-center" });
         return handleCommandCenterTrigger(msg);
       }
       if (workpackCommand) {
+        await recordReceipt({ recognizedCommand: "workpack" });
         return handleWorkpackCommand(msg, workpackCommand.workpack);
       }
+      await recordReceipt({ skippedReason: "no-recognized-command" });
     }
     if (
       event?.type === "reaction_added" ||
       event?.type === "reaction_removed"
     ) {
+      const reaction = event as SlackReactionEvent;
+      await appendSlackEventReceipt({
+        eventId: callback.event_id,
+        teamId: callback.team_id,
+        eventType: reaction.type,
+        channel: reaction.item?.channel,
+        messageTs: reaction.item?.ts,
+        recognizedCommand:
+          reaction.reaction === DISPATCH_REACTION ? "dispatch-reaction" : null,
+        skippedReason:
+          reaction.reaction === DISPATCH_REACTION
+            ? null
+            : "non-dispatch-reaction",
+      }).catch(() => undefined);
       return handleReaction(event as SlackReactionEvent);
     }
   }
