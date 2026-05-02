@@ -357,6 +357,144 @@ Acceptance:
 
 - Marketing has the same “today queue” and approval shape as other departments.
 
+### Build 8 — External Agent + GTM Tool Adapter Layer
+
+**Goal:** let tools like Polsia, Sola, Reevo, OpenAI workspace agents, and Claude Code help the business without becoming uncontrolled systems of record.
+
+Principle:
+
+- HubSpot remains CRM source of truth.
+- Slack remains Ben's command board.
+- Repo-native routes remain the only execution path for sensitive writes.
+- External tools may propose work, drafts, leads, research, and code prompts.
+
+Build:
+
+1. Define a normalized external work item schema:
+   - source tool
+   - department
+   - entity reference
+   - proposed action
+   - risk class
+   - allowed execution path
+   - blocked actions
+2. Add adapter lanes:
+   - Reevo lead/outreach proposals
+   - Polsia strategy/creative/prototype proposals
+   - Sola browser/RPA runbook outputs
+   - OpenAI/Claude/Codex workpack outputs
+3. Render each item as a Slack card with:
+   - source
+   - evidence
+   - recommended action
+   - approve/edit/reject or open-dashboard actions
+4. No external tool directly mutates:
+   - HubSpot stages/properties
+   - Gmail sends
+   - QBO
+   - Shopify cart/pricing/checkout/product logic
+   - ad spend
+   - ShipStation labels
+
+Acceptance:
+
+- External tools increase throughput without creating data drift.
+- Every proposed write enters the same approval/control-plane path.
+
+### Build 9 — Slack Visual Command Board
+
+**Goal:** make Slack feel like a polished operating cockpit instead of text dumps.
+
+Build:
+
+1. Standardize Block Kit department cards:
+   - Sales
+   - Finance
+   - Email
+   - Shipping
+   - Marketing
+   - Ops readiness
+2. Add compact visual summaries:
+   - metric tiles
+   - status bands
+   - emoji-free severity labels where clarity matters
+   - chart/image attachments for dense reports when useful
+3. Add thread-first behavior:
+   - top-level card is short
+   - evidence/raw details stay in thread or dashboard
+4. Add edit modals for draft-heavy workflows.
+
+Acceptance:
+
+- Ben can scan Slack from the road and understand what matters in seconds.
+- Slack messages become decision cards, not walls of text.
+
+### Build 10 — HubSpot Proactive Revenue Agent
+
+**Goal:** stop relying on Ben's memory for customer follow-up, stalled deals, and reorder opportunities.
+
+Phase 1 is read-only.
+
+Build:
+
+1. Add a pure proactive revenue classifier:
+   - stale active deals
+   - stalled sample follow-ups
+   - open call tasks
+   - reorder/check-in candidates when supported by HubSpot timestamps
+   - CRM hygiene gaps when source fields exist
+2. Add read-only route:
+   - `GET /api/ops/hubspot/proactive`
+3. Add `/ops/sales` section:
+   - “HubSpot proactive queue”
+   - grouped actions + top five rows
+4. Add morning brief / Slack slice after the first browser version is stable.
+5. No HubSpot writes, no email drafts, no stage changes in Phase 1.
+
+Acceptance:
+
+- HubSpot becomes a proactive signal source.
+- A HubSpot outage is an error state, never a fabricated zero.
+- No CRM mutation happens.
+
+### Build 11 — Slack AI Operator Router
+
+**Goal:** let Ben converse with ChatGPT / Claude Code / Codex from Slack and get real structured results without model drift.
+
+Build:
+
+1. Add workpack schema + KV queue:
+   - `queued`
+   - `running`
+   - `needs_review`
+   - `approved`
+   - `done`
+   - `failed`
+2. Add Slack reply parser:
+   - `draft reply`
+   - `summarize`
+   - `explain`
+   - `turn into task`
+   - `ask codex`
+   - `ask claude`
+3. Add workpack builder:
+   - source message/thread
+   - entity refs
+   - allowed actions
+   - prohibited actions
+   - expected output schema
+4. Add first safe actions:
+   - draft-only email reply
+   - prepare Codex/Claude implementation prompt
+   - summarize thread into task
+5. No model-owned sends or writes. Approved execution remains repo-native.
+
+Acceptance:
+
+- Ben can work from Slack while on the road.
+- AI workers return structured cards, not freeform drift.
+- Every serious action still has a human approval gate.
+
 ---
 
 ## 5. Slack UX Standard For All Future Cards

@@ -1050,6 +1050,85 @@ describe("buildSalesCommandCenter — stale buyers section", () => {
   });
 });
 
+describe("buildSalesCommandCenter — HubSpot proactive queue", () => {
+  it("assembles the proactive queue from existing pipeline and stale-buyer sources", () => {
+    const report = buildSalesCommandCenter(
+      {
+        ...emptyInput(),
+        salesPipeline: sourceWired({
+          stages: [],
+          openDealCount: 0,
+          staleSampleShipped: {
+            total: 1,
+            preview: [
+              {
+                id: "sample-1",
+                dealname: "Sample Buyer",
+                lastModifiedAt: "2026-04-01T12:00:00.000Z",
+              },
+            ],
+          },
+          openCallTasks: {
+            total: 1,
+            preview: [
+              {
+                id: "task-1",
+                subject: "Call buyer",
+                priority: "HIGH",
+                dueAt: "2026-04-29T12:00:00.000Z",
+              },
+            ],
+          },
+        }),
+        staleBuyers: sourceWired(staleBuyerSummary()),
+      },
+      { now: NOW },
+    );
+
+    expect(report.hubSpotProactive.state.status).toBe("wired");
+    if (report.hubSpotProactive.state.status !== "wired") return;
+    expect(report.hubSpotProactive.state.value.counts.total).toBe(3);
+    expect(report.hubSpotProactive.state.value.topItems[0].label).toBe(
+      "Sample Buyer",
+    );
+  });
+
+  it("surfaces proactive queue errors in blockers instead of faking quiet", () => {
+    const report = buildSalesCommandCenter(
+      {
+        ...emptyInput(),
+        salesPipeline: sourceError("HubSpot unavailable"),
+        staleBuyers: sourceWired(staleBuyerSummary()),
+      },
+      { now: NOW },
+    );
+
+    expect(report.hubSpotProactive.state.status).toBe("error");
+    expect(report.blockers.notes).toContainEqual({
+      source: "hubSpotProactive",
+      state: "error",
+      reason: "HubSpot unavailable",
+    });
+  });
+
+  it("adds a compact proactive line to the Slack slice", () => {
+    const slice = composeSalesCommandSlice({
+      ...emptyInput(),
+      salesPipeline: sourceWired({
+        stages: [],
+        openDealCount: 0,
+        staleSampleShipped: { total: 0, preview: [] },
+        openCallTasks: { total: 0, preview: [] },
+      }),
+      staleBuyers: sourceWired(staleBuyerSummary()),
+    });
+
+    expect(slice.hubSpotProactiveLine).toBe(
+      "HubSpot proactive queue: 1 actions · 0 critical · 1 watch",
+    );
+  });
+});
+
 describe("buildSalesCommandCenter — Day 1 prospect playbook", () => {
   it("surfaces the wired Day 1 prospect counts under wholesale onboarding", () => {
     const report = buildSalesCommandCenter(

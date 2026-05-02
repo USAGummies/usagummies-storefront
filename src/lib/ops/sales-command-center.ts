@@ -223,6 +223,11 @@ export interface SectionWholesaleOnboarding {
   links: Array<{ href: string; label: string }>;
 }
 
+export interface SectionHubSpotProactive {
+  state: SourceState<HubSpotProactiveReport>;
+  link: { href: string; label: string };
+}
+
 export interface SectionRetailProof {
   state: SourceState<LocationDraftCounts>;
   link: { href: string; label: string };
@@ -254,6 +259,7 @@ export interface SalesCommandCenterReport {
   faireDirect: SectionFaireDirect;
   followUps: SectionFollowUps;
   wholesaleOnboarding: SectionWholesaleOnboarding;
+  hubSpotProactive: SectionHubSpotProactive;
   retailProof: SectionRetailProof;
   awaitingBen: SectionAwaitingBen;
   aging: SectionAging;
@@ -314,6 +320,11 @@ import {
   renderSalesPipelineBriefLine,
   type SalesPipelineSummary,
 } from "./sales-pipeline";
+import {
+  buildHubSpotProactiveReport,
+  renderHubSpotProactiveBriefLine,
+  type HubSpotProactiveReport,
+} from "./hubspot-proactive";
 import type { StaleBuyerSummary } from "@/lib/sales/stale-buyer";
 
 export type { SalesPipelineSummary } from "./sales-pipeline";
@@ -375,6 +386,8 @@ export interface SalesCommandSlice {
   wholesaleInquiries: number | null;
   /** Compact HubSpot B2B pipeline line for the morning brief. */
   salesPipelineLine?: string | null;
+  /** Compact HubSpot proactive queue line for the morning brief. */
+  hubSpotProactiveLine?: string | null;
   /** True when at least one wired count above is positive. The
    *  composer uses this to decide between the empty-state copy and
    *  the actionable rendering. */
@@ -426,6 +439,12 @@ export function composeSalesCommandSlice(
     input.salesPipeline ?? sourceNotWired("HubSpot sales pipeline reader not wired."),
     renderSalesPipelineBriefLine,
   );
+  const hubSpotProactiveLine = renderHubSpotProactiveBriefLine(
+    buildHubSpotProactiveReport({
+      salesPipeline: input.salesPipeline,
+      staleBuyers: input.staleBuyers,
+    }),
+  );
 
   // Phase 3 — derive up to 3 aging callouts from the input's
   // agingItems list. The aging stream is sorted critical→overdue→
@@ -469,6 +488,7 @@ export function composeSalesCommandSlice(
     retailDraftsAccepted,
     wholesaleInquiries,
     salesPipelineLine,
+    hubSpotProactiveLine,
     agingCallouts,
     revenueKpi,
     anyAction,
@@ -530,6 +550,27 @@ export function buildSalesCommandCenter(
     input.staleBuyers ?? sourceNotWired("HubSpot stale-buyers reader not wired."),
     staleBuyerCount,
   );
+  const hubSpotProactiveReport = buildHubSpotProactiveReport({
+    salesPipeline: input.salesPipeline,
+    staleBuyers: input.staleBuyers,
+    now: options.now ?? new Date(generatedAt),
+  });
+  const hubSpotProactiveState: SourceState<HubSpotProactiveReport> =
+    hubSpotProactiveReport.status === "ready"
+      ? sourceWired(hubSpotProactiveReport)
+      : hubSpotProactiveReport.status === "error"
+        ? sourceError(
+            hubSpotProactiveReport.notes
+              .filter((n) => n.state === "error")
+              .map((n) => n.reason)
+              .join("; ") || "HubSpot proactive queue degraded",
+          )
+        : sourceNotWired(
+            hubSpotProactiveReport.notes
+              .filter((n) => n.state === "not_wired")
+              .map((n) => n.reason)
+              .join("; ") || "HubSpot proactive queue not wired",
+          );
 
   const anyAction = [
     faireInvitesNeedsReview,
@@ -574,6 +615,9 @@ export function buildSalesCommandCenter(
   }
   if (input.staleBuyers) {
     checks.push(["staleBuyers", input.staleBuyers]);
+  }
+  if (input.salesPipeline || input.staleBuyers) {
+    checks.push(["hubSpotProactive", hubSpotProactiveState]);
   }
   if (input.day1Prospects) {
     checks.push(["day1Prospects", input.day1Prospects]);
@@ -637,6 +681,13 @@ export function buildSalesCommandCenter(
         { href: "/ops/ap-packets", label: "AP packet dashboard" },
         { href: "/ops/finance/review", label: "Finance review" },
       ],
+    },
+    hubSpotProactive: {
+      state: hubSpotProactiveState,
+      link: {
+        href: "/api/ops/hubspot/proactive",
+        label: "Open proactive queue JSON",
+      },
     },
     retailProof: {
       state: input.locationDrafts,

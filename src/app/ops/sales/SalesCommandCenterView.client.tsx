@@ -107,6 +107,30 @@ interface StaleBuyerSummary {
   activeDealsScanned: number;
   source: { system: "hubspot"; retrievedAt: string };
 }
+interface HubSpotProactiveReport {
+  generatedAt: string;
+  status: "ready" | "error" | "not_wired";
+  counts: {
+    total: number;
+    critical: number;
+    watch: number;
+    info: number;
+    staleBuyers: number;
+    staleSamples: number;
+    openCallTasks: number;
+  };
+  topItems: Array<{
+    id: string;
+    kind: "stale_buyer" | "stale_sample" | "open_call_task";
+    severity: "critical" | "watch" | "info";
+    label: string;
+    detail: string;
+    nextAction: string;
+    href: string;
+    ageDays: number | null;
+  }>;
+  notes: Array<{ source: string; state: "error" | "not_wired"; reason: string }>;
+}
 
 interface Report {
   generatedAt: string;
@@ -150,6 +174,10 @@ interface Report {
     staleBuyers: SourceState<StaleBuyerSummary>;
     apPackets: SourceState<ApPacketCounts>;
     links: Array<{ href: string; label: string }>;
+  };
+  hubSpotProactive: {
+    state: SourceState<HubSpotProactiveReport>;
+    link: { href: string; label: string };
   };
   retailProof: {
     state: SourceState<LocationDraftCounts>;
@@ -329,6 +357,7 @@ export function SalesCommandCenterView() {
           <FaireDirectSection report={data} />
           <FollowUpsSection report={data} />
           <WholesaleOnboardingSection report={data} />
+          <HubSpotProactiveSection report={data} />
           <RetailProofSection report={data} />
           <AwaitingBenSection report={data} />
           <KpiScorecardSection report={data} />
@@ -702,6 +731,76 @@ function WholesaleOnboardingSection({ report }: { report: Report }) {
           </Link>
         ))}
       </div>
+    </Section>
+  );
+}
+
+function HubSpotProactiveSection({ report }: { report: Report }) {
+  return (
+    <Section
+      title="HubSpot proactive queue"
+      link={report.hubSpotProactive.link}
+    >
+      {renderSourceState(report.hubSpotProactive.state, (v) => (
+        <>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 10 }}>
+            <MiniStat label="Total" value={v.counts.total} />
+            <MiniStat label="Critical" value={v.counts.critical} color={RED} />
+            <MiniStat label="Watch" value={v.counts.watch} color={AMBER} />
+            <MiniStat label="Call tasks" value={v.counts.openCallTasks} color={NAVY} />
+          </div>
+          {v.topItems.length > 0 ? (
+            <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+              {v.topItems.slice(0, 6).map((item) => (
+                <li
+                  key={item.id}
+                  style={{
+                    borderTop: `1px dashed ${BORDER}`,
+                    padding: "8px 2px",
+                    display: "grid",
+                    gridTemplateColumns: "minmax(0, 1fr) auto",
+                    gap: 10,
+                    alignItems: "start",
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: NAVY }}>
+                      {item.label}
+                    </div>
+                    <div style={{ fontSize: 12, color: DIM, marginTop: 2 }}>
+                      {item.detail} · {item.nextAction}
+                    </div>
+                  </div>
+                  <span
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 800,
+                      color:
+                        item.severity === "critical"
+                          ? RED
+                          : item.severity === "watch"
+                            ? AMBER
+                            : DIM,
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    {item.severity}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div style={{ fontSize: 12, color: DIM }}>
+              HubSpot has no proactive follow-up rows right now.
+            </div>
+          )}
+          {v.notes.length > 0 ? (
+            <div style={{ fontSize: 12, color: AMBER, marginTop: 8 }}>
+              {v.notes.map((n) => `${n.source}: ${n.reason}`).join(" · ")}
+            </div>
+          ) : null}
+        </>
+      ))}
     </Section>
   );
 }
@@ -1284,6 +1383,27 @@ function Stat(props: {
     );
   }
   return inner;
+}
+
+function MiniStat(props: { label: string; value: number; color?: string }) {
+  return (
+    <div
+      style={{
+        background: BG,
+        border: `1px solid ${BORDER}`,
+        borderRadius: 8,
+        padding: "8px 10px",
+        minWidth: 112,
+      }}
+    >
+      <div style={{ fontSize: 18, fontWeight: 800, color: props.color ?? NAVY }}>
+        {props.value}
+      </div>
+      <div style={{ fontSize: 10, color: DIM, textTransform: "uppercase" }}>
+        {props.label}
+      </div>
+    </div>
+  );
 }
 
 function SubLabel({ children }: { children: React.ReactNode }) {
