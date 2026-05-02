@@ -14,12 +14,25 @@ import {
 } from "@/app/ops/tokens";
 
 import type { EmailAgentsStatus } from "@/lib/ops/email-agents-status";
+import type {
+  EmailAgentQueueRow,
+  EmailAgentQueueSummary,
+} from "@/lib/ops/email-agent-queue";
 
 interface StatusResponse {
   ok?: boolean;
   status?: EmailAgentsStatus;
   error?: string;
   code?: string;
+}
+
+interface QueueResponse {
+  ok?: boolean;
+  summary?: EmailAgentQueueSummary;
+  rows?: EmailAgentQueueRow[];
+  truncated?: boolean;
+  degraded?: string[];
+  error?: string;
 }
 
 interface HeartbeatRunRecord {
@@ -67,6 +80,38 @@ export function EmailAgentsStatusView() {
   const [heartbeat, setHeartbeat] = useState<HeartbeatResponse | null>(null);
   const [heartbeatError, setHeartbeatError] = useState<string | null>(null);
   const [heartbeatLoading, setHeartbeatLoading] = useState(false);
+  const [queue, setQueue] = useState<QueueResponse | null>(null);
+  const [queueError, setQueueError] = useState<string | null>(null);
+  const [queueLoading, setQueueLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setQueueLoading(true);
+    setQueueError(null);
+    fetch("/api/ops/email-agents/queue?rows=full&limit=200", {
+      method: "GET",
+      cache: "no-store",
+    })
+      .then(async (res) => {
+        const body = (await res.json().catch(() => null)) as QueueResponse | null;
+        if (!res.ok || !body || body.ok !== true) {
+          throw new Error(body?.error ?? `HTTP ${res.status}`);
+        }
+        if (!cancelled) setQueue(body);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setQueue(null);
+          setQueueError(err instanceof Error ? err.message : String(err));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setQueueLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshKey]);
 
   useEffect(() => {
     let cancelled = false;
@@ -317,6 +362,178 @@ export function EmailAgentsStatusView() {
                   </div>
                 ))}
               </div>
+            </section>
+
+            <section style={sectionStyle} data-testid="email-queue-section">
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
+                <h2 style={{ margin: 0 }}>Inbox queue (Phase 37.1 + 37.2)</h2>
+                {queue?.truncated ? (
+                  <span style={{ fontSize: 12, color: DIM }}>
+                    Truncated — partial scan
+                  </span>
+                ) : null}
+              </div>
+              <p style={{ margin: "8px 0 16px", color: DIM, fontSize: 13 }}>
+                Read-only roll-up over <code>inbox:scan:*</code> KV records
+                written by the Viktor inbox scanner + classifier. No Gmail
+                fetch, no classification, no send happens here.
+              </p>
+
+              {queueLoading ? (
+                <div style={{ color: DIM }}>Loading queue…</div>
+              ) : queueError ? (
+                <div style={{ color: RED }}>Queue unavailable: {queueError}</div>
+              ) : queue?.summary ? (
+                <>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns:
+                        "repeat(auto-fit, minmax(120px, 1fr))",
+                      gap: 10,
+                      marginBottom: 14,
+                    }}
+                  >
+                    <Stat
+                      label="Total"
+                      value={String(queue.summary.total)}
+                      good
+                    />
+                    <Stat
+                      label="Backlog (received)"
+                      value={String(queue.summary.backlogReceived)}
+                      good={queue.summary.backlogReceived === 0}
+                    />
+                    <Stat
+                      label="Classified"
+                      value={String(queue.summary.byStatus.classified ?? 0)}
+                      good
+                    />
+                    <Stat
+                      label="🐳 Whales"
+                      value={String(queue.summary.whaleCount)}
+                      good={queue.summary.whaleCount === 0}
+                    />
+                    <Stat
+                      label="Noise"
+                      value={String(queue.summary.byStatus.received_noise ?? 0)}
+                      good
+                    />
+                  </div>
+
+                  {Object.keys(queue.summary.byCategory ?? {}).length > 0 ? (
+                    <div style={{ marginBottom: 14 }}>
+                      <div style={{ fontSize: 12, color: DIM, fontWeight: 700, marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                        By category
+                      </div>
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        {Object.entries(queue.summary.byCategory)
+                          .sort((a, b) => b[1] - a[1])
+                          .map(([cat, n]) => (
+                            <span
+                              key={cat}
+                              style={{
+                                fontSize: 12,
+                                fontWeight: 700,
+                                padding: "3px 9px",
+                                borderRadius: 999,
+                                background: "rgba(27,42,74,0.05)",
+                                border: `1px solid ${BORDER}`,
+                                fontFamily: "ui-monospace, Menlo, monospace",
+                              }}
+                            >
+                              {cat} · {n}
+                            </span>
+                          ))}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {queue.summary.topRows.length > 0 ? (
+                    <div>
+                      <div
+                        style={{
+                          fontSize: 12,
+                          color: DIM,
+                          fontWeight: 700,
+                          marginBottom: 6,
+                          textTransform: "uppercase",
+                          letterSpacing: 0.5,
+                        }}
+                      >
+                        Top rows ({queue.summary.topRows.length})
+                      </div>
+                      <div style={{ display: "grid", gap: 6 }}>
+                        {queue.summary.topRows.map((r) => (
+                          <div
+                            key={r.messageId}
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns:
+                                "minmax(180px, 1fr) minmax(180px, 1.5fr) auto",
+                              gap: 8,
+                              fontSize: 12,
+                              padding: "6px 0",
+                              borderBottom: `1px dashed ${BORDER}`,
+                              alignItems: "baseline",
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontFamily: "ui-monospace, Menlo, monospace",
+                                color: NAVY,
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                              title={r.fromEmail}
+                            >
+                              {r.fromEmail}
+                            </span>
+                            <span
+                              style={{
+                                color: NAVY,
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                              title={r.subject}
+                            >
+                              {r.subject || "(no subject)"}
+                            </span>
+                            <span
+                              style={{
+                                fontSize: 11,
+                                color:
+                                  r.status === "classified_whale"
+                                    ? GOLD
+                                    : r.status === "received"
+                                      ? "#eab308"
+                                      : DIM,
+                                fontWeight: 700,
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {r.status}
+                              {r.category ? ` · ${r.category}` : ""}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ color: DIM, fontSize: 13 }}>
+                      No actionable rows in queue.
+                    </div>
+                  )}
+
+                  {queue.degraded && queue.degraded.length > 0 ? (
+                    <div style={{ marginTop: 12, fontSize: 12, color: DIM }}>
+                      Degraded: {queue.degraded.join(" · ")}
+                    </div>
+                  ) : null}
+                </>
+              ) : null}
             </section>
 
             <section style={sectionStyle}>

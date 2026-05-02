@@ -43,6 +43,7 @@ const SAMPLE_TRIGGER_REGEX = /\bsample\s*(request|dispatch)\b/i;
 const DISPATCH_TRIGGER_REGEX = /^\/?dispatch\s+(shopify|amazon|hubspot|manual)\b/i;
 const COMMAND_CENTER_REGEX =
   /^\/?(?:ops|operator|command)(?:\s+(?:dashboard|command|center|status|sales))?\s*$/i;
+const EMAIL_QUEUE_REGEX = /^\/?email\s+queue\s*$/i;
 
 /**
  * Reactions that count as "this package physically left the warehouse."
@@ -144,6 +145,7 @@ export async function POST(req: Request): Promise<Response> {
         user: msg.user,
       });
       const isCommandCenter = COMMAND_CENTER_REGEX.test(text);
+      const isEmailQueue = EMAIL_QUEUE_REGEX.test(text);
       const recordReceipt = (input: {
         recognizedCommand?: string | null;
         skippedReason?: string | null;
@@ -163,7 +165,12 @@ export async function POST(req: Request): Promise<Response> {
       // our own responses. Explicit operator commands are allowed even
       // when posted from another app integration (e.g. ChatGPT Slack
       // connector), because Ben uses those tools from the road.
-      if ((msg.subtype || msg.bot_id) && !workpackCommand && !isCommandCenter) {
+      if (
+        (msg.subtype || msg.bot_id) &&
+        !workpackCommand &&
+        !isCommandCenter &&
+        !isEmailQueue
+      ) {
         await recordReceipt({ skippedReason: "non-new-message" });
         return NextResponse.json({ ok: true, skipped: "non-new-message" });
       }
@@ -185,6 +192,10 @@ export async function POST(req: Request): Promise<Response> {
       if (isCommandCenter) {
         await recordReceipt({ recognizedCommand: "command-center" });
         return handleCommandCenterTrigger(msg);
+      }
+      if (isEmailQueue) {
+        await recordReceipt({ recognizedCommand: "email-queue" });
+        return handleEmailQueueTrigger(msg);
       }
       if (workpackCommand) {
         await recordReceipt({ recognizedCommand: "workpack" });
@@ -296,6 +307,52 @@ async function handleCommandCenterTrigger(
       /* best-effort */
     }
     return NextResponse.json({ ok: true, handled: "command-center", degraded: true });
+  }
+}
+
+async function handleEmailQueueTrigger(
+  event: SlackMessageEvent,
+): Promise<Response> {
+  if (!event.ts) {
+    return NextResponse.json({
+      ok: true,
+      handled: "email-queue",
+      skipped: "no thread",
+    });
+  }
+  try {
+    const [{ scanEmailAgentQueue, summarizeEmailAgentQueue }, { renderEmailQueueCard }] =
+      await Promise.all([
+        import("@/lib/ops/email-agent-queue"),
+        import("@/lib/ops/slack-email-queue-card"),
+      ]);
+    const { rows, degraded, truncated } = await scanEmailAgentQueue();
+    const summary = summarizeEmailAgentQueue(rows);
+    const card = renderEmailQueueCard({ summary, truncated, degraded });
+    await postMessage({
+      channel: event.channel ?? slackChannelRef("ops-daily"),
+      text: card.text,
+      blocks: card.blocks,
+      threadTs: event.thread_ts ?? event.ts,
+    });
+    return NextResponse.json({ ok: true, handled: "email-queue" });
+  } catch (err) {
+    try {
+      await postMessage({
+        channel: event.channel ?? slackChannelRef("ops-alerts"),
+        text:
+          ":warning: Email queue could not render. " +
+          (err instanceof Error ? err.message : String(err)),
+        threadTs: event.thread_ts ?? event.ts,
+      });
+    } catch {
+      /* best-effort */
+    }
+    return NextResponse.json({
+      ok: true,
+      handled: "email-queue",
+      degraded: true,
+    });
   }
 }
 
