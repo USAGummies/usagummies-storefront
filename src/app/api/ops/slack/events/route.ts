@@ -48,6 +48,8 @@ const FINANCE_TODAY_REGEX = /^\/?finance\s+today\s*$/i;
 const MARKETING_TODAY_REGEX = /^\/?marketing\s+today\s*$/i;
 const PROPOSALS_REGEX = /^\/?proposals\s*$/i;
 const SHIPPING_TODAY_REGEX = /^\/?shipping\s+today\s*$/i;
+const WHAT_NEEDS_BEN_REGEX =
+  /^\/?(?:what\s+needs\s+ben|ben\s+queue|ben\s+today)\s*$/i;
 
 /**
  * Reactions that count as "this package physically left the warehouse."
@@ -154,6 +156,7 @@ export async function POST(req: Request): Promise<Response> {
       const isMarketingToday = MARKETING_TODAY_REGEX.test(text);
       const isProposals = PROPOSALS_REGEX.test(text);
       const isShippingToday = SHIPPING_TODAY_REGEX.test(text);
+      const isWhatNeedsBen = WHAT_NEEDS_BEN_REGEX.test(text);
       const recordReceipt = (input: {
         recognizedCommand?: string | null;
         skippedReason?: string | null;
@@ -181,7 +184,8 @@ export async function POST(req: Request): Promise<Response> {
         !isFinanceToday &&
         !isMarketingToday &&
         !isProposals &&
-        !isShippingToday
+        !isShippingToday &&
+        !isWhatNeedsBen
       ) {
         await recordReceipt({ skippedReason: "non-new-message" });
         return NextResponse.json({ ok: true, skipped: "non-new-message" });
@@ -224,6 +228,10 @@ export async function POST(req: Request): Promise<Response> {
       if (isShippingToday) {
         await recordReceipt({ recognizedCommand: "shipping-today" });
         return handleShippingTodayTrigger(msg);
+      }
+      if (isWhatNeedsBen) {
+        await recordReceipt({ recognizedCommand: "what-needs-ben" });
+        return handleWhatNeedsBenTrigger(msg);
       }
       if (workpackCommand) {
         await recordReceipt({ recognizedCommand: "workpack" });
@@ -570,6 +578,60 @@ async function handleProposalsTrigger(
     return NextResponse.json({
       ok: true,
       handled: "proposals",
+      degraded: true,
+    });
+  }
+}
+
+async function handleWhatNeedsBenTrigger(
+  event: SlackMessageEvent,
+): Promise<Response> {
+  if (!event.ts) {
+    return NextResponse.json({
+      ok: true,
+      handled: "what-needs-ben",
+      skipped: "no thread",
+    });
+  }
+  try {
+    const [
+      { fetchWhatNeedsBenInputs },
+      { summarizeWhatNeedsBen },
+      { renderWhatNeedsBenCard },
+    ] = await Promise.all([
+      import("@/lib/ops/what-needs-ben-fetch"),
+      import("@/lib/ops/what-needs-ben"),
+      import("@/lib/ops/slack-what-needs-ben-card"),
+    ]);
+    const inputs = await fetchWhatNeedsBenInputs();
+    const summary = summarizeWhatNeedsBen({
+      ...inputs,
+      degraded: inputs.degraded,
+      now: new Date(),
+    });
+    const card = renderWhatNeedsBenCard({ summary });
+    await postMessage({
+      channel: event.channel ?? slackChannelRef("ops-daily"),
+      text: card.text,
+      blocks: card.blocks,
+      threadTs: event.thread_ts ?? event.ts,
+    });
+    return NextResponse.json({ ok: true, handled: "what-needs-ben" });
+  } catch (err) {
+    try {
+      await postMessage({
+        channel: event.channel ?? slackChannelRef("ops-alerts"),
+        text:
+          ":warning: What-needs-Ben could not render. " +
+          (err instanceof Error ? err.message : String(err)),
+        threadTs: event.thread_ts ?? event.ts,
+      });
+    } catch {
+      /* best-effort */
+    }
+    return NextResponse.json({
+      ok: true,
+      handled: "what-needs-ben",
       degraded: true,
     });
   }
