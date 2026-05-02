@@ -23,6 +23,11 @@ import { NextResponse } from "next/server";
 import { getChannel, slackChannelRef } from "@/lib/ops/control-plane/channels";
 import { postMessage, verifySlackSignature } from "@/lib/ops/control-plane/slack";
 import type { ChannelId } from "@/lib/ops/control-plane/types";
+import type { WorkpackInput } from "@/lib/ops/workpacks";
+import {
+  parseSlackWorkpackCommand,
+  renderWorkpackCreatedSlackCard,
+} from "@/lib/ops/slack-workpack-router";
 import {
   clearDispatched,
   findArtifactBySlackTs,
@@ -128,9 +133,10 @@ export async function POST(req: Request): Promise<Response> {
     const event = (body as SlackEventCallback).event;
     if (event?.type === "message") {
       const msg = event as SlackMessageEvent;
-      // Skip our own bot replies + edits + threaded replies so we
-      // don't infinite-loop on our own responses.
-      if (msg.subtype || msg.bot_id || msg.thread_ts) {
+      // Skip our own bot replies + edits so we don't infinite-loop on
+      // our own responses. Thread replies are allowed for workpack
+      // commands ("ask codex", "draft reply", etc.).
+      if (msg.subtype || msg.bot_id) {
         return NextResponse.json({ ok: true, skipped: "non-new-message" });
       }
 
@@ -150,6 +156,16 @@ export async function POST(req: Request): Promise<Response> {
       if (COMMAND_CENTER_REGEX.test(text)) {
         return handleCommandCenterTrigger(msg);
       }
+      const workpackCommand = parseSlackWorkpackCommand({
+        text,
+        channel: msg.channel,
+        ts: msg.ts,
+        threadTs: msg.thread_ts,
+        user: msg.user,
+      });
+      if (workpackCommand) {
+        return handleWorkpackCommand(msg, workpackCommand.workpack);
+      }
     }
     if (
       event?.type === "reaction_added" ||
@@ -161,6 +177,44 @@ export async function POST(req: Request): Promise<Response> {
 
   // Every other event type is acknowledged silently.
   return NextResponse.json({ ok: true });
+}
+
+async function handleWorkpackCommand(
+  event: SlackMessageEvent,
+  workpackInput: WorkpackInput,
+): Promise<Response> {
+  if (!event.ts) {
+    return NextResponse.json({ ok: true, handled: "workpack", skipped: "no thread" });
+  }
+  try {
+    const { createWorkpack } = await import("@/lib/ops/workpacks");
+    const record = await createWorkpack(workpackInput);
+    const message = renderWorkpackCreatedSlackCard(record);
+    await postMessage({
+      channel: event.channel ?? slackChannelRef("ops-daily"),
+      text: message.text,
+      blocks: message.blocks,
+      threadTs: event.thread_ts ?? event.ts,
+    });
+    return NextResponse.json({
+      ok: true,
+      handled: "workpack",
+      workpackId: record.id,
+    });
+  } catch (err) {
+    try {
+      await postMessage({
+        channel: event.channel ?? slackChannelRef("ops-alerts"),
+        text:
+          ":warning: Could not create workpack. " +
+          (err instanceof Error ? err.message : String(err)),
+        threadTs: event.thread_ts ?? event.ts,
+      });
+    } catch {
+      /* best-effort */
+    }
+    return NextResponse.json({ ok: true, handled: "workpack", degraded: true });
+  }
 }
 
 function isChannel(channelId: string | undefined, name: ChannelId): boolean {

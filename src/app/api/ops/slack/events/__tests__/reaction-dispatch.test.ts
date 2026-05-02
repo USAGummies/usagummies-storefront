@@ -42,6 +42,7 @@ vi.mock("@vercel/kv", () => {
 const postMessageMock = vi.fn();
 const buildSlackCommandCenterReportMock = vi.fn();
 const renderSalesCommandCenterSlackMock = vi.fn();
+const createWorkpackMock = vi.fn();
 vi.mock("@/lib/ops/control-plane/slack", () => ({
   verifySlackSignature: vi.fn(async () => ({
     ok: false,
@@ -58,6 +59,10 @@ vi.mock("@/lib/ops/slack-command-center-report", () => ({
 vi.mock("@/lib/ops/slack-command-center", () => ({
   renderSalesCommandCenterSlack: (...args: unknown[]) =>
     renderSalesCommandCenterSlackMock(...args),
+}));
+
+vi.mock("@/lib/ops/workpacks", () => ({
+  createWorkpack: (...args: unknown[]) => createWorkpackMock(...args),
 }));
 
 // Channel registry — return shipping with the canonical Slack ID.
@@ -102,6 +107,22 @@ beforeEach(async () => {
   renderSalesCommandCenterSlackMock.mockReturnValue({
     text: "USA Gummies Command Center",
     blocks: [{ type: "header", text: { type: "plain_text", text: "Command Center" } }],
+  });
+  createWorkpackMock.mockReset();
+  createWorkpackMock.mockResolvedValue({
+    id: "wp_1",
+    status: "queued",
+    intent: "prepare_codex_prompt",
+    department: "ops",
+    title: "Codex implementation prompt",
+    sourceText: "Build it",
+    sourceUrl: "https://usagummies.slack.com/archives/C_OPS/p1777300000444444",
+    requestedBy: "U_BEN",
+    allowedActions: ["prepare_prompt"],
+    prohibitedActions: ["send_email", "write_qbo"],
+    riskClass: "read_only",
+    createdAt: "2026-05-02T12:00:00.000Z",
+    updatedAt: "2026-05-02T12:00:00.000Z",
   });
   // Wipe KV between tests.
   const { kv } = (await import("@vercel/kv")) as unknown as {
@@ -156,6 +177,74 @@ describe("reaction → dispatch flow", () => {
       blocks: [{ type: "header", text: { type: "plain_text", text: "Command Center" } }],
       threadTs: "1777300000.444444",
     });
+  });
+
+  it("creates a workpack and posts a visual card when Ben asks Codex in Slack", async () => {
+    const { POST } = await import("../route");
+    const res = await POST(
+      makeReactionReq({
+        type: "event_callback",
+        event: {
+          type: "message",
+          text: "ask codex build the safe email queue",
+          channel: "C_OPS",
+          user: "U_BEN",
+          ts: "1777300000.444444",
+        },
+      }),
+    );
+    const body = (await res.json()) as { handled?: string; workpackId?: string };
+
+    expect(body.handled).toBe("workpack");
+    expect(body.workpackId).toBe("wp_1");
+    expect(createWorkpackMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        intent: "prepare_codex_prompt",
+        sourceText: "build the safe email queue",
+        requestedBy: "U_BEN",
+      }),
+    );
+    expect(postMessageMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        channel: "C_OPS",
+        text: expect.stringContaining("Workpack queued"),
+        threadTs: "1777300000.444444",
+      }),
+    );
+    const call = postMessageMock.mock.calls.at(-1)?.[0] as { blocks?: unknown[] };
+    expect(JSON.stringify(call.blocks)).toContain("Open workpacks");
+  });
+
+  it("allows workpack commands inside existing threads and replies to the parent", async () => {
+    const { POST } = await import("../route");
+    const res = await POST(
+      makeReactionReq({
+        type: "event_callback",
+        event: {
+          type: "message",
+          text: "draft reply: ask them for the best delivery date",
+          channel: "C_SALES",
+          user: "U_BEN",
+          ts: "1777300000.555555",
+          thread_ts: "1777300000.111111",
+        },
+      }),
+    );
+    const body = (await res.json()) as { handled?: string };
+    expect(body.handled).toBe("workpack");
+    expect(createWorkpackMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        intent: "draft_reply",
+        department: "email",
+        sourceUrl: "https://usagummies.slack.com/archives/C_SALES/p1777300000111111",
+      }),
+    );
+    expect(postMessageMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        channel: "C_SALES",
+        threadTs: "1777300000.111111",
+      }),
+    );
   });
 
   it("ignores non-:white_check_mark: reactions", async () => {
