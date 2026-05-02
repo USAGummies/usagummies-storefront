@@ -45,6 +45,7 @@ const COMMAND_CENTER_REGEX =
   /^\/?(?:ops|operator|command)(?:\s+(?:dashboard|command|center|status|sales))?\s*$/i;
 const EMAIL_QUEUE_REGEX = /^\/?email\s+queue\s*$/i;
 const FINANCE_TODAY_REGEX = /^\/?finance\s+today\s*$/i;
+const MARKETING_TODAY_REGEX = /^\/?marketing\s+today\s*$/i;
 
 /**
  * Reactions that count as "this package physically left the warehouse."
@@ -148,6 +149,7 @@ export async function POST(req: Request): Promise<Response> {
       const isCommandCenter = COMMAND_CENTER_REGEX.test(text);
       const isEmailQueue = EMAIL_QUEUE_REGEX.test(text);
       const isFinanceToday = FINANCE_TODAY_REGEX.test(text);
+      const isMarketingToday = MARKETING_TODAY_REGEX.test(text);
       const recordReceipt = (input: {
         recognizedCommand?: string | null;
         skippedReason?: string | null;
@@ -172,7 +174,8 @@ export async function POST(req: Request): Promise<Response> {
         !workpackCommand &&
         !isCommandCenter &&
         !isEmailQueue &&
-        !isFinanceToday
+        !isFinanceToday &&
+        !isMarketingToday
       ) {
         await recordReceipt({ skippedReason: "non-new-message" });
         return NextResponse.json({ ok: true, skipped: "non-new-message" });
@@ -203,6 +206,10 @@ export async function POST(req: Request): Promise<Response> {
       if (isFinanceToday) {
         await recordReceipt({ recognizedCommand: "finance-today" });
         return handleFinanceTodayTrigger(msg);
+      }
+      if (isMarketingToday) {
+        await recordReceipt({ recognizedCommand: "marketing-today" });
+        return handleMarketingTodayTrigger(msg);
       }
       if (workpackCommand) {
         await recordReceipt({ recognizedCommand: "workpack" });
@@ -433,6 +440,74 @@ async function handleFinanceTodayTrigger(
     return NextResponse.json({
       ok: true,
       handled: "finance-today",
+      degraded: true,
+    });
+  }
+}
+
+async function handleMarketingTodayTrigger(
+  event: SlackMessageEvent,
+): Promise<Response> {
+  if (!event.ts) {
+    return NextResponse.json({
+      ok: true,
+      handled: "marketing-today",
+      skipped: "no thread",
+    });
+  }
+  try {
+    const [
+      { approvalStore },
+      { fetchMarketingPlatforms },
+      { summarizeMarketingToday },
+      { renderMarketingTodayCard },
+    ] = await Promise.all([
+      import("@/lib/ops/control-plane/stores"),
+      import("@/lib/ops/marketing-today-fetch"),
+      import("@/lib/ops/marketing-today"),
+      import("@/lib/ops/slack-marketing-today-card"),
+    ]);
+    const degraded: string[] = [];
+    let approvals: Awaited<
+      ReturnType<ReturnType<typeof approvalStore>["listPending"]>
+    > = [];
+    try {
+      approvals = await approvalStore().listPending();
+    } catch (err) {
+      degraded.push(
+        `approvals:${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+    const platformFetch = await fetchMarketingPlatforms();
+    const summary = summarizeMarketingToday({
+      platforms: platformFetch.platforms,
+      pendingApprovals: approvals,
+      degraded: [...degraded, ...platformFetch.degraded],
+      now: new Date(),
+    });
+    const card = renderMarketingTodayCard({ summary });
+    await postMessage({
+      channel: event.channel ?? slackChannelRef("marketing"),
+      text: card.text,
+      blocks: card.blocks,
+      threadTs: event.thread_ts ?? event.ts,
+    });
+    return NextResponse.json({ ok: true, handled: "marketing-today" });
+  } catch (err) {
+    try {
+      await postMessage({
+        channel: event.channel ?? slackChannelRef("ops-alerts"),
+        text:
+          ":warning: Marketing today could not render. " +
+          (err instanceof Error ? err.message : String(err)),
+        threadTs: event.thread_ts ?? event.ts,
+      });
+    } catch {
+      /* best-effort */
+    }
+    return NextResponse.json({
+      ok: true,
+      handled: "marketing-today",
       degraded: true,
     });
   }
