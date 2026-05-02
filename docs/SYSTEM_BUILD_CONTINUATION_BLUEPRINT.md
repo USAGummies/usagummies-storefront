@@ -13,7 +13,7 @@ The repo now has a broad operating platform: sales command center, readiness das
 The core issue is not lack of primitives. The issue is **system integration and operator polish**:
 
 - Many workflows exist as isolated route/page/helper islands.
-- Slack is now correctly routed by live channel IDs, but the app-side Slack configuration still must be smoke-tested in production.
+- Slack is now correctly routed by live channel IDs. The production self-test route posted a Block Kit card to `#ops-daily` successfully on 2026-05-02, proving bot token + channel routing for `chat.postMessage`.
 - Approval cards are materially better, but most workflow-specific payload previews still need bespoke renderers.
 - Email workflows have safety gates, but the actual email-agent group must be made observable, recoverable, and Slack-editable before it can run daily.
 - OpenAI workspace tools exist as read-only connectors, but they are not yet organized into department agent workpacks with daily/weekly task loops.
@@ -23,18 +23,24 @@ The core issue is not lack of primitives. The issue is **system integration and 
 
 ## 2. Highest-Risk Problems To Fix First
 
-### P0 — Slack App Live Wiring Is Still The Bottleneck
+### P0 — Slack Event Ingestion Is The Remaining Bottleneck
 
-Code now expects:
+Verified working:
+
+- `SLACK_BOT_TOKEN` present in production
+- `SLACK_SIGNING_SECRET` present in production
+- `/api/ops/slack/self-test` deployed
+- production bot can post a Block Kit card to `#ops-daily` by canonical channel ID
+- `/ops/slack` exists as the operator-facing Slack control board
+
+Still not proven:
 
 - Events API to hit `/api/ops/slack/events`
 - Interactivity to hit `/api/slack/approvals`
-- `SLACK_SIGNING_SECRET` present
-- `SLACK_BOT_TOKEN` present
 - bot invited to active private channels
-- bot scopes for `chat:write`, `commands` if slash commands are added, `channels:history` / `groups:history` where read loops need history, and `files:write` where file upload is used
+- bot scopes for `commands` if slash commands are added, `channels:history` / `groups:history` where read loops need history, and `files:write` where file upload is used
 
-If this is not correct in the Slack App Admin UI, the repo can be perfect and Slack will still feel dead.
+Important live finding: messages posted through the ChatGPT Slack connector showed up in `#ops-daily`, but did **not** generate in-thread replies from `/api/ops/slack/events`. That likely means Slack Events does not deliver bot/app-origin messages, the app event subscription is not firing for that channel, or the event URL/subscription configuration still needs admin verification. The repo now has diagnostics, but Slack App Admin still needs a human smoke.
 
 ### P0 — Approval “Needs edit” Is Now Structured, But Not Yet Payload-Revising
 
@@ -94,7 +100,7 @@ Several departments have data surfaces but not one clear queue:
 
 ### P1 — OpenAI Workspace Agents Need Workpacks
 
-Current OpenAI workspace tooling is mostly read-only and safe. That is correct.
+Current OpenAI workspace tooling is mostly read-only and safe. That is correct. The first generic workpack queue now exists and `/ops/workpacks` exposes it to operators.
 
 Missing:
 
@@ -119,7 +125,9 @@ Missing:
 
 ## 4. Recommended Implementation Sequence
 
-### Build 1 — Slack App Live Smoke + Self-Test Route
+### Build 1 — Slack App Live Smoke + Self-Test Route — SHIPPED
+
+**Status:** shipped in commits `85a9e12d` and `9c62d57a`.
 
 **Goal:** prove production Slack wiring from code, not by guessing.
 
@@ -147,9 +155,16 @@ Build:
 
 Acceptance:
 
-- Operator can hit the route after deploy and prove Slack app config.
+- Operator can hit `/ops/slack` after deploy and see Slack readiness.
+- `POST /api/ops/slack/self-test` posts a compact Block Kit card to `#ops-daily`.
 - No secrets leak.
 - No external workflow mutation.
+
+Production verification completed 2026-05-02:
+
+- `GET /api/ops/slack/self-test` returned 200 with bot/signing-secret booleans present and active channel registry rows.
+- `POST /api/ops/slack/self-test {channel:"ops-daily"}` returned 200 and posted to `#ops-daily` at Slack ts `1777758790.850549`.
+- Slack connector readback confirmed the `USA Gummies Ops` bot message landed in `#ops-daily`.
 
 ### Build 2 — Department Command Cards
 
@@ -287,7 +302,7 @@ Acceptance:
 - Rene has a clean approval station.
 - No QBO write yet unless separately approved.
 
-### Build 6 — OpenAI Workspace Agent Workpacks
+### Build 6 — OpenAI Workspace Agent Workpacks — PARTIALLY SHIPPED
 
 **Goal:** make ChatGPT workspace agents useful without giving them unsafe write access.
 
@@ -322,6 +337,21 @@ Build:
 5. Tests:
    - workpacks are read-only unless explicit approval slug
    - prohibited actions include QBO autonomous writes, pricing, checkout, Shopify product logic, ungated Gmail sends
+
+Shipped so far:
+
+- `src/lib/ops/workpacks.ts`
+- `GET/POST /api/ops/workpacks`
+- `/ops/workpacks`
+- Slack workpack router for phrases like `ask codex`, `ask claude`, `draft reply`, `summarize`, and `turn into task`
+- app/bot-origin explicit commands are allowed by the local route tests
+
+Still missing:
+
+- actual Slack Events live delivery for connector-origin commands
+- workpack execution/claiming loop
+- department-specific workpack prompt packs
+- result cards back into Slack threads
 
 Acceptance:
 
@@ -457,7 +487,7 @@ Acceptance:
 - A HubSpot outage is an error state, never a fabricated zero.
 - No CRM mutation happens.
 
-### Build 11 — Slack AI Operator Router
+### Build 11 — Slack AI Operator Router — PARTIALLY SHIPPED
 
 **Goal:** let Ben converse with ChatGPT / Claude Code / Codex from Slack and get real structured results without model drift.
 
@@ -489,11 +519,99 @@ Build:
    - summarize thread into task
 5. No model-owned sends or writes. Approved execution remains repo-native.
 
+Shipped so far:
+
+- workpack schema + KV queue
+- Slack message parser/router
+- in-thread `Workpack queued` reply path in code
+- `/ops/workpacks` dashboard for fallback visibility
+
+Live blocker:
+
+- Connector-origin messages in `#ops-daily` did not trigger the production event route during the 2026-05-02 smoke. The code path is tested, but Slack Events delivery/config needs admin validation.
+
 Acceptance:
 
 - Ben can work from Slack while on the road.
 - AI workers return structured cards, not freeform drift.
 - Every serious action still has a human approval gate.
+
+### Build 12 — Slack Event Receipt Ledger
+
+**Goal:** stop guessing whether Slack Events is firing. Record the last safe subset of inbound event metadata so the operator can see whether Slack is delivering events to the app.
+
+Files to touch:
+
+- `src/lib/ops/slack-event-ledger.ts` (new)
+- `src/app/api/ops/slack/events/route.ts`
+- `src/app/api/ops/slack/events/ledger/route.ts` (new read-only route)
+- `src/app/ops/slack/SlackControlBoard.client.tsx`
+- tests under `src/lib/ops/__tests__` and `src/app/api/ops/slack/events/__tests__`
+
+Build:
+
+1. Add a KV-backed event receipt ledger with a capped index (`ops:slack-events:index`).
+2. Store only non-secret metadata:
+   - event id / team id if present
+   - channel id
+   - message ts
+   - subtype
+   - whether command was recognized
+   - whether the event was skipped and why
+   - createdAt
+3. Call it at the top of `/api/ops/slack/events` after signature/auth verification and body parse.
+4. Add `GET /api/ops/slack/events/ledger?limit=25` auth-gated read-only route.
+5. Add a “Recent Slack Events” section to `/ops/slack`.
+6. Tests:
+   - no raw message body stored beyond a short safe snippet
+   - bot/app message with explicit command records `recognized=true`
+   - normal bot chatter records skipped reason
+   - ledger KV failure never blocks event handler
+
+Acceptance:
+
+- Ben can open `/ops/slack` and immediately see whether Slack Events are reaching production.
+- Event delivery failures are distinguishable from parser failures.
+- No secrets or long message bodies are stored.
+
+### Build 13 — Workpack Claim / Result Loop
+
+**Goal:** make `/ops/workpacks` useful for Codex/Claude handoff, not just a queue.
+
+Files to touch:
+
+- `src/lib/ops/workpacks.ts`
+- `src/app/api/ops/workpacks/[id]/route.ts` (new)
+- `src/app/ops/workpacks/WorkpacksView.client.tsx`
+- tests
+
+Build:
+
+1. Add `updateWorkpack()` with safe fields:
+   - status
+   - assignedTo
+   - resultSummary
+   - resultPrompt
+   - resultLinks
+   - failureReason
+2. Add `PATCH /api/ops/workpacks/[id]`.
+3. UI controls:
+   - mark running
+   - mark needs_review
+   - mark done
+   - attach result summary/prompt
+4. Keep all execution external/human-operated for this phase.
+5. Tests lock:
+   - status enum
+   - no business-system imports
+   - source guardrails preserved
+   - invalid transitions fail closed where needed
+
+Acceptance:
+
+- A Slack-created workpack can be claimed and completed from the browser.
+- Claude/Codex can resume from a structured prompt instead of session-history soup.
+- No automated writes happen.
 
 ---
 
@@ -528,10 +646,16 @@ Avoid:
 ```text
 You are working in /Users/ben/usagummies-storefront on main.
 
-Goal: continue polishing USA Gummies into a Slack-first business operating system.
+Goal: build Build 12 from docs/SYSTEM_BUILD_CONTINUATION_BLUEPRINT.md:
+Slack Event Receipt Ledger.
 
-Start with Build 1 from docs/SYSTEM_BUILD_CONTINUATION_BLUEPRINT.md:
-Slack App Live Smoke + Self-Test Route.
+Context:
+- Slack self-test is shipped and production-verified.
+- /ops/slack exists and can post a visual Block Kit self-test card.
+- /ops/workpacks exists.
+- The remaining blocker is knowing whether Slack Events are actually reaching
+  /api/ops/slack/events in production. Connector-origin `ask codex...`
+  messages appeared in #ops-daily but did not get bot replies.
 
 Constraints:
 - Do not touch pricing, cart, bundle math, Shopify product logic, checkout, QBO writes, or inventory rules.
@@ -541,18 +665,28 @@ Constraints:
 - No secrets may ever appear in responses or logs.
 
 Build:
-1. Add GET/POST /api/ops/slack/self-test.
-2. GET returns boolean-only Slack readiness: bot token present, signing secret present, live channel registry ids, expected Events URL, expected Interactivity URL, required scopes as checklist text.
-3. POST optionally posts a compact Block Kit test card to a requested registered channel; default ops-daily. Auth-gated with isAuthorized().
-4. Add readiness smoke-check entry linking to /api/ops/slack/self-test.
+1. New src/lib/ops/slack-event-ledger.ts:
+   - appendSlackEventReceipt()
+   - listSlackEventReceipts()
+   - capped KV index
+   - stores safe metadata only, not full raw event bodies
+2. Wire appendSlackEventReceipt into /api/ops/slack/events after request
+   verification/body parse. Ledger failures must never block event handling.
+3. New GET /api/ops/slack/events/ledger:
+   - auth-gated with isAuthorized()
+   - returns recent receipts + totals
+4. Extend /ops/slack with a Recent Slack Events section:
+   - event time
+   - channel
+   - subtype
+   - recognized command yes/no
+   - skipped reason
 5. Tests:
-   - 401 unauthenticated
-   - GET no secret leak
-   - GET includes expected URLs
-   - POST defaults to C0ATWJDKLTU
-   - POST refuses unknown channel id/name
-   - POST never accepts archived channel ids
-6. Update contracts/slack-operating.md version history.
+   - no secret leak / no full body leak
+   - explicit app/bot command records recognized=true
+   - regular bot chatter records skipped reason
+   - ledger KV failure does not break the Slack event handler
+   - GET route auth-gated
 
 Run:
 - npx vitest run
@@ -562,9 +696,9 @@ Run:
 Commit and push.
 
 Acceptance:
-- Operator can verify Slack app live wiring from /ops/readiness.
-- Self-test proves the bot can post to a live channel by channel ID.
-- No workflow mutation occurs.
+- Operator can verify Slack Events delivery from /ops/slack.
+- Event-delivery failures are distinguishable from parser/router failures.
+- No workflow mutation occurs beyond the diagnostic KV ledger.
 - Tests/typecheck/lint pass.
 ```
 
