@@ -215,6 +215,30 @@ describe("reaction → dispatch flow", () => {
     expect(JSON.stringify(call.blocks)).toContain("Open workpacks");
   });
 
+  it("allows explicit workpack commands posted by another Slack app integration", async () => {
+    const { POST } = await import("../route");
+    const res = await POST(
+      makeReactionReq({
+        type: "event_callback",
+        event: {
+          type: "message",
+          subtype: "bot_message",
+          bot_id: "B_CHATGPT",
+          text: "ask codex smoke-test workpacks",
+          channel: "C_OPS",
+          ts: "1777300000.666666",
+        },
+      }),
+    );
+    const body = (await res.json()) as { handled?: string };
+    expect(body.handled).toBe("workpack");
+    expect(createWorkpackMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sourceText: "smoke-test workpacks",
+      }),
+    );
+  });
+
   it("allows workpack commands inside existing threads and replies to the parent", async () => {
     const { POST } = await import("../route");
     const res = await POST(

@@ -133,14 +133,23 @@ export async function POST(req: Request): Promise<Response> {
     const event = (body as SlackEventCallback).event;
     if (event?.type === "message") {
       const msg = event as SlackMessageEvent;
-      // Skip our own bot replies + edits so we don't infinite-loop on
-      // our own responses. Thread replies are allowed for workpack
-      // commands ("ask codex", "draft reply", etc.).
-      if (msg.subtype || msg.bot_id) {
+      const text = msg.text ?? "";
+      const workpackCommand = parseSlackWorkpackCommand({
+        text,
+        channel: msg.channel,
+        ts: msg.ts,
+        threadTs: msg.thread_ts,
+        user: msg.user,
+      });
+      const isCommandCenter = COMMAND_CENTER_REGEX.test(text);
+      // Skip normal bot replies + edits so we don't infinite-loop on
+      // our own responses. Explicit operator commands are allowed even
+      // when posted from another app integration (e.g. ChatGPT Slack
+      // connector), because Ben uses those tools from the road.
+      if ((msg.subtype || msg.bot_id) && !workpackCommand && !isCommandCenter) {
         return NextResponse.json({ ok: true, skipped: "non-new-message" });
       }
 
-      const text = msg.text ?? "";
       const inOperationsChannel = isChannel(msg.channel, "operations");
       const inSalesChannel = isChannel(msg.channel, "sales");
 
@@ -153,16 +162,9 @@ export async function POST(req: Request): Promise<Response> {
       ) {
         return handleDispatchTrigger(msg, text);
       }
-      if (COMMAND_CENTER_REGEX.test(text)) {
+      if (isCommandCenter) {
         return handleCommandCenterTrigger(msg);
       }
-      const workpackCommand = parseSlackWorkpackCommand({
-        text,
-        channel: msg.channel,
-        ts: msg.ts,
-        threadTs: msg.thread_ts,
-        user: msg.user,
-      });
       if (workpackCommand) {
         return handleWorkpackCommand(msg, workpackCommand.workpack);
       }
