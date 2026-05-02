@@ -46,6 +46,7 @@ const COMMAND_CENTER_REGEX =
 const EMAIL_QUEUE_REGEX = /^\/?email\s+queue\s*$/i;
 const FINANCE_TODAY_REGEX = /^\/?finance\s+today\s*$/i;
 const MARKETING_TODAY_REGEX = /^\/?marketing\s+today\s*$/i;
+const PROPOSALS_REGEX = /^\/?proposals\s*$/i;
 
 /**
  * Reactions that count as "this package physically left the warehouse."
@@ -150,6 +151,7 @@ export async function POST(req: Request): Promise<Response> {
       const isEmailQueue = EMAIL_QUEUE_REGEX.test(text);
       const isFinanceToday = FINANCE_TODAY_REGEX.test(text);
       const isMarketingToday = MARKETING_TODAY_REGEX.test(text);
+      const isProposals = PROPOSALS_REGEX.test(text);
       const recordReceipt = (input: {
         recognizedCommand?: string | null;
         skippedReason?: string | null;
@@ -175,7 +177,8 @@ export async function POST(req: Request): Promise<Response> {
         !isCommandCenter &&
         !isEmailQueue &&
         !isFinanceToday &&
-        !isMarketingToday
+        !isMarketingToday &&
+        !isProposals
       ) {
         await recordReceipt({ skippedReason: "non-new-message" });
         return NextResponse.json({ ok: true, skipped: "non-new-message" });
@@ -210,6 +213,10 @@ export async function POST(req: Request): Promise<Response> {
       if (isMarketingToday) {
         await recordReceipt({ recognizedCommand: "marketing-today" });
         return handleMarketingTodayTrigger(msg);
+      }
+      if (isProposals) {
+        await recordReceipt({ recognizedCommand: "proposals" });
+        return handleProposalsTrigger(msg);
       }
       if (workpackCommand) {
         await recordReceipt({ recognizedCommand: "workpack" });
@@ -508,6 +515,54 @@ async function handleMarketingTodayTrigger(
     return NextResponse.json({
       ok: true,
       handled: "marketing-today",
+      degraded: true,
+    });
+  }
+}
+
+async function handleProposalsTrigger(
+  event: SlackMessageEvent,
+): Promise<Response> {
+  if (!event.ts) {
+    return NextResponse.json({
+      ok: true,
+      handled: "proposals",
+      skipped: "no thread",
+    });
+  }
+  try {
+    const [
+      { listExternalProposals, summarizeExternalProposals },
+      { renderExternalProposalsCard },
+    ] = await Promise.all([
+      import("@/lib/ops/external-proposals"),
+      import("@/lib/ops/slack-external-proposals-card"),
+    ]);
+    const { records, degraded } = await listExternalProposals({ limit: 100 });
+    const summary = summarizeExternalProposals(records);
+    const card = renderExternalProposalsCard({ summary, degraded });
+    await postMessage({
+      channel: event.channel ?? slackChannelRef("ops-daily"),
+      text: card.text,
+      blocks: card.blocks,
+      threadTs: event.thread_ts ?? event.ts,
+    });
+    return NextResponse.json({ ok: true, handled: "proposals" });
+  } catch (err) {
+    try {
+      await postMessage({
+        channel: event.channel ?? slackChannelRef("ops-alerts"),
+        text:
+          ":warning: Proposals could not render. " +
+          (err instanceof Error ? err.message : String(err)),
+        threadTs: event.thread_ts ?? event.ts,
+      });
+    } catch {
+      /* best-effort */
+    }
+    return NextResponse.json({
+      ok: true,
+      handled: "proposals",
       degraded: true,
     });
   }
