@@ -33,6 +33,12 @@ interface WorkpackRecord {
   allowedActions: string[];
   prohibitedActions: string[];
   riskClass: WorkpackRiskClass;
+  assignedTo?: string;
+  resultSummary?: string;
+  resultPrompt?: string;
+  resultLinks?: string[];
+  failureReason?: string;
+  completedAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -198,6 +204,7 @@ export function WorkpacksView() {
                 key={status}
                 status={status}
                 workpacks={grouped[status]}
+                onChanged={() => setRefreshTick((n) => n + 1)}
               />
             ))
           )}
@@ -210,9 +217,11 @@ export function WorkpacksView() {
 function WorkpackSection({
   status,
   workpacks,
+  onChanged,
 }: {
   status: WorkpackStatus;
   workpacks: WorkpackRecord[];
+  onChanged: () => void;
 }) {
   if (workpacks.length === 0) return null;
   return (
@@ -239,14 +248,71 @@ function WorkpackSection({
       </div>
       <div style={{ display: "grid", gap: 10 }}>
         {workpacks.map((workpack) => (
-          <WorkpackCard key={workpack.id} workpack={workpack} />
+          <WorkpackCard
+            key={workpack.id}
+            workpack={workpack}
+            onChanged={onChanged}
+          />
         ))}
       </div>
     </section>
   );
 }
 
-function WorkpackCard({ workpack }: { workpack: WorkpackRecord }) {
+function WorkpackCard({
+  workpack,
+  onChanged,
+}: {
+  workpack: WorkpackRecord;
+  onChanged: () => void;
+}) {
+  const [status, setStatus] = useState<WorkpackStatus>(workpack.status);
+  const [assignedTo, setAssignedTo] = useState(workpack.assignedTo ?? "");
+  const [resultSummary, setResultSummary] = useState(workpack.resultSummary ?? "");
+  const [resultPrompt, setResultPrompt] = useState(workpack.resultPrompt ?? "");
+  const [resultLinks, setResultLinks] = useState(
+    (workpack.resultLinks ?? []).join("\n"),
+  );
+  const [failureReason, setFailureReason] = useState(workpack.failureReason ?? "");
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  async function savePatch() {
+    setSaving(true);
+    setSaved(false);
+    setSaveError(null);
+    try {
+      const links = resultLinks
+        .split(/\r?\n/)
+        .map((link) => link.trim())
+        .filter(Boolean);
+      const res = await fetch(`/api/ops/workpacks/${encodeURIComponent(workpack.id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status,
+          assignedTo,
+          resultSummary,
+          resultPrompt,
+          resultLinks: links,
+          failureReason,
+        }),
+      });
+      const body = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
+      if (!res.ok) {
+        setSaveError(body.error ?? body.code ?? `HTTP ${res.status}`);
+        return;
+      }
+      setSaved(true);
+      onChanged();
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <article
       style={{
@@ -334,6 +400,104 @@ function WorkpackCard({ workpack }: { workpack: WorkpackRecord }) {
           Open source thread
         </a>
       )}
+
+      <div
+        style={{
+          marginTop: 12,
+          borderTop: `1px dashed ${BORDER}`,
+          paddingTop: 12,
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+          gap: 10,
+        }}
+      >
+        <label style={fieldLabel}>
+          Status
+          <select
+            value={status}
+            onChange={(event) => setStatus(event.target.value as WorkpackStatus)}
+            style={inputStyle}
+          >
+            {STATUS_ORDER.map((s) => (
+              <option key={s} value={s}>
+                {s.replaceAll("_", " ")}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label style={fieldLabel}>
+          Assigned to
+          <input
+            value={assignedTo}
+            onChange={(event) => setAssignedTo(event.target.value)}
+            placeholder="Codex, Claude, Ben..."
+            style={inputStyle}
+          />
+        </label>
+        <label style={fieldLabel}>
+          Result links
+          <textarea
+            value={resultLinks}
+            onChange={(event) => setResultLinks(event.target.value)}
+            placeholder="https://..."
+            rows={2}
+            style={textareaStyle}
+          />
+        </label>
+        <label style={fieldLabel}>
+          Failure reason
+          <input
+            value={failureReason}
+            onChange={(event) => setFailureReason(event.target.value)}
+            placeholder="Only if failed"
+            style={inputStyle}
+          />
+        </label>
+      </div>
+      <label style={{ ...fieldLabel, marginTop: 10 }}>
+        Result summary
+        <textarea
+          value={resultSummary}
+          onChange={(event) => setResultSummary(event.target.value)}
+          placeholder="What was produced?"
+          rows={2}
+          style={textareaStyle}
+        />
+      </label>
+      <label style={{ ...fieldLabel, marginTop: 10 }}>
+        Continuation prompt / handoff
+        <textarea
+          value={resultPrompt}
+          onChange={(event) => setResultPrompt(event.target.value)}
+          placeholder="Paste the next-agent prompt here."
+          rows={4}
+          style={textareaStyle}
+        />
+      </label>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          marginTop: 10,
+          flexWrap: "wrap",
+        }}
+      >
+        <button
+          type="button"
+          onClick={savePatch}
+          disabled={saving}
+          style={{
+            ...buttonStyle,
+            opacity: saving ? 0.6 : 1,
+            cursor: saving ? "wait" : "pointer",
+          }}
+        >
+          {saving ? "Saving..." : "Save workpack state"}
+        </button>
+        {saved && <span style={{ color: GREEN, fontSize: 12 }}>Saved.</span>}
+        {saveError && <span style={{ color: RED, fontSize: 12 }}>{saveError}</span>}
+      </div>
     </article>
   );
 }
@@ -452,6 +616,33 @@ const bodyCopy: React.CSSProperties = {
   fontSize: 13,
   lineHeight: 1.5,
   margin: 0,
+};
+
+const fieldLabel: React.CSSProperties = {
+  display: "block",
+  color: DIM,
+  fontSize: 11,
+  fontWeight: 800,
+  textTransform: "uppercase",
+  letterSpacing: "0.05em",
+};
+
+const inputStyle: React.CSSProperties = {
+  display: "block",
+  width: "100%",
+  marginTop: 5,
+  border: `1px solid ${BORDER}`,
+  borderRadius: 8,
+  padding: "8px 9px",
+  color: NAVY,
+  background: "#fff",
+  fontSize: 13,
+};
+
+const textareaStyle: React.CSSProperties = {
+  ...inputStyle,
+  resize: "vertical",
+  fontFamily: "inherit",
 };
 
 const buttonStyle: React.CSSProperties = {

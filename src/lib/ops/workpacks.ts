@@ -56,8 +56,37 @@ export interface WorkpackRecord {
   allowedActions: string[];
   prohibitedActions: string[];
   riskClass: WorkpackRiskClass;
+  assignedTo?: string;
+  resultSummary?: string;
+  resultPrompt?: string;
+  resultLinks?: string[];
+  failureReason?: string;
+  completedAt?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface WorkpackUpdatePatch {
+  status?: WorkpackStatus;
+  assignedTo?: string | null;
+  resultSummary?: string | null;
+  resultPrompt?: string | null;
+  resultLinks?: string[] | null;
+  failureReason?: string | null;
+}
+
+export class WorkpackUpdateError extends Error {
+  constructor(
+    public readonly code:
+      | "not_found"
+      | "invalid_status"
+      | "invalid_links"
+      | "no_changes",
+    message: string,
+  ) {
+    super(message);
+    this.name = "WorkpackUpdateError";
+  }
 }
 
 export type WorkpackValidation =
@@ -183,4 +212,96 @@ export async function listWorkpacks(
     if (row) rows.push(row);
   }
   return rows;
+}
+
+function cleanOptional(value: string | null | undefined): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const clean = value.trim();
+  return clean || undefined;
+}
+
+function cleanResultLinks(value: string[] | null | undefined): string[] | undefined {
+  if (value == null) return undefined;
+  if (!Array.isArray(value)) {
+    throw new WorkpackUpdateError("invalid_links", "resultLinks must be an array");
+  }
+  const links = value
+    .map((link) => (typeof link === "string" ? link.trim() : ""))
+    .filter(Boolean);
+  if (links.some((link) => !/^https?:\/\//i.test(link))) {
+    throw new WorkpackUpdateError(
+      "invalid_links",
+      "resultLinks must be http(s) URLs",
+    );
+  }
+  return Array.from(new Set(links)).slice(0, 10);
+}
+
+export async function updateWorkpack(
+  id: string,
+  patch: WorkpackUpdatePatch,
+  options: { now?: Date } = {},
+): Promise<WorkpackRecord> {
+  const existing = await getWorkpack(id);
+  if (!existing) {
+    throw new WorkpackUpdateError("not_found", `Workpack ${id} not found`);
+  }
+  const next: WorkpackRecord = { ...existing };
+  let changed = false;
+
+  if (patch.status !== undefined) {
+    if (!isOneOf(patch.status, WORKPACK_STATUSES)) {
+      throw new WorkpackUpdateError("invalid_status", "Invalid workpack status");
+    }
+    if (patch.status !== next.status) {
+      next.status = patch.status;
+      changed = true;
+    }
+  }
+
+  const stringFields = [
+    "assignedTo",
+    "resultSummary",
+    "resultPrompt",
+    "failureReason",
+  ] as const;
+  for (const field of stringFields) {
+    if (field in patch) {
+      const value = cleanOptional(patch[field]);
+      if (value === undefined) {
+        if (next[field] !== undefined) {
+          delete next[field];
+          changed = true;
+        }
+      } else if (next[field] !== value) {
+        next[field] = value;
+        changed = true;
+      }
+    }
+  }
+
+  if ("resultLinks" in patch) {
+    const links = cleanResultLinks(patch.resultLinks);
+    const current = JSON.stringify(next.resultLinks ?? []);
+    const incoming = JSON.stringify(links ?? []);
+    if (current !== incoming) {
+      if (links && links.length > 0) next.resultLinks = links;
+      else delete next.resultLinks;
+      changed = true;
+    }
+  }
+
+  if (!changed) {
+    throw new WorkpackUpdateError("no_changes", "No workpack changes supplied");
+  }
+
+  const now = (options.now ?? new Date()).toISOString();
+  next.updatedAt = now;
+  if (next.status === "done" || next.status === "failed") {
+    next.completedAt = next.completedAt ?? now;
+  } else {
+    delete next.completedAt;
+  }
+  await kv.set(`${RECORD_PREFIX}${next.id}`, next);
+  return next;
 }
