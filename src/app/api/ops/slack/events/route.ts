@@ -44,6 +44,7 @@ const DISPATCH_TRIGGER_REGEX = /^\/?dispatch\s+(shopify|amazon|hubspot|manual)\b
 const COMMAND_CENTER_REGEX =
   /^\/?(?:ops|operator|command)(?:\s+(?:dashboard|command|center|status|sales))?\s*$/i;
 const EMAIL_QUEUE_REGEX = /^\/?email\s+queue\s*$/i;
+const FINANCE_TODAY_REGEX = /^\/?finance\s+today\s*$/i;
 
 /**
  * Reactions that count as "this package physically left the warehouse."
@@ -146,6 +147,7 @@ export async function POST(req: Request): Promise<Response> {
       });
       const isCommandCenter = COMMAND_CENTER_REGEX.test(text);
       const isEmailQueue = EMAIL_QUEUE_REGEX.test(text);
+      const isFinanceToday = FINANCE_TODAY_REGEX.test(text);
       const recordReceipt = (input: {
         recognizedCommand?: string | null;
         skippedReason?: string | null;
@@ -169,7 +171,8 @@ export async function POST(req: Request): Promise<Response> {
         (msg.subtype || msg.bot_id) &&
         !workpackCommand &&
         !isCommandCenter &&
-        !isEmailQueue
+        !isEmailQueue &&
+        !isFinanceToday
       ) {
         await recordReceipt({ skippedReason: "non-new-message" });
         return NextResponse.json({ ok: true, skipped: "non-new-message" });
@@ -196,6 +199,10 @@ export async function POST(req: Request): Promise<Response> {
       if (isEmailQueue) {
         await recordReceipt({ recognizedCommand: "email-queue" });
         return handleEmailQueueTrigger(msg);
+      }
+      if (isFinanceToday) {
+        await recordReceipt({ recognizedCommand: "finance-today" });
+        return handleFinanceTodayTrigger(msg);
       }
       if (workpackCommand) {
         await recordReceipt({ recognizedCommand: "workpack" });
@@ -351,6 +358,81 @@ async function handleEmailQueueTrigger(
     return NextResponse.json({
       ok: true,
       handled: "email-queue",
+      degraded: true,
+    });
+  }
+}
+
+async function handleFinanceTodayTrigger(
+  event: SlackMessageEvent,
+): Promise<Response> {
+  if (!event.ts) {
+    return NextResponse.json({
+      ok: true,
+      handled: "finance-today",
+      skipped: "no thread",
+    });
+  }
+  try {
+    const [
+      { approvalStore },
+      { listReceiptReviewPackets },
+      { summarizeFinanceToday },
+      { renderFinanceTodayCard },
+    ] = await Promise.all([
+      import("@/lib/ops/control-plane/stores"),
+      import("@/lib/ops/docs"),
+      import("@/lib/ops/finance-today"),
+      import("@/lib/ops/slack-finance-today-card"),
+    ]);
+    const degraded: string[] = [];
+    let approvals: Awaited<
+      ReturnType<ReturnType<typeof approvalStore>["listPending"]>
+    > = [];
+    try {
+      approvals = await approvalStore().listPending();
+    } catch (err) {
+      degraded.push(
+        `approvals:${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+    let packets: Awaited<ReturnType<typeof listReceiptReviewPackets>> = [];
+    try {
+      packets = await listReceiptReviewPackets({ limit: 200 });
+    } catch (err) {
+      degraded.push(
+        `packets:${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+    const summary = summarizeFinanceToday({
+      pendingApprovals: approvals,
+      packets,
+      degraded,
+      now: new Date(),
+    });
+    const card = renderFinanceTodayCard({ summary });
+    await postMessage({
+      channel: event.channel ?? slackChannelRef("finance"),
+      text: card.text,
+      blocks: card.blocks,
+      threadTs: event.thread_ts ?? event.ts,
+    });
+    return NextResponse.json({ ok: true, handled: "finance-today" });
+  } catch (err) {
+    try {
+      await postMessage({
+        channel: event.channel ?? slackChannelRef("ops-alerts"),
+        text:
+          ":warning: Finance today could not render. " +
+          (err instanceof Error ? err.message : String(err)),
+        threadTs: event.thread_ts ?? event.ts,
+      });
+    } catch {
+      /* best-effort */
+    }
+    return NextResponse.json({
+      ok: true,
+      handled: "finance-today",
       degraded: true,
     });
   }
