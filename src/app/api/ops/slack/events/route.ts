@@ -47,6 +47,7 @@ const EMAIL_QUEUE_REGEX = /^\/?email\s+queue\s*$/i;
 const FINANCE_TODAY_REGEX = /^\/?finance\s+today\s*$/i;
 const MARKETING_TODAY_REGEX = /^\/?marketing\s+today\s*$/i;
 const PROPOSALS_REGEX = /^\/?proposals\s*$/i;
+const SHIPPING_TODAY_REGEX = /^\/?shipping\s+today\s*$/i;
 
 /**
  * Reactions that count as "this package physically left the warehouse."
@@ -152,6 +153,7 @@ export async function POST(req: Request): Promise<Response> {
       const isFinanceToday = FINANCE_TODAY_REGEX.test(text);
       const isMarketingToday = MARKETING_TODAY_REGEX.test(text);
       const isProposals = PROPOSALS_REGEX.test(text);
+      const isShippingToday = SHIPPING_TODAY_REGEX.test(text);
       const recordReceipt = (input: {
         recognizedCommand?: string | null;
         skippedReason?: string | null;
@@ -178,7 +180,8 @@ export async function POST(req: Request): Promise<Response> {
         !isEmailQueue &&
         !isFinanceToday &&
         !isMarketingToday &&
-        !isProposals
+        !isProposals &&
+        !isShippingToday
       ) {
         await recordReceipt({ skippedReason: "non-new-message" });
         return NextResponse.json({ ok: true, skipped: "non-new-message" });
@@ -217,6 +220,10 @@ export async function POST(req: Request): Promise<Response> {
       if (isProposals) {
         await recordReceipt({ recognizedCommand: "proposals" });
         return handleProposalsTrigger(msg);
+      }
+      if (isShippingToday) {
+        await recordReceipt({ recognizedCommand: "shipping-today" });
+        return handleShippingTodayTrigger(msg);
       }
       if (workpackCommand) {
         await recordReceipt({ recognizedCommand: "workpack" });
@@ -563,6 +570,62 @@ async function handleProposalsTrigger(
     return NextResponse.json({
       ok: true,
       handled: "proposals",
+      degraded: true,
+    });
+  }
+}
+
+async function handleShippingTodayTrigger(
+  event: SlackMessageEvent,
+): Promise<Response> {
+  if (!event.ts) {
+    return NextResponse.json({
+      ok: true,
+      handled: "shipping-today",
+      skipped: "no thread",
+    });
+  }
+  try {
+    const [
+      { fetchShippingTodayInputs },
+      { summarizeShippingToday },
+      { renderShippingTodayCard },
+    ] = await Promise.all([
+      import("@/lib/ops/shipping-today-fetch"),
+      import("@/lib/ops/shipping-today"),
+      import("@/lib/ops/slack-shipping-today-card"),
+    ]);
+    const inputs = await fetchShippingTodayInputs();
+    const summary = summarizeShippingToday({
+      retryQueue: inputs.retryQueue,
+      pendingApprovals: inputs.pendingApprovals,
+      wallet: inputs.wallet,
+      degraded: inputs.degraded,
+      now: new Date(),
+    });
+    const card = renderShippingTodayCard({ summary });
+    await postMessage({
+      channel: event.channel ?? slackChannelRef("shipping"),
+      text: card.text,
+      blocks: card.blocks,
+      threadTs: event.thread_ts ?? event.ts,
+    });
+    return NextResponse.json({ ok: true, handled: "shipping-today" });
+  } catch (err) {
+    try {
+      await postMessage({
+        channel: event.channel ?? slackChannelRef("ops-alerts"),
+        text:
+          ":warning: Shipping today could not render. " +
+          (err instanceof Error ? err.message : String(err)),
+        threadTs: event.thread_ts ?? event.ts,
+      });
+    } catch {
+      /* best-effort */
+    }
+    return NextResponse.json({
+      ok: true,
+      handled: "shipping-today",
       degraded: true,
     });
   }

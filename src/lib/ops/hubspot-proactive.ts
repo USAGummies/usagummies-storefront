@@ -1,6 +1,11 @@
 import type { SourceState } from "./sales-command-center";
 import type { SalesPipelineSummary } from "./sales-pipeline";
 import type { StaleBuyerSummary } from "@/lib/sales/stale-buyer";
+import {
+  buildClosingMachineReport,
+  renderClosingMachineBriefLine,
+  type ClosingMachineReport,
+} from "./may-closing-machine";
 
 export type HubSpotProactiveKind =
   | "stale_buyer"
@@ -34,6 +39,7 @@ export interface HubSpotProactiveReport {
     openCallTasks: number;
   };
   topItems: HubSpotProactiveItem[];
+  closingMachine: ClosingMachineReport;
   notes: Array<{ source: string; state: "error" | "not_wired"; reason: string }>;
   source: {
     system: "hubspot";
@@ -184,6 +190,7 @@ export function buildHubSpotProactiveReport(input: {
         : "ready",
     counts,
     topItems: sorted.slice(0, topLimit),
+    closingMachine: buildClosingMachineReport(sorted),
     notes,
     source: {
       system: "hubspot",
@@ -198,5 +205,5 @@ export function renderHubSpotProactiveBriefLine(
   if (report.status === "error") return "HubSpot proactive queue: degraded";
   if (report.status === "not_wired") return "HubSpot proactive queue: not wired";
   if (report.counts.total === 0) return "HubSpot proactive queue: quiet";
-  return `HubSpot proactive queue: ${report.counts.total} actions · ${report.counts.critical} critical · ${report.counts.watch} watch`;
+  return `${renderClosingMachineBriefLine(report.closingMachine)} · ${report.counts.critical} critical`;
 }

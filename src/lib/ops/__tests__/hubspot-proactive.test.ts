@@ -75,6 +75,10 @@ describe("buildHubSpotProactiveReport", () => {
     expect(report.counts.openCallTasks).toBe(1);
     expect(report.topItems[0].label).toBe("Old Buyer");
     expect(report.topItems[0].severity).toBe("critical");
+    expect(report.closingMachine.counts.total).toBe(3);
+    expect(report.closingMachine.lanes.map((lane) => lane.lane)).toContain(
+      "sample_shipped",
+    );
   });
 
   it("keeps wired empty as ready zero, not not_wired", () => {

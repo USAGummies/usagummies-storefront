@@ -129,6 +129,25 @@ interface HubSpotProactiveReport {
     href: string;
     ageDays: number | null;
   }>;
+  closingMachine: {
+    mantra: string;
+    counts: { hot: number; warm: number; cold: number; total: number };
+    lanes: Array<{
+      lane: string;
+      label: string;
+      dailyAction: string;
+      count: number;
+      topRows: Array<{
+        id: string;
+        label: string;
+        href: string;
+        temperature: "hot" | "warm" | "cold";
+        blocker: string;
+        nextMove: string;
+        defaultCloseAsk: string;
+      }>;
+    }>;
+  };
   notes: Array<{ source: string; state: "error" | "not_wired"; reason: string }>;
 }
 
@@ -745,10 +764,66 @@ function HubSpotProactiveSection({ report }: { report: Report }) {
         <>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 10 }}>
             <MiniStat label="Total" value={v.counts.total} />
+            <MiniStat label="Hot" value={v.closingMachine.counts.hot} color={RED} />
+            <MiniStat label="Warm" value={v.closingMachine.counts.warm} color={AMBER} />
             <MiniStat label="Critical" value={v.counts.critical} color={RED} />
             <MiniStat label="Watch" value={v.counts.watch} color={AMBER} />
             <MiniStat label="Call tasks" value={v.counts.openCallTasks} color={NAVY} />
           </div>
+          <div
+            style={{
+              background: `${GOLD}12`,
+              border: `1px solid ${GOLD}35`,
+              borderRadius: 8,
+              padding: "9px 10px",
+              color: NAVY,
+              fontSize: 12,
+              marginBottom: 10,
+            }}
+          >
+            <strong>May closing mantra:</strong> {v.closingMachine.mantra}
+          </div>
+          {v.closingMachine.lanes.length > 0 ? (
+            <div style={{ display: "grid", gap: 8, marginBottom: 12 }}>
+              {v.closingMachine.lanes.slice(0, 5).map((lane) => (
+                <div
+                  key={lane.lane}
+                  style={{
+                    border: `1px solid ${BORDER}`,
+                    borderRadius: 8,
+                    padding: "9px 10px",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      gap: 10,
+                      color: NAVY,
+                      fontSize: 13,
+                      fontWeight: 800,
+                    }}
+                  >
+                    <span>{lane.label}</span>
+                    <span>{lane.count}</span>
+                  </div>
+                  <div style={{ color: DIM, fontSize: 12, marginTop: 2 }}>
+                    {lane.dailyAction}
+                  </div>
+                  {lane.topRows.slice(0, 2).map((row) => (
+                    <div key={row.id} style={{ marginTop: 7, fontSize: 12 }}>
+                      <a href={row.href} target="_blank" rel="noreferrer" style={linkStyle}>
+                        {row.label}
+                      </a>{" "}
+                      <span style={{ color: DIM }}>
+                        · {row.nextMove} · {row.defaultCloseAsk}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          ) : null}
           {v.topItems.length > 0 ? (
             <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
               {v.topItems.slice(0, 6).map((item) => (

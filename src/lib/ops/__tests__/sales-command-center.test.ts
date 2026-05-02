@@ -1124,7 +1124,7 @@ describe("buildSalesCommandCenter — HubSpot proactive queue", () => {
     });
 
     expect(slice.hubSpotProactiveLine).toBe(
-      "HubSpot proactive queue: 1 actions · 0 critical · 1 watch",
+      "May closing machine: 0 hot · 1 warm · 0 cold — default close: 1-case starter order · 0 critical",
     );
   });
 });
