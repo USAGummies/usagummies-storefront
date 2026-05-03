@@ -51,6 +51,7 @@ const SHIPPING_TODAY_REGEX = /^\/?shipping\s+today\s*$/i;
 const WHAT_NEEDS_BEN_REGEX =
   /^\/?(?:what\s+needs\s+ben|ben\s+queue|ben\s+today)\s*$/i;
 const AGENTS_STATUS_REGEX = /^\/?agents\s+status\s*$/i;
+const PIPELINE_DRIFT_REGEX = /^\/?pipeline\s+drift\s*$/i;
 
 /**
  * Reactions that count as "this package physically left the warehouse."
@@ -159,6 +160,7 @@ export async function POST(req: Request): Promise<Response> {
       const isShippingToday = SHIPPING_TODAY_REGEX.test(text);
       const isWhatNeedsBen = WHAT_NEEDS_BEN_REGEX.test(text);
       const isAgentsStatus = AGENTS_STATUS_REGEX.test(text);
+      const isPipelineDrift = PIPELINE_DRIFT_REGEX.test(text);
       const recordReceipt = (input: {
         recognizedCommand?: string | null;
         skippedReason?: string | null;
@@ -188,7 +190,8 @@ export async function POST(req: Request): Promise<Response> {
         !isProposals &&
         !isShippingToday &&
         !isWhatNeedsBen &&
-        !isAgentsStatus
+        !isAgentsStatus &&
+        !isPipelineDrift
       ) {
         await recordReceipt({ skippedReason: "non-new-message" });
         return NextResponse.json({ ok: true, skipped: "non-new-message" });
@@ -239,6 +242,10 @@ export async function POST(req: Request): Promise<Response> {
       if (isAgentsStatus) {
         await recordReceipt({ recognizedCommand: "agents-status" });
         return handleAgentsStatusTrigger(msg);
+      }
+      if (isPipelineDrift) {
+        await recordReceipt({ recognizedCommand: "pipeline-drift" });
+        return handlePipelineDriftTrigger(msg);
       }
       if (workpackCommand) {
         await recordReceipt({ recognizedCommand: "workpack" });
@@ -585,6 +592,112 @@ async function handleProposalsTrigger(
     return NextResponse.json({
       ok: true,
       handled: "proposals",
+      degraded: true,
+    });
+  }
+}
+
+async function handlePipelineDriftTrigger(
+  event: SlackMessageEvent,
+): Promise<Response> {
+  if (!event.ts) {
+    return NextResponse.json({
+      ok: true,
+      handled: "pipeline-drift",
+      skipped: "no thread",
+    });
+  }
+  try {
+    const [
+      { listRecentDeals },
+      { canonicalStageFromHubspot },
+      { listPipelineEvidence },
+      { detectPipelineDrift, verifyPipelineState },
+      { renderPipelineDriftCard },
+    ] = await Promise.all([
+      import("@/lib/ops/hubspot-client"),
+      import("@/lib/sales/hubspot-stage-mapping"),
+      import("@/lib/sales/pipeline-evidence-store"),
+      import("@/lib/sales/pipeline-verifier"),
+      import("@/lib/sales/slack-pipeline-drift-card"),
+    ]);
+    const degraded: string[] = [];
+    let deals: Awaited<ReturnType<typeof listRecentDeals>> = [];
+    try {
+      deals = await listRecentDeals({ limit: 100 });
+    } catch (err) {
+      degraded.push(
+        `hubspot:${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+
+    const drifted: Array<
+      Awaited<ReturnType<typeof detectPipelineDrift>> & { dealName?: string }
+    > = [];
+    let oneStep = 0;
+    let twoStep = 0;
+    let threePlusStep = 0;
+    let noEvidence = 0;
+    for (const d of deals) {
+      const canonicalHubspot = canonicalStageFromHubspot(d.dealstage);
+      if (!canonicalHubspot) continue;
+      const ev = await listPipelineEvidence(d.id);
+      if (ev.degraded.length > 0) {
+        degraded.push(...ev.degraded.map((m) => `${d.id}:${m}`));
+      }
+      const verified = verifyPipelineState({
+        dealId: d.id,
+        evidence: ev.evidence,
+        claimedStage: canonicalHubspot,
+      });
+      const drift = detectPipelineDrift({
+        dealId: d.id,
+        hubspotStage: canonicalHubspot,
+        verifiedState: verified,
+      });
+      if (drift) {
+        drifted.push({ ...drift, dealName: d.dealname });
+        if (drift.verifiedStage === null) noEvidence += 1;
+        else if (drift.driftSteps === 1) oneStep += 1;
+        else if (drift.driftSteps === 2) twoStep += 1;
+        else threePlusStep += 1;
+      }
+    }
+    const summary = {
+      total: deals.length,
+      clean: deals.length - drifted.length,
+      driftCount: drifted.length,
+      bySeverity: { oneStep, twoStep, threePlusStep, noEvidence },
+    };
+    const card = renderPipelineDriftCard({
+      summary,
+      drifted: drifted.filter(
+        (d): d is NonNullable<typeof d> => d !== null,
+      ) as never,
+      degraded,
+    });
+    await postMessage({
+      channel: event.channel ?? slackChannelRef("sales"),
+      text: card.text,
+      blocks: card.blocks,
+      threadTs: event.thread_ts ?? event.ts,
+    });
+    return NextResponse.json({ ok: true, handled: "pipeline-drift" });
+  } catch (err) {
+    try {
+      await postMessage({
+        channel: event.channel ?? slackChannelRef("ops-alerts"),
+        text:
+          ":warning: Pipeline drift could not render. " +
+          (err instanceof Error ? err.message : String(err)),
+        threadTs: event.thread_ts ?? event.ts,
+      });
+    } catch {
+      /* best-effort */
+    }
+    return NextResponse.json({
+      ok: true,
+      handled: "pipeline-drift",
       degraded: true,
     });
   }
