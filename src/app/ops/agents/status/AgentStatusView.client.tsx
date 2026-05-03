@@ -286,8 +286,34 @@ export function AgentStatusView() {
               </Callout>
             )}
             {a.notes && <Muted>{a.notes}</Muted>}
-            <div style={{ fontSize: 11, color: DIM, marginTop: 10 }}>
-              <Code>{a.runtimePath}</Code>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginTop: 10,
+                gap: 8,
+              }}
+            >
+              <div style={{ fontSize: 11, color: DIM, minWidth: 0, flex: 1 }}>
+                <Code>{a.runtimePath}</Code>
+              </div>
+              <a
+                href={`/ops/agents/runs/${encodeURIComponent(a.id)}`}
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: NAVY,
+                  border: `1px solid ${BORDER}`,
+                  borderRadius: 6,
+                  padding: "3px 8px",
+                  textDecoration: "none",
+                  whiteSpace: "nowrap",
+                }}
+                title="Run history timeline for this agent"
+              >
+                Runs →
+              </a>
             </div>
           </div>
         ))}
