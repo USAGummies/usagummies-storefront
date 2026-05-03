@@ -180,6 +180,16 @@ export const AGENT_MANIFEST: readonly AgentManifestEntry[] = Object.freeze([
     notes:
       "Boring + relentless. Daily HubSpot scan: missing-field, stale-deal, zero-dollar, stuck-in-stage, duplicate-name, closed-with-open-amount. Quiet-collapse on zero findings.",
   },
+  {
+    id: "dtc-revenue-commander",
+    name: "DTC Revenue Commander",
+    contract: "—",
+    runtimePath: "/api/ops/agents/dtc-revenue/run",
+    cadence: "Weekday 07:45 PT",
+    channel: "#ops-daily",
+    notes:
+      "Daily Shopify pulse: yesterday revenue + orders + AOV, day-over-day, week-over-week, 7-day rolling, MTD. Reads kpi_timeseries from Supabase. GA4 conversion data not yet wired server-side (honestly surfaced).",
+  },
 ]);
 
 /**

@@ -115,6 +115,10 @@
     {
       "path": "/api/ops/agents/crm-hygiene/run?post=true",
       "schedule": "15 14 * * 1-5"
+    },
+    {
+      "path": "/api/ops/agents/dtc-revenue/run?post=true",
+      "schedule": "30 15 * * 1-5"
     }
   ]
 }
