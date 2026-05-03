@@ -159,7 +159,10 @@ export async function executeApprovedJournalEntryPost(
     process.env.NEXT_PUBLIC_SITE_URL || DEFAULT_SITE_URL
   ).replace(/\/$/, "");
   const url = `${baseUrl}${QBO_JE_PATH}`;
-  const cronSecret = process.env.CRON_SECRET ?? "";
+  // `.trim()` is defensive against the historical Vercel-env trailing-
+  // newline corruption (see MEMORY.md "Trailing `\n`" entry). Receiver
+  // also trims; both sides agree.
+  const cronSecret = (process.env.CRON_SECRET ?? "").trim();
 
   // The /api/ops/qbo/journal-entry endpoint already exists and runs
   // its own guardrails. Call it as a thin pass-through; we don't

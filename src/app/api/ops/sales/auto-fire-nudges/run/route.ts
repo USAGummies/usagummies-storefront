@@ -519,11 +519,17 @@ async function runOrchestrator(
       source: "scheduled",
       trigger: `auto-fire-nudges:${asOf.toISOString().slice(0, 10)}`,
     });
+    // Result is "ok" even when some sub-fetches degraded — the run
+    // as a whole completed and produced a defensible result. Failures
+    // are surfaced inside `after.failed` + `after.degraded` so the
+    // operator can spot trouble without conflating it with a hard
+    // run-level failure (which would be reserved for a thrown error
+    // we couldn't catch).
     await record(run, {
       actionSlug: "brief.publish",
       entityType: "auto-fire-nudges-run",
       entityId: asOf.toISOString().slice(0, 10),
-      result: degraded.length > 0 || failed > 0 ? "ok" : "ok",
+      result: "ok",
       after: {
         fired,
         skipped,
@@ -597,10 +603,10 @@ export async function POST(req: Request): Promise<Response> {
   return NextResponse.json(result);
 }
 
-export const __INTERNAL_FOR_TESTS = {
-  runOrchestrator,
-  parseOpts,
-};
+// Note: test seams (runOrchestrator, parseOpts) intentionally NOT
+// re-exported here — Next.js route files only allow a fixed set of
+// exports (GET/POST/runtime/dynamic/etc). For test access, refactor
+// helpers into a sibling lib module.
 
 // listAmazonCustomers is imported above to keep the symbol referenced
 // for future Amazon FBM in-app nudge flows; Amazon outbound email is

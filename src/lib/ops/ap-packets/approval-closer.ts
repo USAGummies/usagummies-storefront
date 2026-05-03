@@ -199,7 +199,9 @@ export async function executeApprovedApPacketSend(
     process.env.NEXT_PUBLIC_SITE_URL || DEFAULT_SITE_URL
   ).replace(/\/$/, "");
   const url = `${baseUrl}${SEND_PATH}`;
-  const cronSecret = process.env.CRON_SECRET ?? "";
+  // `.trim()` is defensive against the historical Vercel-env trailing-
+  // newline corruption (see MEMORY.md "Trailing `\n`" entry).
+  const cronSecret = (process.env.CRON_SECRET ?? "").trim();
 
   let httpStatus = 0;
   let body: SendRouteResponse | null = null;

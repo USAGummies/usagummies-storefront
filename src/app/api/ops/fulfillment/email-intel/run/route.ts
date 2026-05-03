@@ -401,8 +401,10 @@ async function runOnce(opts: RunBody): Promise<RunResult> {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              // Forward CRON_SECRET so isAuthorized passes.
-              Authorization: `Bearer ${process.env.CRON_SECRET ?? ""}`,
+              // Forward CRON_SECRET so isAuthorized passes. `.trim()`
+              // is defensive against the historical Vercel-env trailing-
+              // newline corruption (see MEMORY.md "Trailing `\n`" entry).
+              Authorization: `Bearer ${(process.env.CRON_SECRET ?? "").trim()}`,
             },
             body: JSON.stringify(evaluation.intent),
           });

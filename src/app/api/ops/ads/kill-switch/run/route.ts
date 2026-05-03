@@ -348,7 +348,7 @@ export async function POST(req: Request): Promise<Response> {
   return NextResponse.json(result);
 }
 
-export const __INTERNAL_FOR_TESTS = {
-  runKillSwitch,
-  yesterdayIso,
-};
+// Note: test seams (runKillSwitch, yesterdayIso) intentionally NOT
+// re-exported here — Next.js route files only allow a fixed set of
+// exports (GET/POST/runtime/dynamic/etc). For test access, refactor
+// the helpers into a sibling lib module.

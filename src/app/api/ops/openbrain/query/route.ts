@@ -174,4 +174,6 @@ export async function POST(req: Request): Promise<Response> {
   return NextResponse.json({ ok: true, ...result });
 }
 
-export const __INTERNAL_FOR_TESTS = { runQuery, parseParams, extractCaptureBody };
+// Test seams intentionally NOT re-exported — Next.js routes only
+// allow a fixed set of exports. For test access of runQuery /
+// parseParams / extractCaptureBody, refactor into a sibling lib.
