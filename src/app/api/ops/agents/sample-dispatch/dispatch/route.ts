@@ -60,6 +60,7 @@ import {
   composeShipmentProposal,
   type OrderIntent,
 } from "@/lib/ops/sample-order-dispatch";
+import { persistDispatchPayload } from "@/lib/ops/sample-order-dispatch/payload-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -212,6 +213,22 @@ export async function POST(req: Request): Promise<Response> {
       });
       approvalId = approval.id;
       approvalTs = approval.slackThread?.ts ?? null;
+
+      // Persist the structured payload so the approval-closer can
+      // recover ship-to / classification when Ben hits Approve hours
+      // later in Slack — without this the manual-channel branch has
+      // no way to call ShipStation `createOrder`. Fail-soft: a KV
+      // miss degrades the closer to its existing manual-handoff path,
+      // never blocks the approval card.
+      const persisted = await persistDispatchPayload({
+        approvalId: approval.id,
+        orderIntent: body,
+        classification,
+        payloadRef: `dispatch:${body.channel}:${body.sourceId}`,
+      });
+      if (!persisted.ok) {
+        degraded.push(`payload-persist: ${persisted.error}`);
+      }
     } catch (err) {
       approvalErr = err instanceof Error ? err.message : String(err);
       degraded.push(`approval-open: ${approvalErr}`);

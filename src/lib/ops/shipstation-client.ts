@@ -1798,6 +1798,194 @@ export async function voidShipStationLabel(
   return { ok: true, message: data.message || "Label voided" };
 }
 
+export interface CreateOrderItem {
+  sku: string;
+  name: string;
+  quantity: number;
+  unitPrice?: number;
+}
+
+export interface CreateShipStationOrderParams {
+  /**
+   * Channel-side identifier — flows back as `orderNumber` to the
+   * marketplace, AND doubles as ShipStation's duplicate-detect key
+   * (re-POSTing the same orderNumber is an UPDATE, not a duplicate-
+   * create). Use the upstream sourceId so re-fires are idempotent.
+   */
+  orderNumber: string;
+  /** Defaults to `awaiting_shipment` so the auto-ship cron sees it. */
+  orderStatus?:
+    | "awaiting_shipment"
+    | "awaiting_payment"
+    | "on_hold"
+    | "shipped";
+  /** ISO timestamp; defaults to now. */
+  orderDate?: string;
+  customerEmail?: string;
+  customerNotes?: string;
+  internalNotes?: string;
+  shipTo: LabelDestination;
+  items: CreateOrderItem[];
+  /** Pounds. */
+  weight?: { value: number; units: "ounces" | "pounds" | "grams" };
+  dimensions?: {
+    length: number;
+    width: number;
+    height: number;
+    units?: "inches" | "centimeters";
+  };
+  /** ShipStation `packageCode` — defaults to "package". */
+  packageCode?: string;
+  /** Hint for service when carrier auto-rate-shops. */
+  requestedShippingService?: string;
+  /**
+   * advancedOptions custom fields. customField1 is the canonical place
+   * we stash dispatch tags so #shipping mirrors / drift audits can
+   * recover the sample-tag flag from the order itself.
+   */
+  customField1?: string;
+  customField2?: string;
+  customField3?: string;
+  tagIds?: number[];
+}
+
+export interface CreateShipStationOrderResult {
+  /** ShipStation-internal numeric id — used by `/orders/createlabel`. */
+  orderId: number;
+  /** Echoed back from the request (channel-side identifier). */
+  orderNumber: string;
+  /**
+   * Deep link into the ShipStation web UI so Slack mirrors are 1-click.
+   * Uses ShipStation's universal "Search by orderNumber" URL since the
+   * V1 API doesn't expose a stable per-order URL.
+   */
+  orderUrl: string;
+}
+
+/**
+ * Create (or upsert, by orderNumber) a ShipStation order via
+ * `/orders/createorder`. The order lands in `awaiting_shipment` so the
+ * existing auto-ship cron picks it up on the next tick — this helper
+ * deliberately does NOT buy a label; the cron owns label purchase
+ * (with its own dedup + drift audit).
+ *
+ * Used by the sample-dispatch approval closer to convert an approved
+ * Class B `shipment.create` into a real ShipStation queue entry. See
+ * `/contracts/integrations/shipstation.md` §3.6 for the canonical
+ * sample-shipment flow this slots into (step 3).
+ */
+export async function createShipStationOrder(
+  params: CreateShipStationOrderParams,
+): Promise<
+  | { ok: true; order: CreateShipStationOrderResult }
+  | { ok: false; error: string }
+> {
+  const auth = getAuthHeader();
+  if (!auth) return { ok: false, error: "ShipStation credentials not configured" };
+
+  const from = getShipFromAddress();
+  const orderDate = params.orderDate || new Date().toISOString();
+  const orderStatus = params.orderStatus || "awaiting_shipment";
+  const packageCode = params.packageCode || "package";
+
+  const body = {
+    orderNumber: params.orderNumber,
+    orderKey: params.orderNumber,
+    orderDate,
+    orderStatus,
+    customerEmail: params.customerEmail,
+    customerNotes: params.customerNotes,
+    internalNotes: params.internalNotes,
+    billTo: { name: params.shipTo.name },
+    shipTo: {
+      name: params.shipTo.name,
+      company: params.shipTo.company,
+      street1: params.shipTo.street1,
+      street2: params.shipTo.street2,
+      city: params.shipTo.city,
+      state: params.shipTo.state.trim().toUpperCase(),
+      postalCode: params.shipTo.postalCode.trim(),
+      country: (params.shipTo.country || "US").trim().toUpperCase(),
+      phone: params.shipTo.phone,
+      residential: params.shipTo.residential ?? true,
+    },
+    shipFrom: {
+      name: from.name,
+      company: from.company,
+      street1: from.street1,
+      street2: from.street2,
+      city: from.city,
+      state: from.state,
+      postalCode: from.postalCode,
+      country: from.country,
+      phone: from.phone,
+    },
+    items: params.items.map((i) => ({
+      sku: i.sku,
+      name: i.name,
+      quantity: i.quantity,
+      unitPrice: i.unitPrice ?? 0,
+    })),
+    weight: params.weight,
+    dimensions: params.dimensions
+      ? {
+          length: params.dimensions.length,
+          width: params.dimensions.width,
+          height: params.dimensions.height,
+          units: params.dimensions.units || "inches",
+        }
+      : undefined,
+    packageCode,
+    requestedShippingService: params.requestedShippingService,
+    advancedOptions: {
+      customField1: params.customField1,
+      customField2: params.customField2,
+      customField3: params.customField3,
+    },
+    tagIds: params.tagIds,
+  };
+
+  let res: Response;
+  try {
+    res = await fetch("https://ssapi.shipstation.com/orders/createorder", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: auth },
+      body: JSON.stringify(body),
+    });
+  } catch (err) {
+    return {
+      ok: false,
+      error: `ShipStation request failed: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    return {
+      ok: false,
+      error: `ShipStation createorder ${res.status}: ${text.slice(0, 400)}`,
+    };
+  }
+
+  const data = (await res.json().catch(() => ({}))) as {
+    orderId?: number;
+    orderNumber?: string;
+  };
+  if (typeof data.orderId !== "number" || !data.orderId) {
+    return { ok: false, error: "ShipStation returned no orderId" };
+  }
+  const orderNumber = data.orderNumber || params.orderNumber;
+  return {
+    ok: true,
+    order: {
+      orderId: data.orderId,
+      orderNumber,
+      orderUrl: `https://ship.shipstation.com/orders/all-orders-search-result?quickSearch=${encodeURIComponent(
+        orderNumber,
+      )}`,
+    },
+  };
+}
+
 /**
  * Reset a ShipStation order back to `awaiting_shipment` by re-POSTing it
  * via `/orders/createorder` (same endpoint creates + updates). Used after

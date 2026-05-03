@@ -3,36 +3,33 @@
  *
  * When Ben clicks Approve on a shipment.create card, the Slack interactive
  * route flips the approval status to "approved" and then calls this
- * function. The closer's job is the MINIMUM next step — never the full
- * label purchase by default — so we never auto-buy without the operator
- * having a hand on the wheel.
+ * function. The closer's job:
  *
- * Today's behavior:
- *   - For channel="manual" (free-form email samples → Ben, Ashford WA,
- *     per CLAUDE.md REVISED 2026-04-30 + /contracts/integrations/
- *     shipstation.md §3.5): queue the intent in KV for the operator to
- *     drain, post a thread reply on the approval card AND a
- *     phone-visible mirror to `#shipping`, and audit the hand-off. No
- *     label buy yet — the manual channel doesn't have a ShipStation
- *     order pre-created, so the auto-ship cron has nothing to pick up.
- *     Wiring `createOrder` into this path is a follow-up; for now Ben
- *     packs from Ashford using the queued summary + posts proof-of-ship
- *     in `#shipping`.
- *   - For channel ∈ {shopify, amazon, faire, hubspot}: post a "manual
- *     required" thread reply pointing the operator to the existing
- *     auto-ship pipeline / ShipStation queue. We deliberately do NOT
- *     reach into ShipStation here — the dedicated auto-ship cron (with
- *     its own validation + dedup + drift audit) is the only path that
- *     buys labels.
+ *   - Manual channel (free-form email sample → Ben, Ashford WA, per
+ *     CLAUDE.md REVISED 2026-04-30 + /contracts/integrations/
+ *     shipstation.md §3.5): create a ShipStation order in
+ *     `awaiting_shipment` so the existing auto-ship cron can buy the
+ *     label on its next tick. Queue + Slack mirror happen in lock-step.
+ *     If ShipStation is unreachable or the structured payload was never
+ *     persisted, fall back to the legacy manual-handoff path (Ben packs
+ *     + buys label by hand). The fallback is what shipped during the
+ *     2026-05-02 CNHA repro (approval `12ebec77-…`).
+ *   - Non-manual channels (shopify / amazon / faire / hubspot): the
+ *     order already exists in ShipStation via the marketplace sync, so
+ *     we just hand off to the auto-ship cron with a thread reply. We
+ *     deliberately do NOT call ShipStation here — the dedicated cron
+ *     (with its own validation + dedup + drift audit) is the only path
+ *     that buys labels.
  *
- * Doctrine: CLAUDE.md "Fulfillment Rules" REVISED 2026-04-30 — every
- * sample now ships from Ashford via Ben while the East Coast staging
- * warehouse is offline. The earlier "samples = Drew, East Coast" rule
- * is DEFERRED, not deleted: when the staging warehouse re-activates
- * with a confirmed canonical address, this branch should learn an
- * `origin` hint (carried on the approval payload, not on `channel`)
- * and route east-coast samples back to Drew. Until then every
- * manual-channel sample originates from Ashford.
+ * Hard rule (preserved): the closer NEVER buys a label. It only creates
+ * a ShipStation order so the auto-ship cron has something to pick up.
+ * Label purchase stays in `/api/ops/shipping/auto-ship`.
+ *
+ * Idempotency: a per-approval KV marker (`sample-dispatch:shipstation-
+ * order:<approvalId>`) guards `createShipStationOrder` — double fires
+ * (KV race, Slack retry) read the marker and skip the create. The
+ * existing approval-queue marker (`sample-dispatch:approved:<id>`) is
+ * preserved as the operator hand-off signal.
  *
  * "If label buying needs missing data, do not guess" — Ben, 2026-04-24.
  *
@@ -50,8 +47,14 @@ import type {
   ApprovalRequest,
   RunContext,
 } from "@/lib/ops/control-plane/types";
+import {
+  createShipStationOrder,
+  isShipStationConfigured,
+} from "@/lib/ops/shipstation-client";
+import { loadDispatchPayload } from "@/lib/ops/sample-order-dispatch/payload-store";
 
 const QUEUE_KEY_PREFIX = "sample-dispatch:approved:";
+const SHIPSTATION_ORDER_KEY_PREFIX = "sample-dispatch:shipstation-order:";
 const QUEUE_TTL_SECONDS = 30 * 24 * 3600; // 30 days
 
 export type ShipmentApprovalExecutionResult =
@@ -63,6 +66,10 @@ export type ShipmentApprovalExecutionResult =
       queuedKey: string;
       threadMessage: string;
       shippingChannelPosted: boolean;
+      shipStationOrderId?: number;
+      shipStationOrderNumber?: string;
+      shipStationOrderUrl?: string;
+      shipStationFallbackReason?: string;
     }
   | {
       ok: true;
@@ -79,36 +86,79 @@ interface ParsedPayloadRef {
   sourceId: string;
 }
 
+/**
+ * Parse the payloadRef into channel + sourceId. We accept the two
+ * formats the upstream routes emit:
+ *
+ *   - `dispatch:<channel>:<sourceId>` — `/api/ops/agents/sample-
+ *     dispatch/dispatch` (webhook adapter path).
+ *   - `sample-queue:<sourceId>` — `/api/ops/sample/queue` (operator
+ *     queue path; channel is always "manual").
+ *
+ * Other formats return null so the caller fails closed.
+ */
 function parsePayloadRef(ref: string | undefined): ParsedPayloadRef | null {
   if (!ref) return null;
-  // Format: "dispatch:<channel>:<sourceId>"
-  const m = /^dispatch:([^:]+):(.+)$/.exec(ref);
-  if (!m) return null;
-  return { channel: m[1], sourceId: m[2] };
+  const dispatchMatch = /^dispatch:([^:]+):(.+)$/.exec(ref);
+  if (dispatchMatch) {
+    return { channel: dispatchMatch[1], sourceId: dispatchMatch[2] };
+  }
+  const queueMatch = /^sample-queue:(.+)$/.exec(ref);
+  if (queueMatch) {
+    return { channel: "manual", sourceId: queueMatch[1] };
+  }
+  return null;
+}
+
+interface CloseAuditFields {
+  result: "ok" | "error";
+  kind?: string;
+  queuedKey?: string;
+  shipStationOrderId?: number;
+  shipStationOrderNumber?: string;
+  shipStationOrderUrl?: string;
+  fallbackReason?: string;
+  error?: string;
 }
 
 async function appendCloseAudit(
   run: RunContext,
   approval: ApprovalRequest,
-  fields: {
-    result: "ok" | "error";
-    kind?: string;
-    queuedKey?: string;
-    error?: string;
-  },
+  fields: CloseAuditFields,
 ) {
+  const action =
+    fields.kind === "shipstation-order-created"
+      ? "shipment.approved.shipstation-order.created"
+      : fields.kind === "shipstation-order-failed"
+        ? "shipment.approved.shipstation-order.failed"
+        : "shipment.approved.handoff";
   const entry = buildAuditEntry(run, {
-    action: "shipment.approved.handoff",
+    action,
     entityType: "shipment",
     entityId: approval.targetEntity?.id,
     result: fields.result,
     approvalId: approval.id,
-    after: { kind: fields.kind, queuedKey: fields.queuedKey },
+    after: {
+      kind: fields.kind,
+      queuedKey: fields.queuedKey,
+      shipStationOrderId: fields.shipStationOrderId,
+      shipStationOrderNumber: fields.shipStationOrderNumber,
+      shipStationOrderUrl: fields.shipStationOrderUrl,
+      fallbackReason: fields.fallbackReason,
+    },
     error: fields.error ? { message: fields.error } : undefined,
     sourceCitations: [
       { system: "control-plane:approval", id: approval.id },
       ...(approval.payloadRef
         ? [{ system: "dispatch:payloadRef", id: approval.payloadRef }]
+        : []),
+      ...(fields.shipStationOrderId
+        ? [
+            {
+              system: "shipstation:order",
+              id: String(fields.shipStationOrderId),
+            },
+          ]
         : []),
     ],
     confidence: approval.evidence.confidence,
@@ -119,12 +169,159 @@ async function appendCloseAudit(
     .catch(() => void 0);
 }
 
+interface ShipStationCreateResult {
+  orderId: number;
+  orderNumber: string;
+  orderUrl: string;
+}
+
+/**
+ * Try to create (or recover an idempotent prior create of) a
+ * ShipStation order for an approved manual-channel sample. Returns
+ * `{ created, order }` on success, `{ skipped, reason }` if no
+ * structured payload was persisted (legacy approvals predating the
+ * 2026-05-02 wiring) or ShipStation isn't configured, and `{ failed,
+ * error }` on a real ShipStation API failure. The caller falls through
+ * to the manual-handoff Slack message + queue in any non-success case.
+ */
+async function attemptShipStationOrderCreate(
+  run: RunContext,
+  approval: ApprovalRequest,
+): Promise<
+  | { status: "created"; order: ShipStationCreateResult; alreadyExisted: false }
+  | { status: "created"; order: ShipStationCreateResult; alreadyExisted: true }
+  | { status: "skipped"; reason: string }
+  | { status: "failed"; error: string }
+> {
+  // Idempotency check FIRST so a retry never double-creates.
+  const idempotencyKey = `${SHIPSTATION_ORDER_KEY_PREFIX}${approval.id}`;
+  let existingRaw: unknown = null;
+  try {
+    existingRaw = await kv.get(idempotencyKey);
+  } catch {
+    // KV unreachable — treat as not-yet-created (better to risk a
+    // duplicate than to skip the create entirely; ShipStation's
+    // upsert-by-orderNumber dedup catches duplicates anyway).
+  }
+  if (existingRaw) {
+    let existing: ShipStationCreateResult | null = null;
+    if (typeof existingRaw === "string") {
+      try {
+        existing = JSON.parse(existingRaw) as ShipStationCreateResult;
+      } catch {
+        existing = null;
+      }
+    } else if (typeof existingRaw === "object") {
+      existing = existingRaw as ShipStationCreateResult;
+    }
+    if (existing && typeof existing.orderId === "number") {
+      return { status: "created", order: existing, alreadyExisted: true };
+    }
+  }
+
+  if (!isShipStationConfigured()) {
+    return {
+      status: "skipped",
+      reason: "ShipStation not configured (SHIPSTATION_API_KEY/SECRET unset)",
+    };
+  }
+
+  const payload = await loadDispatchPayload(approval.id);
+  if (!payload) {
+    return {
+      status: "skipped",
+      reason:
+        "no structured dispatch payload persisted for this approval (likely a legacy/pre-2026-05-02 card)",
+    };
+  }
+
+  // Normalise the dispatch into a sample-shipment ShipStation order
+  // matching `/contracts/integrations/shipstation.md` §3.5: a single
+  // 6-bag inner case in a 7×7×7 box, ~3.4 lb, Ashford ship-from
+  // (handled inside createShipStationOrder via getShipFromAddress).
+  const intent = payload.orderIntent;
+  const classification = payload.classification;
+  const orderNumber = intent.orderNumber || intent.sourceId;
+
+  // Tag set: tag:sample + tag:no-revenue (per §3.5) + origin tag from
+  // the classifier so drift audits can verify the closer respected
+  // the Ashford rule.
+  const customField1 = "tag:sample,tag:no-revenue";
+  const customField2 = `origin:${classification.origin}`;
+  const customField3 = `approval:${approval.id}`;
+
+  // Item: 1 × UG-AAGB-6CT (6-bag inner case). The auto-ship cron's
+  // `totalBagsForItems` maps this SKU to 6 bags → `inner_box_7x7x7`
+  // packaging profile, which is auto-buy eligible.
+  const items = [
+    {
+      sku: "UG-AAGB-6CT",
+      name: "All American Gummy Bears 7.5oz Sample Case (6-ct)",
+      quantity: 1,
+      unitPrice: 0,
+    },
+  ];
+
+  const result = await createShipStationOrder({
+    orderNumber,
+    orderStatus: "awaiting_shipment",
+    customerEmail: undefined,
+    customerNotes: intent.note,
+    internalNotes: `Sample dispatch · approval ${approval.id} · ${classification.originReason}`,
+    shipTo: {
+      name: intent.shipTo.name,
+      company: intent.shipTo.company,
+      street1: intent.shipTo.street1,
+      street2: intent.shipTo.street2,
+      city: intent.shipTo.city,
+      state: intent.shipTo.state,
+      postalCode: intent.shipTo.postalCode,
+      country: intent.shipTo.country || "US",
+      phone: intent.shipTo.phone,
+      residential: intent.shipTo.residential ?? true,
+    },
+    items,
+    weight: { value: 3.4, units: "pounds" },
+    dimensions: { length: 7, width: 7, height: 7, units: "inches" },
+    packageCode: "package",
+    requestedShippingService: classification.serviceCode,
+    customField1,
+    customField2,
+    customField3,
+  });
+
+  if (!result.ok) {
+    return { status: "failed", error: result.error };
+  }
+
+  // Persist idempotency marker so a retry returns the same orderId.
+  // KV failure here is non-fatal — the audit still captures the create.
+  try {
+    await kv.set(idempotencyKey, JSON.stringify(result.order), {
+      ex: QUEUE_TTL_SECONDS,
+    });
+  } catch {
+    /* swallow — audit captures the create either way */
+  }
+
+  await appendCloseAudit(run, approval, {
+    result: "ok",
+    kind: "shipstation-order-created",
+    shipStationOrderId: result.order.orderId,
+    shipStationOrderNumber: result.order.orderNumber,
+    shipStationOrderUrl: result.order.orderUrl,
+  });
+
+  return { status: "created", order: result.order, alreadyExisted: false };
+}
+
 /**
  * Execute the closer for an approved shipment.create approval.
  *
- * Idempotency: writes a single KV key per approval id. Calling twice
- * with the same approval just re-asserts the queue entry — never buys a
- * label, so even repeat fires are safe.
+ * Idempotency: a per-approval KV marker guards the ShipStation create.
+ * The legacy `sample-dispatch:approved:<id>` queue entry is preserved
+ * as the manual hand-off signal even when the create succeeds, so
+ * #shipping always shows the same trail of "queued" → "label bought".
  */
 export async function executeApprovedShipmentCreate(
   approval: ApprovalRequest,
@@ -142,7 +339,7 @@ export async function executeApprovedShipmentCreate(
   }
   const parsed = parsePayloadRef(approval.payloadRef);
   if (!parsed) {
-    const err = `shipment.create approval ${approval.id} missing dispatch:<channel>:<sourceId> payloadRef`;
+    const err = `shipment.create approval ${approval.id} missing dispatch:<channel>:<sourceId> or sample-queue:<sourceId> payloadRef`;
     return { ok: false, handled: true, error: err };
   }
 
@@ -156,12 +353,10 @@ export async function executeApprovedShipmentCreate(
   };
 
   // Manual channel = free-form email sample → Ben packs from Ashford
-  // (CLAUDE.md REVISED 2026-04-30 + shipstation.md §3.5). Queue the
-  // intent for the operator and surface it on both the approval thread
-  // AND `#shipping` so Ben sees it on his phone alongside auto-ship
-  // notifications. No label buy: manual-channel samples don't have a
-  // ShipStation order yet, so the auto-ship cron has nothing to pick
-  // up. Wiring `createOrder` into this branch is the next iteration.
+  // (CLAUDE.md REVISED 2026-04-30 + shipstation.md §3.5). Try to
+  // create the ShipStation order so the auto-ship cron can buy the
+  // label on its next tick; on any failure fall through to the legacy
+  // manual-handoff path so Ben can pack + label by hand.
   if (parsed.channel === "manual") {
     const queuedKey = `${QUEUE_KEY_PREFIX}${approval.id}`;
     try {
@@ -187,13 +382,50 @@ export async function executeApprovedShipmentCreate(
         error: errMsg,
       });
     }
+
+    // Attempt ShipStation order create. Surface the result in the
+    // thread + #shipping mirror so Ben can see at a glance whether the
+    // auto-ship cron will pick this up or whether he needs to pack +
+    // label by hand.
+    const ssAttempt = await attemptShipStationOrderCreate(run, approval);
+    let shipStationOrderId: number | undefined;
+    let shipStationOrderNumber: string | undefined;
+    let shipStationOrderUrl: string | undefined;
+    let shipStationFallbackReason: string | undefined;
+
+    if (ssAttempt.status === "created") {
+      shipStationOrderId = ssAttempt.order.orderId;
+      shipStationOrderNumber = ssAttempt.order.orderNumber;
+      shipStationOrderUrl = ssAttempt.order.orderUrl;
+    } else if (ssAttempt.status === "failed") {
+      shipStationFallbackReason = ssAttempt.error;
+      await appendCloseAudit(run, approval, {
+        result: "error",
+        kind: "shipstation-order-failed",
+        error: ssAttempt.error,
+        fallbackReason: ssAttempt.error,
+      });
+    } else {
+      // status === "skipped" — no payload found or ShipStation not
+      // configured. This is the legacy fallback path; not an error.
+      shipStationFallbackReason = ssAttempt.reason;
+    }
+
     const sampleLabel = approval.targetEntity?.label ?? parsed.sourceId;
-    const threadMessage =
-      `:package: Approved \`shipment.create\` — queued for Ben to pack from Ashford ` +
-      `(${sampleLabel}). ` +
-      `*No label purchased by closer.* Ben packs the case sample (6 × 7.5 oz bags + strip clip + hook in a 7×7×7 box) ` +
-      `and posts proof-of-ship in #shipping when the label is bought. ` +
-      `_Queue key: \`${queuedKey}\`_`;
+    const threadMessage = shipStationOrderId
+      ? `:package: Approved \`shipment.create\` — ShipStation order \`${shipStationOrderNumber}\` ` +
+        `created in awaiting_shipment for Ashford pack-out (${sampleLabel}). ` +
+        `*No label purchased by closer.* The auto-ship cron will buy the label on its next tick ` +
+        `and post tracking + PDF in #shipping. ` +
+        `<${shipStationOrderUrl}|Open in ShipStation> · _Queue key: \`${queuedKey}\`_`
+      : `:package: Approved \`shipment.create\` — queued for Ben to pack from Ashford ` +
+        `(${sampleLabel}). ` +
+        `*No label purchased by closer.* Ben packs the case sample (6 × 7.5 oz bags + strip clip + hook in a 7×7×7 box) ` +
+        `and posts proof-of-ship in #shipping when the label is bought. ` +
+        (shipStationFallbackReason
+          ? `_ShipStation auto-create skipped: ${shipStationFallbackReason}._ `
+          : "") +
+        `_Queue key: \`${queuedKey}\`_`;
 
     // Mirror to #shipping so Ben sees the queue entry on his phone
     // alongside the auto-ship pipeline's notifications. Fail-soft —
@@ -204,13 +436,22 @@ export async function executeApprovedShipmentCreate(
         const previewLine = approval.payloadPreview
           ? `\n${approval.payloadPreview}`
           : "";
-        await postMessage({
-          channel: slackChannelRef("shipping"),
-          text:
-            `:package: *Sample queued for Ashford pack-out* — ${sampleLabel}` +
+        const shippingText = shipStationOrderId
+          ? `:package: *Sample queued in ShipStation* — ${sampleLabel}` +
+            previewLine +
+            `\nShipStation order: \`${shipStationOrderNumber}\` · <${shipStationOrderUrl}|Open in ShipStation>` +
+            `\nApproval: \`${approval.id}\` · Queue key: \`${queuedKey}\`` +
+            `\nAuto-ship cron will buy label on next tick — tracking + PDF will follow here.`
+          : `:package: *Sample queued for Ashford pack-out* — ${sampleLabel}` +
             previewLine +
             `\nApproval: \`${approval.id}\` · Queue key: \`${queuedKey}\`` +
-            `\nNo label purchased yet — buy + post proof-of-ship here when shipped.`,
+            (shipStationFallbackReason
+              ? `\n_ShipStation auto-create skipped: ${shipStationFallbackReason}._`
+              : "") +
+            `\nNo label purchased yet — buy + post proof-of-ship here when shipped.`;
+        await postMessage({
+          channel: slackChannelRef("shipping"),
+          text: shippingText,
         });
         shippingChannelPosted = true;
       } catch {
@@ -222,6 +463,10 @@ export async function executeApprovedShipmentCreate(
       result: "ok",
       kind: "manual-handoff",
       queuedKey,
+      shipStationOrderId,
+      shipStationOrderNumber,
+      shipStationOrderUrl,
+      fallbackReason: shipStationOrderId ? undefined : shipStationFallbackReason,
     });
     return {
       ok: true,
@@ -231,6 +476,10 @@ export async function executeApprovedShipmentCreate(
       queuedKey,
       threadMessage,
       shippingChannelPosted,
+      shipStationOrderId,
+      shipStationOrderNumber,
+      shipStationOrderUrl,
+      shipStationFallbackReason,
     };
   }
 
