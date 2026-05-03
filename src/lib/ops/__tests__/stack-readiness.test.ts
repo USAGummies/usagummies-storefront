@@ -70,12 +70,14 @@ describe("STACK_SERVICES manifest sanity", () => {
     }
   });
 
-  it("flags make-com as fragile per the known broken bridge", () => {
+  it("does NOT include make-com (removed 2026-05-03 — Ben canceled subscription)", () => {
+    // Regression guard: a future contributor must not re-add make-com
+    // to the stack registry without unsubscribing the rest of the
+    // stack-down brief plumbing first. The /api/leads webhook call
+    // remains fail-soft via LEADS_WEBHOOK_URL — leaving that env var
+    // unset is the canonical "off" state.
     const make = STACK_SERVICES.find((s) => s.id === "make-com");
-    expect(make).toBeDefined();
-    // Maturity 4+ means broken or known-flaky right now.
-    expect(make!.maturity).toBeGreaterThanOrEqual(4);
-    expect(make!.knownIssue).toBeTruthy();
+    expect(make).toBeUndefined();
   });
 });
 

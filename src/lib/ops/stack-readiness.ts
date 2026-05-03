@@ -172,17 +172,13 @@ export const STACK_SERVICES: readonly StackServiceManifest[] = [
       "/api/leads HubSpot deal-create fails (silent skip; Notion mirror + KV archive still capture). /api/booth-order HubSpot writes degrade. Faire send-on-approve mirror goes blind.",
     replacement: "Pipedrive or Attio + a thin sync layer. ~1 week migration.",
   },
-  {
-    id: "make-com",
-    name: "Make.com (legacy automation bridge)",
-    layer: "integration",
-    envVars: ["LEADS_WEBHOOK_URL"],
-    maturity: 4,
-    degradedMode:
-      "Was the bridge for /wholesale → HubSpot. Eliminated as a hard dependency in Phase 1.b — direct HubSpot wire bypasses it. Now legacy: only impacts automation Ben hasn't migrated.",
-    replacement: "Already replaced for the wholesale path. Other Make.com scenarios should migrate to direct API calls.",
-    knownIssue: "Broken since ~Apr 13, 2026 per project memory. Ben to fix or fully retire.",
-  },
+  // 2026-05-03 — Make.com removed from the stack registry. Ben canceled
+  // the Make.com subscription after a multi-week broken-bridge state and
+  // the wholesale path was already migrated to direct HubSpot wires
+  // (Phase 1.b). The /api/leads + /api/subscriptions LEADS_WEBHOOK_URL
+  // call is fail-soft (only fires when env var is set); leaving the
+  // env var unset is the documented "off" state. The morning brief
+  // stack-down line stops nagging about make-com automatically.
   {
     id: "quickbooks-online",
     name: "QuickBooks Online (QBO)",

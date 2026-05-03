@@ -172,13 +172,13 @@ describe("renderStackDownLine", () => {
 
   it("does NOT truncate when 4 are down (post-2026-05-03 cap=5)", () => {
     const line = renderStackDownLine([
-      stackRow({ id: "make-com", status: "down" }),
       stackRow({ id: "quickbooks-online", status: "down" }),
       stackRow({ id: "nextauth", status: "down" }),
       stackRow({ id: "shipstation", status: "down" }),
+      stackRow({ id: "vercel-kv", status: "down" }),
     ]);
     expect(line).not.toContain("+1 more");
-    expect(line).toContain("shipstation");
+    expect(line).toContain("vercel-kv");
   });
 });
 
@@ -191,10 +191,10 @@ describe("renderStackDegradedLine", () => {
 
   it("renders count + ids when services are degraded", () => {
     const line = renderStackDegradedLine([
-      stackRow({ id: "make-com", status: "degraded" }),
+      stackRow({ id: "shipstation", status: "degraded" }),
     ]);
     expect(line).toContain("1 service degraded");
-    expect(line).toContain("make-com");
+    expect(line).toContain("shipstation");
   });
 });
 
