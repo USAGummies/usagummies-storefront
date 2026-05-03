@@ -64,6 +64,7 @@ import {
   validateSampleQueueRequest,
   type SampleQueueRequest,
 } from "@/lib/ops/sample-queue";
+import { persistDispatchPayload } from "@/lib/ops/sample-order-dispatch/payload-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -185,6 +186,21 @@ export async function POST(req: Request): Promise<Response> {
       });
       approvalId = approval.id;
       approvalTs = approval.slackThread?.ts ?? null;
+
+      // Persist the structured payload so the manual-channel branch of
+      // the approval-closer can hand ship-to + classification to
+      // ShipStation `createOrder` when Ben hits Approve. Without this
+      // the closer falls back to the legacy queue + manual-pack path
+      // (Ben buys label by hand). Fail-soft on KV miss.
+      const persisted = await persistDispatchPayload({
+        approvalId: approval.id,
+        orderIntent,
+        classification,
+        payloadRef: `sample-queue:${orderIntent.sourceId}`,
+      });
+      if (!persisted.ok) {
+        degraded.push(`payload-persist: ${persisted.error}`);
+      }
     } catch (err) {
       approvalErr = err instanceof Error ? err.message : String(err);
       degraded.push(`approval-open: ${approvalErr}`);
