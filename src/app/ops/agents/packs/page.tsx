@@ -546,6 +546,14 @@ function AgentRow({ agent }: { agent: AgentEntryView }) {
             <span className="text-gray-500">runtime: not wired</span>
           </>
         )}
+        {" · "}
+        <a
+          href={`/ops/agents/runs/${encodeURIComponent(agent.id)}`}
+          className="font-mono text-blue-700 underline hover:text-blue-900"
+          title="Per-agent run history timeline"
+        >
+          runs →
+        </a>
       </div>
       {agent.approvalSlugs.length > 0 ? (
         <div className="mt-1 text-xs">
