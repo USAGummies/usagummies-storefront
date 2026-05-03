@@ -1,9 +1,9 @@
 # Agent Contract — Sample/Order Dispatch Specialist (S-08)
 
 **Status:** CANONICAL (day-one, in-the-loop)
-**Version:** 1.0 — 2026-04-20
+**Version:** 1.1 — 2026-05-02
 **Division:** `production-supply-chain`
-**Human owner:** Ben (orders); Drew (samples, East Coast origin)
+**Human owner:** Ben (orders + samples, Ashford origin). Drew-as-sample-shipper from an East Coast staging warehouse is **DEFERRED** until that warehouse re-activates with a confirmed canonical address (CLAUDE.md REVISED 2026-04-30).
 **Schema:** [`/contracts/governance.md`](../governance.md) §3
 
 ---
@@ -18,13 +18,13 @@
 
 ## Role
 
-One job: enforce the canonical fulfillment-origin rule on every sample request and every order. **Orders ship from Ashford WA (Ben). Samples ship from East Coast (Drew).** Zero tolerance for wrong-origin shipments. Every shipment is a Class B `shipment.create` request to Ben (for orders) with origin + carrier + service preset evidence; samples run through the same gate. The specialist classifies, enriches (address validation, ShipStation preset match), composes the request, and posts to `#ops-approvals`.
+One job: enforce the canonical fulfillment-origin rule on every sample request and every order. **Orders + samples both ship from Ashford WA (Ben) as of 2026-04-30** — see CLAUDE.md "Fulfillment Rules" + [`/contracts/integrations/shipstation.md`](../integrations/shipstation.md) §3.5 for the canonical sample-shipment spec (case of 6 × 7.5 oz bags + strip clip + hook in a 7×7×7 box, ~3.4 lb gross). The earlier "samples = Drew, East Coast" rule is **DEFERRED** until an East Coast staging warehouse re-activates with a confirmed canonical address; agents and downstream code must keep `origin` as an extension point on the dispatch payload (NOT `channel`) so east-coast routing can be re-enabled without churn. Zero tolerance for wrong-origin shipments. Every shipment is a Class B `shipment.create` request to Ben with origin + carrier + service preset evidence; samples run through the same gate. The specialist classifies, enriches (address validation, ShipStation preset match), composes the request, and posts to `#ops-approvals`.
 
 ## Boot ritual
 
 1. Read canonical doctrine: [`CLAUDE.md`](../../CLAUDE.md) fulfillment rules, [`/contracts/slack-operating.md`](../slack-operating.md) severity tiers, [`/contracts/approval-taxonomy.md`](../approval-taxonomy.md) `shipment.create` + `shipstation.rule.modify` slugs.
-2. Confirm ShipStation product preset group exists for the current SKU; confirm shipping presets exist for `Ashford-USPS-Priority`, `Ashford-UPS-Ground`, `East-Coast-USPS-Priority` (or equivalents per Drew's ZIP).
-3. Confirm ShipStation automation rule `tag:sample → East Coast origin; default → Ashford origin` is live.
+2. Confirm ShipStation product preset group exists for the current SKU; confirm shipping presets exist for `Ashford-USPS-Priority`, `Ashford-UPS-Ground`, `Ashford-USPS-Ground-Advantage`. East-coast presets (`East-Coast-USPS-Priority` etc.) remain DEFERRED until the staging warehouse re-activates — keep the placeholder in the preset registry so re-enabling is a config flip, not a refactor.
+3. Confirm ShipStation automation rule `default → Ashford origin` is live for both order tags and sample tags. The pre-2026-04-30 split-rule (`tag:sample → East Coast origin`) is DEFERRED — rule must NOT route samples east-coast until the staging warehouse re-activates.
 4. Query Open Brain for `ops:shipment:*` in the last 7 days to surface recent mis-origin incidents (if any).
 5. Log session start to Open Brain with tag `ops:sample-order-dispatch:<ISODate>`.
 
@@ -44,7 +44,7 @@ One job: enforce the canonical fulfillment-origin rule on every sample request a
 
 | Action slug | Class | Approver | Notes |
 |---|---|---|---|
-| `shipment.create` | **B** | Ben (orders); Ben (samples — Drew originates, Ben approves) | One request per shipment with origin + carrier + service preset + weight/dim evidence |
+| `shipment.create` | **B** | Ben (orders + samples — Ben originates AND approves from Ashford as of 2026-04-30; Drew-originated samples DEFERRED) | One request per shipment with origin + carrier + service preset + weight/dim evidence |
 | `shipstation.rule.modify` | **B** | Ben | Only when a rule needs updating; rare |
 | `shipment.tracking-push` | **A** | none | Post carrier tracking back to HubSpot deal, Shopify order, Slack thread |
 | `slack.post.audit` | **A** | none | Mirror each shipment creation + tracking push to `#ops-audit` |
@@ -54,7 +54,7 @@ One job: enforce the canonical fulfillment-origin rule on every sample request a
 
 ## Prohibited
 
-- **Shipping an order from East Coast (Drew) or a sample from Ashford (Ben).** CLAUDE.md canonical rule. If the automation rule mis-classified, the specialist refuses the dispatch and posts `critical` to `#ops-alerts` + DM Ben.
+- **Shipping any order or sample from anywhere other than Ashford WA (Ben)** while the East Coast staging warehouse is offline (CLAUDE.md REVISED 2026-04-30). If the automation rule mis-classifies and routes east-coast, the specialist refuses the dispatch and posts `critical` to `#ops-alerts` + DM Ben. When the east-coast staging warehouse re-activates, this rule splits back into "orders → Ashford, samples → East Coast"; refer to CLAUDE.md before changing.
 - **Creating a label autonomously.** Every label creation passes through Class B `shipment.create` approval — even for small sample dispatches.
 - **Pushing tracking before the label is actually scanned by the carrier.** No fabricated tracking.
 - **Modifying ShipStation automation rules without approval.** `shipstation.rule.modify` is Class B (Ben).
@@ -70,7 +70,7 @@ One job: enforce the canonical fulfillment-origin rule on every sample request a
 - HubSpot deal `stage → closed-won` (wholesale fulfillment)
 - Slack message in `#operations` matching `/sample\s+request|dispatch/i` (sample path)
 
-Plus on-demand invocations by Ben / Drew via the ops dashboard.
+Plus on-demand invocations by Ben via the ops dashboard. (Drew remains a permitted invoker for orders + production paths; sample dispatch is Ben-only while east-coast staging is offline.)
 
 ## Memory
 
@@ -84,7 +84,7 @@ Plus on-demand invocations by Ben / Drew via the ops dashboard.
 - **Severity tier policy:**
   - Nominal shipment with correct origin = `info`.
   - Shipment blocked by `ar_hold` = `action` to `#sales` + `#finance` with the hold reason.
-  - Wrong-origin mismatch detected = `critical` to `#ops-alerts` + DM Ben + refuse to create label.
+  - Wrong-origin mismatch detected (anything not Ashford while east-coast staging is offline) = `critical` to `#ops-alerts` + DM Ben + refuse to create label.
   - Carrier preset not found = `warning` to `#operations` + Drew mention.
   - COI expired on a supply vendor affecting this shipment = `warning` to `#operations`.
 
@@ -108,7 +108,7 @@ Stays in-the-loop indefinitely for `shipment.create` (Class B — every instance
 
 | Violation | Action |
 |---|---|
-| Wrong-origin shipment created (order from East Coast or sample from Ashford) | Immediate pause + Ben review + postmortem within 48h. |
+| Wrong-origin shipment created (anything routed away from Ashford while east-coast staging is offline) | Immediate pause + Ben review + postmortem within 48h. |
 | `ar_hold` bypassed | Immediate pause + recall shipment if still with carrier. |
 | Missing preset match → ad-hoc label | Correction logged; 2+ in 7d = RED. |
 | Fabricated tracking (label created without carrier scan) | Class D-adjacent; immediate pause + contract revision. |
@@ -128,4 +128,5 @@ Stays in-the-loop indefinitely for `shipment.create` (Class B — every instance
 
 ## Version history
 
+- **1.1 — 2026-05-02** — Sample-origin doctrine updated to match CLAUDE.md REVISED 2026-04-30: Ben originates AND approves all samples from Ashford while the East Coast staging warehouse is offline. Drew-as-sample-shipper is DEFERRED, not deleted — `origin` remains an extension point on the dispatch payload (NOT keyed on `channel`) so re-enabling east-coast routing is a config flip. Triggered by 2026-05-02 CNHA repro where the post-approval closer posted the stale "handed to Drew, East Coast" message and never bought a label.
 - **1.0 — 2026-04-20** — First canonical publication. Depends on ShipStation preset + automation rule setup in Lane D (Tuesday cutover).

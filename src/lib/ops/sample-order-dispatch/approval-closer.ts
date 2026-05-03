@@ -8,16 +8,31 @@
  * having a hand on the wheel.
  *
  * Today's behavior:
- *   - For channel="manual" (free-form email samples → Ben in Ashford,
- *     per /contracts/integrations/shipstation.md §3.5 REVISED 2026-04-30):
- *     post a thread reply confirming the hand-off; record an audit entry;
- *     queue the intent in KV for the operator to drain. No label buy.
+ *   - For channel="manual" (free-form email samples → Ben, Ashford WA,
+ *     per CLAUDE.md REVISED 2026-04-30 + /contracts/integrations/
+ *     shipstation.md §3.5): queue the intent in KV for the operator to
+ *     drain, post a thread reply on the approval card AND a
+ *     phone-visible mirror to `#shipping`, and audit the hand-off. No
+ *     label buy yet — the manual channel doesn't have a ShipStation
+ *     order pre-created, so the auto-ship cron has nothing to pick up.
+ *     Wiring `createOrder` into this path is a follow-up; for now Ben
+ *     packs from Ashford using the queued summary + posts proof-of-ship
+ *     in `#shipping`.
  *   - For channel ∈ {shopify, amazon, faire, hubspot}: post a "manual
  *     required" thread reply pointing the operator to the existing
  *     auto-ship pipeline / ShipStation queue. We deliberately do NOT
  *     reach into ShipStation here — the dedicated auto-ship cron (with
  *     its own validation + dedup + drift audit) is the only path that
  *     buys labels.
+ *
+ * Doctrine: CLAUDE.md "Fulfillment Rules" REVISED 2026-04-30 — every
+ * sample now ships from Ashford via Ben while the East Coast staging
+ * warehouse is offline. The earlier "samples = Drew, East Coast" rule
+ * is DEFERRED, not deleted: when the staging warehouse re-activates
+ * with a confirmed canonical address, this branch should learn an
+ * `origin` hint (carried on the approval payload, not on `channel`)
+ * and route east-coast samples back to Drew. Until then every
+ * manual-channel sample originates from Ashford.
  *
  * "If label buying needs missing data, do not guess" — Ben, 2026-04-24.
  *
@@ -27,6 +42,8 @@
 import { kv } from "@vercel/kv";
 
 import { buildAuditEntry } from "@/lib/ops/control-plane/audit";
+import { getChannel, slackChannelRef } from "@/lib/ops/control-plane/channels";
+import { postMessage } from "@/lib/ops/control-plane/slack/client";
 import { auditStore } from "@/lib/ops/control-plane/stores";
 import { auditSurface } from "@/lib/ops/control-plane/slack";
 import type {
@@ -45,6 +62,7 @@ export type ShipmentApprovalExecutionResult =
       approvalId: string;
       queuedKey: string;
       threadMessage: string;
+      shippingChannelPosted: boolean;
     }
   | {
       ok: true;
@@ -137,10 +155,13 @@ export async function executeApprovedShipmentCreate(
     trigger: `approval:${approval.id}`,
   };
 
-  // Manual channel = free-form email sample → Ben in Ashford
-  // (per /contracts/integrations/shipstation.md §3.5 REVISED 2026-04-30).
-  // Queue the intent for the operator and post the hand-off message.
-  // No label buy.
+  // Manual channel = free-form email sample → Ben packs from Ashford
+  // (CLAUDE.md REVISED 2026-04-30 + shipstation.md §3.5). Queue the
+  // intent for the operator and surface it on both the approval thread
+  // AND `#shipping` so Ben sees it on his phone alongside auto-ship
+  // notifications. No label buy: manual-channel samples don't have a
+  // ShipStation order yet, so the auto-ship cron has nothing to pick
+  // up. Wiring `createOrder` into this branch is the next iteration.
   if (parsed.channel === "manual") {
     const queuedKey = `${QUEUE_KEY_PREFIX}${approval.id}`;
     try {
@@ -166,11 +187,37 @@ export async function executeApprovedShipmentCreate(
         error: errMsg,
       });
     }
+    const sampleLabel = approval.targetEntity?.label ?? parsed.sourceId;
     const threadMessage =
-      `:package: Approved \`shipment.create\` — handed to Ben for manual sample fulfillment ` +
-      `(${approval.targetEntity?.label ?? parsed.sourceId}). ` +
-      `*No label purchased.* Ben packs from Ashford and confirms in #shipping when shipped. ` +
+      `:package: Approved \`shipment.create\` — queued for Ben to pack from Ashford ` +
+      `(${sampleLabel}). ` +
+      `*No label purchased by closer.* Ben packs the case sample (6 × 7.5 oz bags + strip clip + hook in a 7×7×7 box) ` +
+      `and posts proof-of-ship in #shipping when the label is bought. ` +
       `_Queue key: \`${queuedKey}\`_`;
+
+    // Mirror to #shipping so Ben sees the queue entry on his phone
+    // alongside the auto-ship pipeline's notifications. Fail-soft —
+    // the approval-thread reply remains the source-of-truth.
+    let shippingChannelPosted = false;
+    if (getChannel("shipping")) {
+      try {
+        const previewLine = approval.payloadPreview
+          ? `\n${approval.payloadPreview}`
+          : "";
+        await postMessage({
+          channel: slackChannelRef("shipping"),
+          text:
+            `:package: *Sample queued for Ashford pack-out* — ${sampleLabel}` +
+            previewLine +
+            `\nApproval: \`${approval.id}\` · Queue key: \`${queuedKey}\`` +
+            `\nNo label purchased yet — buy + post proof-of-ship here when shipped.`,
+        });
+        shippingChannelPosted = true;
+      } catch {
+        /* best-effort — approval thread reply still carries the signal */
+      }
+    }
+
     await appendCloseAudit(run, approval, {
       result: "ok",
       kind: "manual-handoff",
@@ -183,6 +230,7 @@ export async function executeApprovedShipmentCreate(
       approvalId: approval.id,
       queuedKey,
       threadMessage,
+      shippingChannelPosted,
     };
   }
 
