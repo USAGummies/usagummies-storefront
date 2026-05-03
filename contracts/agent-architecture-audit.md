@@ -181,7 +181,7 @@ Mapped against the inventory above. Most contracts have a runtime; some are deli
 
 A "pack" is a read-model — a curated cross-cut of the agent registry for a specific audience or division. Packs do **not** add agents. They reorganize how existing agents are surfaced.
 
-The point of packs: when Rene opens her dashboard, she should see one consolidated view of every agent that touches finance, not have to know the 21 contract filenames. Same for Drew on operations, Ben on the executive view, etc.
+The point of packs: when Rene opens his dashboard, he should see one consolidated view of every agent that touches finance, not have to know the 21 contract filenames. Same for Drew on operations, Ben on the executive view, etc.
 
 ### Pack 1 — Executive Pack (Ben)
 
