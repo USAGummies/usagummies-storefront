@@ -66,8 +66,12 @@ vi.mock("@vercel/kv", () => {
 // real network. Tests assert against the call args. Use `vi.hoisted` so
 // the mock factory can reference the spy even though `vi.mock` is
 // hoisted above the rest of the file.
+type PostMessageArg = { channel: string; text: string };
 const { postMessageMock } = vi.hoisted(() => ({
-  postMessageMock: vi.fn(async () => ({ ok: true, ts: "fake-ts" })),
+  postMessageMock: vi.fn(async (_args: { channel: string; text: string }) => ({
+    ok: true,
+    ts: "fake-ts",
+  })),
 }));
 vi.mock("@/lib/ops/control-plane/slack/client", () => ({
   postMessage: postMessageMock,
@@ -88,18 +92,22 @@ vi.mock("@/lib/ops/control-plane/channels", () => ({
 
 // Stub the ShipStation client. Default = ShipStation configured + a
 // successful createOrder response. Per-test overrides via the spies.
+// Mocks are typed as `unknown` args + union return so per-test
+// `mockImplementationOnce` can return either an ok or an error shape.
 const { isShipStationConfiguredMock, createShipStationOrderMock } = vi.hoisted(
   () => ({
-    isShipStationConfiguredMock: vi.fn(() => true),
-    createShipStationOrderMock: vi.fn(async () => ({
-      ok: true as const,
-      order: {
-        orderId: 999_001,
-        orderNumber: "sample-test-source-1",
-        orderUrl:
-          "https://ship.shipstation.com/orders/all-orders-search-result?quickSearch=sample-test-source-1",
-      },
-    })),
+    isShipStationConfiguredMock: vi.fn((): boolean => true),
+    createShipStationOrderMock: vi.fn(
+      async (_args: Record<string, unknown>): Promise<unknown> => ({
+        ok: true,
+        order: {
+          orderId: 999_001,
+          orderNumber: "sample-test-source-1",
+          orderUrl:
+            "https://ship.shipstation.com/orders/all-orders-search-result?quickSearch=sample-test-source-1",
+        },
+      }),
+    ),
   }),
 );
 vi.mock("@/lib/ops/shipstation-client", () => ({
@@ -265,10 +273,9 @@ describe("executeApprovedShipmentCreate", () => {
 
     // ShipStation called exactly once with the §3.5 canonical spec.
     expect(createShipStationOrderMock).toHaveBeenCalledTimes(1);
-    const ssArgs = createShipStationOrderMock.mock.calls[0]![0] as Record<
-      string,
-      unknown
-    >;
+    const ssCall = createShipStationOrderMock.mock.calls[0];
+    if (!ssCall) throw new Error("expected createShipStationOrder call");
+    const ssArgs = ssCall[0] as Record<string, unknown>;
     expect(ssArgs.orderStatus).toBe("awaiting_shipment");
     expect(ssArgs.weight).toEqual({ value: 3.4, units: "pounds" });
     expect(ssArgs.dimensions).toMatchObject({
@@ -306,10 +313,9 @@ describe("executeApprovedShipmentCreate", () => {
 
     // #shipping mirror posted exactly once with the SS order link.
     expect(postMessageMock).toHaveBeenCalledTimes(1);
-    const postArgs = postMessageMock.mock.calls[0]![0] as {
-      channel: string;
-      text: string;
-    };
+    const postCall = postMessageMock.mock.calls[0];
+    if (!postCall) throw new Error("expected postMessage call");
+    const postArgs = postCall[0] as PostMessageArg;
     expect(postArgs.channel).toBe("C-SHIPPING");
     expect(postArgs.text).toContain("ShipStation");
     expect(postArgs.text).toContain("sample-test-source-1");
@@ -323,10 +329,12 @@ describe("executeApprovedShipmentCreate", () => {
   it("manual channel + ShipStation API failure: falls back to legacy manual-handoff path; audits the failure", async () => {
     const approval = buildApproval();
     seedPayload(approval.id, buildPayload());
-    createShipStationOrderMock.mockImplementationOnce(async () => ({
-      ok: false as const,
-      error: "ShipStation 503: service unavailable",
-    }));
+    createShipStationOrderMock.mockImplementationOnce(
+      async (): Promise<unknown> => ({
+        ok: false,
+        error: "ShipStation 503: service unavailable",
+      }),
+    );
 
     const result = await executeApprovedShipmentCreate(approval);
 
@@ -356,10 +364,9 @@ describe("executeApprovedShipmentCreate", () => {
 
     // #shipping mirror still fires with the fallback wording.
     expect(postMessageMock).toHaveBeenCalledTimes(1);
-    const postArgs = postMessageMock.mock.calls[0]![0] as {
-      channel: string;
-      text: string;
-    };
+    const postCall = postMessageMock.mock.calls[0];
+    if (!postCall) throw new Error("expected postMessage call");
+    const postArgs = postCall[0] as PostMessageArg;
     expect(postArgs.text).toContain("Ashford");
     expect(postArgs.text).toContain("ShipStation auto-create skipped");
     expect(postArgs.text).not.toContain("ShipStation order: `sample-test");
