@@ -276,9 +276,23 @@ export default function GoLandingPage() {
                 </span>
               </h1>
             </Link>
-            <p style={{ fontSize: 14, lineHeight: 1.5, color: "#5f5b56", marginTop: 12, maxWidth: 460, marginLeft: "auto", marginRight: "auto" }}>
+            {/* Tagline is clickable → /made-in-usa (Clarity 2026-05-02:
+                4 dead clicks today on this text — users treat it as a link). */}
+            <Link
+              href="/made-in-usa"
+              className="lp-headline-link"
+              style={{
+                display: "inline-block",
+                fontSize: 14,
+                lineHeight: 1.5,
+                color: "#5f5b56",
+                marginTop: 12,
+                maxWidth: 460,
+                textDecoration: "none",
+              }}
+            >
               American gummy bears, made across the country.
-            </p>
+            </Link>
 
             {/* Social proof stat */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 12 }}>
@@ -289,12 +303,20 @@ export default function GoLandingPage() {
             </div>
           </div>
 
-          {/* Image - smaller on mobile to keep CTA visible */}
-          <div className="lp-animate" style={{ display: "flex", justifyContent: "center", position: "relative", marginTop: 16 }}>
-            <div style={{ position: "relative", width: "100%", maxWidth: 240 }} className="md:!max-w-[340px]">
+          {/* Image - smaller on mobile to keep CTA visible.
+              Image now wrapped in Link → /go/checkout?qty=5 (Clarity 2026-05-02:
+              users tap the bag photo expecting product detail/zoom; route them
+              straight to the BUY 4 GET 1 FREE checkout instead). */}
+          <Link
+            href={CHECKOUT_URL}
+            className="lp-animate lp-headline-link"
+            aria-label="Buy 4 bags, get 1 free — $23.96 with free shipping"
+            style={{ display: "flex", justifyContent: "center", position: "relative", marginTop: 16, textDecoration: "none" }}
+          >
+            <div style={{ position: "relative", width: "100%", maxWidth: 240, cursor: "pointer" }} className="md:!max-w-[340px]">
               <Image
                 src="/Hero-pack.jpeg"
-                alt="Bag of USA Gummies classic gummy bears"
+                alt="Bag of USA Gummies classic gummy bears — tap to claim Buy 4 Get 1 Free"
                 width={760}
                 height={950}
                 priority
@@ -306,7 +328,7 @@ export default function GoLandingPage() {
                 }}
               />
             </div>
-          </div>
+          </Link>
         </div>
 
         {/* Trust bar — each badge is now an actual link (Clarity 2026-05-01:

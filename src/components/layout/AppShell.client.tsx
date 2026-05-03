@@ -448,15 +448,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </span>
             </button>
 
-            <button
-              type="button"
-              onClick={() => setMobileOpen((s) => !s)}
-              className="md:hidden pressable focus-ring inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border)] text-[var(--text)] bg-white"
-              aria-label="Toggle navigation"
-              aria-expanded={mobileOpen}
-            >
-              ☰
-            </button>
+            {/* Mobile hamburger menu — hidden on /go landing page (Clarity
+                2026-05-02: 2 dead clicks today on this icon — IG-app users
+                tap it expecting more navigation, see a drawer they don't
+                want, and bounce. /go is a focused LP, the BUY CTA is the
+                only nav we want). Per Ben directive 2026-05-02. */}
+            {!isLandingPage && (
+              <button
+                type="button"
+                onClick={() => setMobileOpen((s) => !s)}
+                className="md:hidden pressable focus-ring inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border)] text-[var(--text)] bg-white"
+                aria-label="Toggle navigation"
+                aria-expanded={mobileOpen}
+              >
+                ☰
+              </button>
+            )}
           </div>
         </div>
 
