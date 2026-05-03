@@ -199,6 +199,13 @@ export interface BriefInput {
    */
   yesterdayRuns?: { forDate: string; lines: string[] };
   /**
+   * Morning-only: rendered "vs yesterday" diff line. Caller (route)
+   * computes it via `renderBriefDiffLine()` from today's resolved
+   * metrics + yesterday's KV-stored snapshot. Composer renders it
+   * verbatim under TODAY'S MISSION when present.
+   */
+  briefDiffLine?: string;
+  /**
    * Morning-only: compact sales-command summary covering Faire
    * invites/follow-ups, pending Slack approvals, AP packets, retail
    * drafts, wholesale inquiries. The route populates this from the
@@ -453,9 +460,16 @@ export function composeDailyBrief(input: BriefInput): BriefOutput {
     const agentList = input.pausedAgents.map((p) => `\`${p.agentId}\``).join(", ");
     priorities.push(`🛑 *${pausedCount}* agent(s) standing down — review needed: ${agentList}.`);
   }
+  // Morning brief gets the "vs yesterday" diff line appended to the
+  // TODAY'S MISSION block. Quiet-collapses to nothing when the diff
+  // is null (no yesterday snapshot OR no meaningful deltas).
+  const missionBody =
+    input.kind === "morning" && input.briefDiffLine
+      ? `${priorities.join("\n")}\n${input.briefDiffLine}`
+      : priorities.join("\n");
   blocks.push({
     type: "section",
-    text: { type: "mrkdwn", text: `*🎯 TODAY'S MISSION*\n${priorities.join("\n")}` },
+    text: { type: "mrkdwn", text: `*🎯 TODAY'S MISSION*\n${missionBody}` },
   });
 
   // ---- Yesterday's cron runs (morning-only) ----

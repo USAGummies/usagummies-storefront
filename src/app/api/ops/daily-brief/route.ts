@@ -36,6 +36,12 @@ import {
 import { computeDailyPnL } from "@/lib/ops/daily-pnl";
 import { summarizeYesterdayRuns } from "@/lib/ops/control-plane/yesterday-runs";
 import {
+  loadBriefSnapshot,
+  saveBriefSnapshot,
+  type BriefSnapshot,
+} from "@/lib/ops/control-plane/brief-snapshot";
+import { renderBriefDiffLine } from "@/lib/ops/control-plane/brief-diff";
+import {
   parsePerVendorMarginLedger,
   selectVendorMarginAlerts,
 } from "@/lib/finance/per-vendor-margin";
@@ -681,6 +687,36 @@ async function composeAndPost(req: Request): Promise<Response> {
     });
   }
 
+  // Compute today's metrics snapshot + the "vs yesterday" diff line
+  // (morning only). Yesterday's snapshot is read from KV; today's is
+  // saved AFTER the brief posts. Fail-soft per CB#16 doctrine —
+  // a KV miss returns null and the diff line is just omitted.
+  const todaySnapshot: BriefSnapshot = {
+    date: now.toISOString().slice(0, 10),
+    cashUsd: cashPosition.amountUsd ?? null,
+    pendingApprovals: pendingApprovals.length,
+    staleBuyers: staleBuyers
+      ? staleBuyers.staleByStage.reduce((s, x) => s + x.count, 0)
+      : null,
+    sampleQueueAwaitingShip: sampleQueue?.awaitingShip ?? null,
+    sampleQueueShippedAwaitingResponse:
+      sampleQueue?.shippedAwaitingResponse ?? null,
+    capturedAt: now.toISOString(),
+  };
+  let briefDiffLine: string | null = null;
+  if (kind === "morning") {
+    const yesterdayDate = new Date(now.getTime() - 86_400_000)
+      .toISOString()
+      .slice(0, 10);
+    const yesterdaySnap = await loadBriefSnapshot(yesterdayDate);
+    if (yesterdaySnap) {
+      briefDiffLine = renderBriefDiffLine({
+        today: todaySnapshot,
+        yesterday: yesterdaySnap,
+      });
+    }
+  }
+
   const composeInput = {
     kind,
     asOf: now,
@@ -704,6 +740,7 @@ async function composeAndPost(req: Request): Promise<Response> {
               .slice(0, 10),
           )
         : undefined,
+    briefDiffLine: briefDiffLine ?? undefined,
     salesCommand,
     vendorMargin,
     staleBuyers,
@@ -748,6 +785,13 @@ async function composeAndPost(req: Request): Promise<Response> {
   // store unavailability (which also got surfaced inside the brief body)
   // plus delivery failure. If either is true, the response is not healthy.
   const envelopeDegraded = degradations.length > 0;
+
+  // Save today's snapshot for tomorrow's "vs yesterday" diff line.
+  // Morning-only — EOD snapshots would compete with the morning row
+  // for today's date and confuse the diff. Fail-soft.
+  if (kind === "morning") {
+    await saveBriefSnapshot(todaySnapshot);
+  }
 
   return NextResponse.json({
     ok: true,
