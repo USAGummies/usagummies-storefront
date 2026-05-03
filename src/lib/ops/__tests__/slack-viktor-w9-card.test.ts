@@ -41,7 +41,7 @@ describe("renderViktorW9Card", () => {
     expect(card.text).toMatch(/not configured/);
     const blob = JSON.stringify(card.blocks);
     expect(blob).toMatch(/⚪️ not configured/);
-    expect(blob).toMatch(/Booke API access is not configured/);
+    expect(blob).toMatch(/Booke has no partner REST API/);
     expect(blob).toContain("/contracts/booke-integration-runbook.md");
   });
 
@@ -66,7 +66,7 @@ describe("renderViktorW9Card", () => {
     expect(card.text).toMatch(/queue empty/);
     const blob = JSON.stringify(card.blocks);
     expect(blob).toMatch(/🟢 clean/);
-    expect(blob).toMatch(/queue is empty/);
+    expect(blob).toMatch(/Queue is empty/);
   });
 
   it("configured + queue non-empty → yellow + top rows render", () => {

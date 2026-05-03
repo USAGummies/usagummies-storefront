@@ -174,22 +174,35 @@ export async function setBookeQueueCount(count: number): Promise<BookeKvEntry> {
 }
 
 // ---------------------------------------------------------------------------
-// Viktor W-9 read API — list helpers
+// Viktor W-9 read API — forward-looking stubs
 // ---------------------------------------------------------------------------
 //
-// Per `/contracts/viktor.md` v3.2 W-9 ("Finance close-loop"). Read-only
-// list helpers Viktor uses to pull Booke's To Review queue + account /
-// vendor reference data when proposing category mappings.
+// ⚠️ ARCHITECTURAL NOTE (2026-05-03 PM Chrome verification):
 //
-// Each function returns a discriminated `BookeReadResult<T>` so callers
-// can branch on `configured` vs `unconfigured` vs `errored` without
-// guessing. When `BOOKE_API_TOKEN` is absent every helper returns
-// `{ ok: false, configured: false }` cleanly — existing flows are
-// unaffected; the readiness page surfaces "not configured" so an
-// operator can see what's missing.
+// Booke does NOT expose a partner REST API. Their product model is:
+// "invite Booke as a QBO user → Booke writes categorizations directly
+// to QBO → operators review exceptions in QBO." There is no separate
+// Booke data store to query. Verified by walking booke.ai,
+// docs.booke.ai, app.booke.ai, and the SLA / partner / API paths —
+// no developer documentation exists.
 //
-// NEVER paste a Booke password / token in Slack / source / logs. Token
-// lives in `BOOKE_API_TOKEN` Vercel env var only.
+// These helpers (`listToReviewTransactions` / `listAccounts` /
+// `listVendors`) are kept as **forward-looking stubs** for the day
+// Booke ships a partner API. Until then, every call returns
+// `{ ok: false, configured: false, reason: "BOOKE_API_TOKEN not
+// configured" }` cleanly — there is no token to issue.
+//
+// The CORRECT read path for Viktor's W-9 close-loop is QBO directly
+// via `/api/ops/qbo/*` (already in his read scope per
+// `/contracts/viktor.md`). Booke's value lives natively in QBO's
+// bank feed — the categorizations Booke proposes show up as
+// suggestions on QBO's For Review tab, which Viktor reads from QBO.
+//
+// See `/contracts/booke-integration-runbook.md` v1.1 §0 for the full
+// architectural finding + the doctrinal answer to Rene's
+// 2026-05-03 question.
+//
+// NEVER paste a Booke password / token in Slack / source / logs.
 
 const BOOKE_API_BASE = "https://api.booke.ai/api/v1";
 

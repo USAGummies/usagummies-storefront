@@ -193,16 +193,17 @@ function buildBriefText(
 ): string {
   if (!args.configured) {
     return (
-      "_Booke API access is not configured yet. Operator must walk_ " +
-      `<${RUNBOOK_URL}|/contracts/booke-integration-runbook.md>_ ` +
-      "_(4 steps, ~5 min). Until then I can read Booke's queue count via the legacy KV path but cannot pull individual To Review rows or apply categories._"
+      "_*Architectural note (2026-05-03):* Booke has no partner REST API. " +
+      "The categorizations Booke proposes show up natively on QBO's For Review tab — that's where the data lives. " +
+      "I read it from QBO directly via_ `/api/ops/qbo/*` _(already in my read scope)._ " +
+      `_See_ <${RUNBOOK_URL}|booke-integration-runbook.md> _§0 for the full answer to Rene's "coded access" question._`
     );
   }
   if (args.readError) {
     return "*🚨 Booke API read failed.* I'm pausing the W-9 close-loop until the operator restores access. Surfacing the error string above for triage.";
   }
   if (queueCount === 0) {
-    return "_Booke To Review queue is empty._ Ready for the next phase: BoA bank rec → Capital One CC rec → reconnect Platinum after April rec is clean.";
+    return "_Queue is empty._ Ready for the next phase: BoA bank rec → Capital One CC rec → reconnect Platinum after April rec is clean.";
   }
   return (
     `*${queueCount} To Review row${queueCount === 1 ? "" : "s"}.*` +
