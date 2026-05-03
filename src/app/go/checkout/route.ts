@@ -188,6 +188,26 @@ function withShopPayEnabled(url: string) {
   }
 }
 
+/**
+ * Force Shop Pay OFF on the checkout URL — used for Instagram, Facebook,
+ * Threads, TikTok in-app browsers. 2026-05-03 trace confirmed:
+ *
+ *   - skip_shop_pay=false → Shopify routes through `shop.app/checkout` → IG
+ *     in-app webview can't carry 3rd-party cookies → bumps to homepage.
+ *   - skip_shop_pay=true  → Shopify routes DIRECTLY to
+ *     `…/checkouts/cn/{id}/en?_r=…&skip_shop_pay=true` in 1 hop, lands on
+ *     the standard checkout page (verified with cookie-jar curl).
+ */
+function withShopPayDisabled(url: string) {
+  try {
+    const parsed = new URL(url);
+    parsed.searchParams.set("skip_shop_pay", "true");
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+}
+
 /** Extract GA4 session_id from the container-specific _ga_* cookie */
 function extractGA4SessionId(req: NextRequest): string {
   for (const cookie of req.cookies.getAll()) {
@@ -388,13 +408,24 @@ export async function GET(req: NextRequest) {
   fireMetaCAPIAddToCart(req, qty);
   console.info("go_checkout_redirect", ga4Params);
 
-  // 2026-05-02 — In-app browser bypass. See `isInAppBrowser` docstring.
-  // Skip the Storefront API call entirely for IG/FB/Threads/TikTok webviews
-  // and use the direct permalink. Single hop, no token race, BXGY still
-  // applies via Shopify's automatic-discount engine at cart level.
-  if (inAppBrowser) {
-    return NextResponse.redirect(fallbackPermalink(qty, attribution), 302);
-  }
+  // 2026-05-03 — Updated In-App Browser strategy.
+  //
+  // Previous approach (commit 3a52bb80) routed IG/FB/Threads/TikTok webviews
+  // to the simple permalink (`/cart/{var}:{qty}`). Trace 2026-05-03 revealed
+  // that path goes through `shop.app/checkout/.../shop_pay_callback` which
+  // 3rd-party-cookie-blocked in-app webviews can't survive — they bump to
+  // `https://usa-gummies.myshopify.com/` (homepage) instead of checkout.
+  //
+  // New approach: ALL flows use the Storefront API (single-source cart
+  // creation, identity attributes preserved). Branch only on the Shop Pay
+  // flag. Cookie-jar curl trace 2026-05-03:
+  //   - Storefront URL + skip_shop_pay=true  → 1 hop → real checkout (1.56s)
+  //   - Storefront URL + skip_shop_pay=false → goes through shop.app
+  //     callback → fine on desktop with cookies, dies in IG webview.
+  //
+  // So in-app browsers get skip_shop_pay=true (no Shop Pay express, but
+  // checkout actually works). Native browsers get skip_shop_pay=false (Shop
+  // Pay express button + the optimized flow).
 
   if (!STOREFRONT_TOKEN) {
     return NextResponse.redirect(fallbackPermalink(qty, attribution), 302);
@@ -428,12 +459,13 @@ export async function GET(req: NextRequest) {
       return NextResponse.redirect(fallbackPermalink(qty, attribution), 302);
     }
 
-    // Append skip_shop_pay=false to force the Shop Pay express button on at
-    // checkout — see header comment for why. Then layer attribution params.
-    const shopPayFriendlyUrl = withShopPayEnabled(checkoutUrl);
+    // Choose Shop Pay strategy based on browser. See block-comment above.
+    const finalUrl = inAppBrowser
+      ? withShopPayDisabled(checkoutUrl)
+      : withShopPayEnabled(checkoutUrl);
 
     return NextResponse.redirect(
-      withAttribution(shopPayFriendlyUrl, attribution),
+      withAttribution(finalUrl, attribution),
       302,
     );
   } catch {
