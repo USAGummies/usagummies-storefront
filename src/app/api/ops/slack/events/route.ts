@@ -52,6 +52,15 @@ const WHAT_NEEDS_BEN_REGEX =
   /^\/?(?:what\s+needs\s+ben|ben\s+queue|ben\s+today)\s*$/i;
 const AGENTS_STATUS_REGEX = /^\/?agents\s+status\s*$/i;
 const PIPELINE_DRIFT_REGEX = /^\/?pipeline\s+drift\s*$/i;
+/**
+ * Viktor W-9 finance close-loop triggers — match Rene's canonical
+ * phrases for starting a Booke → QBO close session in #financials.
+ * Per /contracts/viktor.md v3.2 W-9. Conservative match: requires
+ * "booke" with a close-framing word — won't fire on general booke
+ * chatter.
+ */
+const VIKTOR_W9_REGEX =
+  /^\/?(?:booke\s+(?:status|today|prep|prepare|ready|review|next)|prepare\s+booke?|is\s+booke?\s+(?:next|ready|done)|booke?\s+to\s+complete|prep\s+booke?)\s*$/i;
 
 /**
  * Reactions that count as "this package physically left the warehouse."
@@ -161,6 +170,7 @@ export async function POST(req: Request): Promise<Response> {
       const isWhatNeedsBen = WHAT_NEEDS_BEN_REGEX.test(text);
       const isAgentsStatus = AGENTS_STATUS_REGEX.test(text);
       const isPipelineDrift = PIPELINE_DRIFT_REGEX.test(text);
+      const isViktorW9 = VIKTOR_W9_REGEX.test(text);
       const recordReceipt = (input: {
         recognizedCommand?: string | null;
         skippedReason?: string | null;
@@ -191,7 +201,8 @@ export async function POST(req: Request): Promise<Response> {
         !isShippingToday &&
         !isWhatNeedsBen &&
         !isAgentsStatus &&
-        !isPipelineDrift
+        !isPipelineDrift &&
+        !isViktorW9
       ) {
         await recordReceipt({ skippedReason: "non-new-message" });
         return NextResponse.json({ ok: true, skipped: "non-new-message" });
@@ -246,6 +257,10 @@ export async function POST(req: Request): Promise<Response> {
       if (isPipelineDrift) {
         await recordReceipt({ recognizedCommand: "pipeline-drift" });
         return handlePipelineDriftTrigger(msg);
+      }
+      if (isViktorW9) {
+        await recordReceipt({ recognizedCommand: "viktor-w9" });
+        return handleViktorW9Trigger(msg);
       }
       if (workpackCommand) {
         await recordReceipt({ recognizedCommand: "workpack" });
@@ -592,6 +607,71 @@ async function handleProposalsTrigger(
     return NextResponse.json({
       ok: true,
       handled: "proposals",
+      degraded: true,
+    });
+  }
+}
+
+async function handleViktorW9Trigger(
+  event: SlackMessageEvent,
+): Promise<Response> {
+  if (!event.ts) {
+    return NextResponse.json({
+      ok: true,
+      handled: "viktor-w9",
+      skipped: "no thread",
+    });
+  }
+  try {
+    const [{ isBookeConfigured, listToReviewTransactions }, { renderViktorW9Card }] =
+      await Promise.all([
+        import("@/lib/ops/booke-client"),
+        import("@/lib/ops/slack-viktor-w9-card"),
+      ]);
+    const configured = isBookeConfigured();
+    let toReviewRows: Awaited<
+      ReturnType<typeof listToReviewTransactions>
+    > extends infer R
+      ? R extends { ok: true; data: infer D }
+        ? D
+        : never
+      : never = [] as never;
+    let readError: string | null = null;
+    if (configured) {
+      const r = await listToReviewTransactions({ limit: 50 });
+      if (r.ok) {
+        toReviewRows = r.data as never;
+      } else if (r.configured) {
+        readError = r.reason;
+      }
+    }
+    const card = renderViktorW9Card({
+      configured,
+      toReviewRows: toReviewRows as never,
+      readError,
+    });
+    await postMessage({
+      channel: event.channel ?? slackChannelRef("finance"),
+      text: card.text,
+      blocks: card.blocks,
+      threadTs: event.thread_ts ?? event.ts,
+    });
+    return NextResponse.json({ ok: true, handled: "viktor-w9", configured });
+  } catch (err) {
+    try {
+      await postMessage({
+        channel: event.channel ?? slackChannelRef("ops-alerts"),
+        text:
+          ":warning: Viktor W-9 trigger could not render. " +
+          (err instanceof Error ? err.message : String(err)),
+        threadTs: event.thread_ts ?? event.ts,
+      });
+    } catch {
+      /* best-effort */
+    }
+    return NextResponse.json({
+      ok: true,
+      handled: "viktor-w9",
       degraded: true,
     });
   }
