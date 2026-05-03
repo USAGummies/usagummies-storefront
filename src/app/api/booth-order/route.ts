@@ -535,16 +535,45 @@ export async function POST(req: Request) {
     // Immediate invoice creation keeps accounting and ship hold aligned on day 1.
     if (paymentMethod === "invoice_me" && qboCustomerId) {
       try {
+        const txnDate = new Date().toISOString().slice(0, 10);
         const dueDate = new Date(Date.now() + 10 * 86400000).toISOString().slice(0, 10);
+        // Ship date defaults to today + 1 business day (lead time). For
+        // in-person handoff, ship date = today (it's a same-day handoff).
+        const shipDate =
+          deliveryMethod === "in_person"
+            ? txnDate
+            : new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
+        // Customer-friendly ship method label (matches what we'd put on
+        // the shipping label). The actual ShipMethodRef requires a QBO
+        // ShipMethod lookup which is a separate query — deferring that
+        // lookup; meanwhile the customer-facing copy lives in CustomerMemo.
+        const qboBillAddr =
+          ship_address?.trim() && ship_city?.trim()
+            ? {
+                Line1: ship_address.trim(),
+                City: ship_city.trim(),
+                CountrySubDivisionCode: ship_state?.trim() || "",
+                PostalCode: ship_zip?.trim() || "",
+                Country: "US",
+              }
+            : undefined;
         const qboInvoice = await createQBOInvoice({
           CustomerRef: { value: qboCustomerId },
+          TxnDate: txnDate,
           DueDate: dueDate,
+          ShipDate: shipDate,
           BillEmail: email?.trim() ? { Address: email.trim() } : undefined,
+          ...(qboBillAddr ? { BillAddr: qboBillAddr, ShipAddr: qboBillAddr } : {}),
+          PrivateNote: `Booth order · ${qty} ${pack.label}${qty > 1 ? "s" : ""} · ${deliveryMethod} · ${paymentMethod}`,
           CustomerMemo: {
             // Phase 36.5 — escalation clause baked into every booth-order
             // QBO invoice. Source of truth: src/lib/finance/escalation-language.ts.
+            // Phase 36.6 (CB#26 — Rene's 4/14 punchlist): ship method
+            // surfaces in the customer-facing memo since QBO ShipMethodRef
+            // requires a lookup we're deferring (TODO: queryQBOShipMethod).
             value:
-              "Net 10. This submit is a real order. No onboarding step is required; shipment or handoff releases per payment terms.\n\n" +
+              `Net 10. Ship method: ${deliveryMethod === "in_person" ? "In-person handoff / local delivery" : freightLabel}. ` +
+              "This submit is a real order. No onboarding step is required; shipment or handoff releases per payment terms.\n\n" +
               STANDARD_ESCALATION_CLAUSE,
           },
           Line: [

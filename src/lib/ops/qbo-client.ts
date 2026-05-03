@@ -572,6 +572,47 @@ export type QBOInvoiceInput = {
   DocNumber?: string;
   CustomerMemo?: { value: string };
   BillEmail?: { Address: string };
+  // Phase 36.6 — invoice field parity per Rene's 4/14 punchlist
+  // (CB#26). The /api/ops/qbo/invoice POST route resolves Terms +
+  // ShipMethod via lookups; for direct callers (booth-order route)
+  // we expose the QBO-shaped fields so the same numbers land on the
+  // invoice without round-tripping through the wrapper route.
+  /** Invoice transaction date (YYYY-MM-DD). Defaults to today on QBO side. */
+  TxnDate?: string;
+  /** Ship date (YYYY-MM-DD). Customer-facing — distinct from invoice date. */
+  ShipDate?: string;
+  /** Tracking number — usually empty at create time, filled when label fires. */
+  TrackingNum?: string;
+  /**
+   * SalesTermRef. Caller must resolve term name → QBO Term Id BEFORE
+   * passing (use queryQBOTermByName). For direct callers we accept
+   * the already-resolved value.
+   */
+  SalesTermRef?: { value: string; name?: string };
+  /**
+   * ShipMethodRef. Same lookup pattern as SalesTermRef.
+   */
+  ShipMethodRef?: { value: string; name?: string };
+  /** Ship-to address (QBO PhysicalAddress shape). */
+  ShipAddr?: {
+    Line1?: string;
+    Line2?: string;
+    City?: string;
+    CountrySubDivisionCode?: string;
+    PostalCode?: string;
+    Country?: string;
+  };
+  /** Bill-to address (QBO PhysicalAddress shape). */
+  BillAddr?: {
+    Line1?: string;
+    Line2?: string;
+    City?: string;
+    CountrySubDivisionCode?: string;
+    PostalCode?: string;
+    Country?: string;
+  };
+  /** PrivateNote (internal memo, distinct from CustomerMemo). */
+  PrivateNote?: string;
 };
 
 /**
