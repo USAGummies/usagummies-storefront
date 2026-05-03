@@ -36,23 +36,34 @@ describe("classifyDispatch — origin rules", () => {
     expect(result.originReason).toContain("default");
   });
 
-  it("routes explicit sample tag to East Coast", () => {
+  it("routes explicit sample tag to Ashford (samples no longer route East Coast — shipstation.md §3.5)", () => {
     const result = classifyDispatch(baseOrder({ tags: ["sample"] }));
-    expect(result.origin).toBe("east_coast");
-    expect(result.originReason).toContain("sample");
+    expect(result.origin).toBe("ashford");
+    expect(result.originReason).toContain("Ashford");
+    expect(result.originReason).toContain("§3.5");
   });
 
-  it("routes tag:sample variant to East Coast", () => {
+  it("routes tag:sample variant to Ashford", () => {
     const result = classifyDispatch(baseOrder({ tags: ["tag:sample"] }));
-    expect(result.origin).toBe("east_coast");
+    expect(result.origin).toBe("ashford");
   });
 
-  it("routes purpose:sample variant to East Coast", () => {
+  it("routes purpose:sample variant to Ashford", () => {
     const result = classifyDispatch(baseOrder({ tags: ["purpose:sample"] }));
-    expect(result.origin).toBe("east_coast");
+    expect(result.origin).toBe("ashford");
   });
 
-  it("honors explicit origin:east-coast override without sample tag", () => {
+  it("classifies sample-tag + sample note combo as Ashford (regression for 2026-05-02 CNHA bypass)", () => {
+    const result = classifyDispatch(
+      baseOrder({
+        tags: ["sample", "tag:sample"],
+        note: "sample box for buyer review",
+      }),
+    );
+    expect(result.origin).toBe("ashford");
+  });
+
+  it("honors explicit origin:east-coast override (preserved for future warehouse re-activation)", () => {
     const result = classifyDispatch(
       baseOrder({ tags: ["origin:east-coast"] }),
     );
@@ -60,7 +71,7 @@ describe("classifyDispatch — origin rules", () => {
     expect(result.originReason).toContain("override");
   });
 
-  it("warns when origin:east-coast override appears on a >$100 non-sample order", () => {
+  it("warns when origin:east-coast override appears on a >$100 order (warehouse currently DEFERRED)", () => {
     const result = classifyDispatch(
       baseOrder({
         tags: ["origin:east-coast"],
@@ -70,6 +81,7 @@ describe("classifyDispatch — origin rules", () => {
     expect(result.warnings.some((w) => w.includes("origin:east-coast"))).toBe(
       true,
     );
+    expect(result.warnings.some((w) => w.includes("DEFERRED"))).toBe(true);
   });
 });
 
@@ -209,8 +221,15 @@ describe("composeShipmentProposal", () => {
     expect(proposal.requiredApprovers).toEqual(["Ben"]);
   });
 
-  it("summary reflects the computed origin", () => {
+  it("summary reflects the computed origin (samples now route Ashford)", () => {
     const order = baseOrder({ tags: ["sample"] });
+    const classification = classifyDispatch(order);
+    const proposal = composeShipmentProposal(order, classification);
+    expect(proposal.summary).toContain("Ashford");
+  });
+
+  it("summary names East Coast only when explicit origin:east-coast override is present", () => {
+    const order = baseOrder({ tags: ["origin:east-coast"] });
     const classification = classifyDispatch(order);
     const proposal = composeShipmentProposal(order, classification);
     expect(proposal.summary).toContain("East Coast");

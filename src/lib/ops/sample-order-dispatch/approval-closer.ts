@@ -8,9 +8,10 @@
  * having a hand on the wheel.
  *
  * Today's behavior:
- *   - For channel="manual" (free-form email samples → Drew): post a
- *     thread reply confirming the hand-off; record an audit entry; queue
- *     the intent in KV for the operator to drain. No label buy.
+ *   - For channel="manual" (free-form email samples → Ben in Ashford,
+ *     per /contracts/integrations/shipstation.md §3.5 REVISED 2026-04-30):
+ *     post a thread reply confirming the hand-off; record an audit entry;
+ *     queue the intent in KV for the operator to drain. No label buy.
  *   - For channel ∈ {shopify, amazon, faire, hubspot}: post a "manual
  *     required" thread reply pointing the operator to the existing
  *     auto-ship pipeline / ShipStation queue. We deliberately do NOT
@@ -136,8 +137,10 @@ export async function executeApprovedShipmentCreate(
     trigger: `approval:${approval.id}`,
   };
 
-  // Manual channel = free-form email sample → Drew. Queue the intent for
-  // the operator and post the hand-off message. No label buy.
+  // Manual channel = free-form email sample → Ben in Ashford
+  // (per /contracts/integrations/shipstation.md §3.5 REVISED 2026-04-30).
+  // Queue the intent for the operator and post the hand-off message.
+  // No label buy.
   if (parsed.channel === "manual") {
     const queuedKey = `${QUEUE_KEY_PREFIX}${approval.id}`;
     try {
@@ -155,7 +158,7 @@ export async function executeApprovedShipmentCreate(
       );
     } catch (err) {
       // KV failure is non-fatal — we still post the hand-off message and
-      // audit the closer fired. Drew picks up via Slack, not via KV scan.
+      // audit the closer fired. Ben picks up via Slack, not via KV scan.
       const errMsg = err instanceof Error ? err.message : String(err);
       await appendCloseAudit(run, approval, {
         result: "error",
@@ -164,9 +167,9 @@ export async function executeApprovedShipmentCreate(
       });
     }
     const threadMessage =
-      `:package: Approved \`shipment.create\` — handed to Drew for manual sample fulfillment ` +
+      `:package: Approved \`shipment.create\` — handed to Ben for manual sample fulfillment ` +
       `(${approval.targetEntity?.label ?? parsed.sourceId}). ` +
-      `*No label purchased.* Drew packs from the East Coast and confirms in #operations when shipped. ` +
+      `*No label purchased.* Ben packs from Ashford and confirms in #shipping when shipped. ` +
       `_Queue key: \`${queuedKey}\`_`;
     await appendCloseAudit(run, approval, {
       result: "ok",
