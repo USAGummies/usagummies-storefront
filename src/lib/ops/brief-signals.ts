@@ -65,8 +65,13 @@ export interface BriefSignalsOutput {
   hasCritical: boolean;
 }
 
-const STACK_DOWN_LIMIT = 3;
-const STACK_DEGRADED_LIMIT = 3;
+// Bumped 3 → 5 (2026-05-03): when 4 stack services are down (the
+// observed common case during make.com/QBO/nextauth co-failures), the
+// 3-cap was hiding the 4th name behind "(+1 more)" — operator can't
+// triage what they can't see. 5 covers the realistic worst case
+// without crowding the brief line.
+const STACK_DOWN_LIMIT = 5;
+const STACK_DEGRADED_LIMIT = 5;
 
 /**
  * Render a single line summarizing stack-readiness `down` rows.

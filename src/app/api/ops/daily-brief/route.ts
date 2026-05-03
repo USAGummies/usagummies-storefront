@@ -273,9 +273,18 @@ async function composeAndPost(req: Request): Promise<Response> {
   // with a specific reason. We never fabricate a number. Plaid is the
   // only external join currently wired server-side because it's the
   // only one with a safe, proven in-repo helper (see /api/ops/plaid/
-  // balance for the existing pattern). All other revenue joins are
-  // caller-supplied via the request body per ops/make-webhooks.md.
+  // balance for the existing pattern).
   const cashPosition = overrides.cashPosition ?? (await resolvePlaidCashPosition());
+
+  // ---- Resolve yesterday's revenue ----
+  //
+  // Priority: caller-supplied override > live Supabase kpi_timeseries
+  // fetch > unavailable with reason. Same no-fabrication contract as
+  // cashPosition. Reads daily_revenue_shopify and daily_revenue_amazon
+  // metrics for yesterday (per the kpi-collector cron). Faire is still
+  // manual until FAIRE_ACCESS_TOKEN lands.
+  const revenueYesterday =
+    overrides.revenueYesterday ?? (await resolveYesterdayRevenue());
 
   // Shipping Hub pre-flight — morning brief only. Ben's 08:00 PT read
   // in #ops-daily surfaces wallet/ATP/queue/stale-voids so he knows
@@ -666,7 +675,7 @@ async function composeAndPost(req: Request): Promise<Response> {
     pausedAgents,
     recentAudit,
     lastDriftAuditSummary,
-    revenueYesterday: overrides.revenueYesterday,
+    revenueYesterday,
     cashPosition,
     arPosition: overrides.arPosition,
     preflight,
@@ -977,5 +986,112 @@ async function resolvePlaidCashPosition(): Promise<{
       amountUsd: null,
       unavailableReason: `Plaid getBalances failed: ${err instanceof Error ? err.message : String(err)}`,
     };
+  }
+}
+
+/**
+ * Resolve yesterday's revenue by channel from Supabase kpi_timeseries.
+ * Returns one RevenueLine per channel (Shopify DTC + Amazon for now).
+ *
+ * No-fabrication contract: every channel either has a real amountUsd +
+ * source.system + source.retrievedAt, OR amountUsd=null with an
+ * unavailableReason. Faire is intentionally absent until
+ * FAIRE_ACCESS_TOKEN lands — the brief composer doesn't fabricate
+ * a Faire row from nothing.
+ *
+ * Source: kpi_timeseries window_type=daily, captured_for_date=yesterday,
+ * metric_name in (daily_revenue_shopify, daily_revenue_amazon). The
+ * kpi-collector cron writes these rows; this resolver reads them.
+ */
+async function resolveYesterdayRevenue(): Promise<RevenueLine[]> {
+  const baseUrl =
+    process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const yesterday = new Date(Date.now() - 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+
+  if (!baseUrl || !serviceKey) {
+    const reason =
+      "Supabase not configured (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY unset).";
+    return [
+      { channel: "Shopify DTC", amountUsd: null, unavailableReason: reason },
+      { channel: "Amazon", amountUsd: null, unavailableReason: reason },
+    ];
+  }
+
+  try {
+    const url =
+      `${baseUrl}/rest/v1/kpi_timeseries` +
+      `?window_type=eq.daily` +
+      `&captured_for_date=eq.${yesterday}` +
+      `&metric_name=in.(daily_revenue_shopify,daily_revenue_amazon)` +
+      `&select=metric_name,value,captured_at`;
+    const res = await fetch(url, {
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+        "Content-Type": "application/json",
+      },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) {
+      const reason = `Supabase kpi_timeseries returned HTTP ${res.status}.`;
+      return [
+        { channel: "Shopify DTC", amountUsd: null, unavailableReason: reason },
+        { channel: "Amazon", amountUsd: null, unavailableReason: reason },
+      ];
+    }
+    const rows = (await res.json()) as Array<{
+      metric_name: string;
+      value: number;
+      captured_at: string;
+    }>;
+    const list = Array.isArray(rows) ? rows : [];
+    const shopifyRow = list.find(
+      (r) => r.metric_name === "daily_revenue_shopify",
+    );
+    const amazonRow = list.find(
+      (r) => r.metric_name === "daily_revenue_amazon",
+    );
+    const retrievedAt = new Date().toISOString();
+    return [
+      shopifyRow
+        ? {
+            channel: "Shopify DTC",
+            amountUsd: Math.round(Number(shopifyRow.value) * 100) / 100,
+            source: {
+              system: "kpi_timeseries:daily_revenue_shopify",
+              id: yesterday,
+              retrievedAt,
+            },
+          }
+        : {
+            channel: "Shopify DTC",
+            amountUsd: null,
+            unavailableReason: `No daily_revenue_shopify row for ${yesterday} — kpi-collector cron may not have run yet.`,
+          },
+      amazonRow
+        ? {
+            channel: "Amazon",
+            amountUsd: Math.round(Number(amazonRow.value) * 100) / 100,
+            source: {
+              system: "kpi_timeseries:daily_revenue_amazon",
+              id: yesterday,
+              retrievedAt,
+            },
+          }
+        : {
+            channel: "Amazon",
+            amountUsd: null,
+            unavailableReason: `No daily_revenue_amazon row for ${yesterday} — kpi-collector cron may not have run yet.`,
+          },
+    ];
+  } catch (err) {
+    const reason = `Supabase kpi_timeseries fetch failed: ${err instanceof Error ? err.message : String(err)}`;
+    return [
+      { channel: "Shopify DTC", amountUsd: null, unavailableReason: reason },
+      { channel: "Amazon", amountUsd: null, unavailableReason: reason },
+    ];
   }
 }

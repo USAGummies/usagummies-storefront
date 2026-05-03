@@ -157,15 +157,28 @@ describe("renderStackDownLine", () => {
     expect(line).toContain("shipstation");
   });
 
-  it("truncates with '+N more' when more than 3 are down", () => {
+  it("truncates with '+N more' when more than 5 are down", () => {
     const line = renderStackDownLine([
       stackRow({ id: "a", status: "down" }),
       stackRow({ id: "b", status: "down" }),
       stackRow({ id: "c", status: "down" }),
       stackRow({ id: "d", status: "down" }),
       stackRow({ id: "e", status: "down" }),
+      stackRow({ id: "f", status: "down" }),
+      stackRow({ id: "g", status: "down" }),
     ]);
     expect(line).toContain("+2 more");
+  });
+
+  it("does NOT truncate when 4 are down (post-2026-05-03 cap=5)", () => {
+    const line = renderStackDownLine([
+      stackRow({ id: "make-com", status: "down" }),
+      stackRow({ id: "quickbooks-online", status: "down" }),
+      stackRow({ id: "nextauth", status: "down" }),
+      stackRow({ id: "shipstation", status: "down" }),
+    ]);
+    expect(line).not.toContain("+1 more");
+    expect(line).toContain("shipstation");
   });
 });
 
