@@ -327,16 +327,53 @@ function fireMetaCAPIAddToCart(req: NextRequest, qty: number) {
   }
 }
 
+/**
+ * Detect Instagram, Facebook, or Threads in-app browser via user-agent.
+ *
+ * Why this matters (Clarity 2026-05-02): 89.74% of /go traffic today landed
+ * via the Instagram in-app browser. The Storefront-API cart-token →
+ * `skip_shop_pay=false` → Shop Pay redirect chain dies inside in-app
+ * webviews (3rd-party cookies blocked, multi-hop redirect kills the token,
+ * Shop Pay express button never renders). Result: 21 BUY-CTA clicks today,
+ * only 1 reached Shopify checkout, 0 purchases.
+ *
+ * Fix: for in-app browsers, skip the Storefront API entirely and redirect
+ * straight to the simple cart permalink (`/cart/{variantId}:{qty}`).
+ * Single hop, no token race, no Shop Pay dependency. Automatic BXGY
+ * discount still applies at the Shopify cart level (verified via
+ * Storefront API: 5 bags = $23.96 cart total).
+ *
+ * Trade-off: in-app users lose the Shop Pay express button, but Shop Pay
+ * doesn't work in their browser anyway. Desktop + native mobile browsers
+ * still get the optimized Storefront API flow with Shop Pay.
+ */
+function isInAppBrowser(ua: string): boolean {
+  if (!ua) return false;
+  const u = ua.toLowerCase();
+  return (
+    u.includes("instagram") ||      // Instagram in-app browser
+    u.includes("fban") ||           // Facebook iOS in-app
+    u.includes("fbav") ||           // Facebook Android in-app
+    u.includes("fb_iab") ||         // Facebook in-app (alt)
+    u.includes("fb4a") ||           // Facebook for Android
+    u.includes("barcelonaapp") ||   // Threads in-app
+    u.includes("tiktok")            // TikTok in-app
+  );
+}
+
 export async function GET(req: NextRequest) {
   const rawQty = req.nextUrl.searchParams.get("qty");
   const qty = rawQty ? Math.max(1, Math.min(12, Math.floor(Number(rawQty)) || DEFAULT_QTY)) : DEFAULT_QTY;
   const attribution = collectAttributionParams(req);
   const referrer = req.headers.get("referer") || "";
+  const userAgent = req.headers.get("user-agent") || "";
+  const inAppBrowser = isInAppBrowser(userAgent);
   const ga4Params: Record<string, string | number> = {
     qty,
     page_path: "/go/checkout",
     page_location: `${req.nextUrl.origin}/go/checkout`,
     page_referrer: referrer,
+    in_app_browser: inAppBrowser ? "true" : "false",
   };
   for (const key of GA4_ATTRIBUTION_KEYS) {
     const value = attribution.get(key);
@@ -350,6 +387,14 @@ export async function GET(req: NextRequest) {
   // for why this is needed (client-side beacon dies on navigation).
   fireMetaCAPIAddToCart(req, qty);
   console.info("go_checkout_redirect", ga4Params);
+
+  // 2026-05-02 — In-app browser bypass. See `isInAppBrowser` docstring.
+  // Skip the Storefront API call entirely for IG/FB/Threads/TikTok webviews
+  // and use the direct permalink. Single hop, no token race, BXGY still
+  // applies via Shopify's automatic-discount engine at cart level.
+  if (inAppBrowser) {
+    return NextResponse.redirect(fallbackPermalink(qty, attribution), 302);
+  }
 
   if (!STOREFRONT_TOKEN) {
     return NextResponse.redirect(fallbackPermalink(qty, attribution), 302);
