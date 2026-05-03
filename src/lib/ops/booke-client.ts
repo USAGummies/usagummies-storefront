@@ -172,3 +172,188 @@ export async function setBookeQueueCount(count: number): Promise<BookeKvEntry> {
   await kv.set(KV_BOOKE_COUNT, entry);
   return entry;
 }
+
+// ---------------------------------------------------------------------------
+// Viktor W-9 read API — list helpers
+// ---------------------------------------------------------------------------
+//
+// Per `/contracts/viktor.md` v3.2 W-9 ("Finance close-loop"). Read-only
+// list helpers Viktor uses to pull Booke's To Review queue + account /
+// vendor reference data when proposing category mappings.
+//
+// Each function returns a discriminated `BookeReadResult<T>` so callers
+// can branch on `configured` vs `unconfigured` vs `errored` without
+// guessing. When `BOOKE_API_TOKEN` is absent every helper returns
+// `{ ok: false, configured: false }` cleanly — existing flows are
+// unaffected; the readiness page surfaces "not configured" so an
+// operator can see what's missing.
+//
+// NEVER paste a Booke password / token in Slack / source / logs. Token
+// lives in `BOOKE_API_TOKEN` Vercel env var only.
+
+const BOOKE_API_BASE = "https://api.booke.ai/api/v1";
+
+export interface BookeUnreviewedTransaction {
+  id: string;
+  date: string;
+  vendor: string | null;
+  amount: number;
+  description: string;
+  /** Currently-suggested category from Booke's classifier. */
+  suggestedCategory: string | null;
+  /** Confidence 0..1, when Booke surfaces it. */
+  suggestedConfidence: number | null;
+  /** Source bank/feed (BoA, Capital One, Amazon, etc.). */
+  source: string;
+}
+
+export interface BookeAccount {
+  id: string;
+  name: string;
+  qboAccountNumber: string | null;
+  type: string;
+}
+
+export interface BookeVendor {
+  id: string;
+  name: string;
+  qboVendorId: string | null;
+}
+
+export type BookeReadResult<T> =
+  | { ok: true; configured: true; data: T }
+  | { ok: false; configured: false; reason: "BOOKE_API_TOKEN not configured" }
+  | { ok: false; configured: true; reason: string };
+
+const NOT_CONFIGURED = {
+  ok: false as const,
+  configured: false as const,
+  reason: "BOOKE_API_TOKEN not configured" as const,
+};
+
+/** Returns true iff `BOOKE_API_TOKEN` is set (no other validation). */
+export function isBookeConfigured(): boolean {
+  return Boolean(process.env.BOOKE_API_TOKEN?.trim());
+}
+
+/**
+ * List transactions in Booke's "To Review" queue.
+ *
+ * Wiring placeholder: when Booke's partner API contract is confirmed,
+ * the inner fetch stays the same; only the response-parser updates.
+ */
+export async function listToReviewTransactions(opts: {
+  limit?: number;
+  fetchImpl?: typeof fetch;
+} = {}): Promise<BookeReadResult<BookeUnreviewedTransaction[]>> {
+  if (!isBookeConfigured()) return NOT_CONFIGURED;
+  const fetchImpl = opts.fetchImpl ?? fetch;
+  try {
+    const res = await fetchImpl(
+      `${BOOKE_API_BASE}/transactions?status=queued,pending_review&limit=${opts.limit ?? 50}`,
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.BOOKE_API_TOKEN!.trim()}`,
+          Accept: "application/json",
+        },
+        cache: "no-store",
+      },
+    );
+    if (!res.ok) {
+      return {
+        ok: false,
+        configured: true,
+        reason: `Booke API ${res.status}`,
+      };
+    }
+    const body = (await res.json()) as {
+      transactions?: BookeUnreviewedTransaction[];
+    };
+    return {
+      ok: true,
+      configured: true,
+      data: Array.isArray(body.transactions) ? body.transactions : [],
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      configured: true,
+      reason: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+export async function listAccounts(opts: {
+  fetchImpl?: typeof fetch;
+} = {}): Promise<BookeReadResult<BookeAccount[]>> {
+  if (!isBookeConfigured()) return NOT_CONFIGURED;
+  const fetchImpl = opts.fetchImpl ?? fetch;
+  try {
+    const res = await fetchImpl(`${BOOKE_API_BASE}/accounts`, {
+      headers: {
+        Authorization: `Bearer ${process.env.BOOKE_API_TOKEN!.trim()}`,
+        Accept: "application/json",
+      },
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      return {
+        ok: false,
+        configured: true,
+        reason: `Booke API ${res.status}`,
+      };
+    }
+    const body = (await res.json()) as { accounts?: BookeAccount[] };
+    return {
+      ok: true,
+      configured: true,
+      data: Array.isArray(body.accounts) ? body.accounts : [],
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      configured: true,
+      reason: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+export async function listVendors(opts: {
+  fetchImpl?: typeof fetch;
+} = {}): Promise<BookeReadResult<BookeVendor[]>> {
+  if (!isBookeConfigured()) return NOT_CONFIGURED;
+  const fetchImpl = opts.fetchImpl ?? fetch;
+  try {
+    const res = await fetchImpl(`${BOOKE_API_BASE}/vendors`, {
+      headers: {
+        Authorization: `Bearer ${process.env.BOOKE_API_TOKEN!.trim()}`,
+        Accept: "application/json",
+      },
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      return {
+        ok: false,
+        configured: true,
+        reason: `Booke API ${res.status}`,
+      };
+    }
+    const body = (await res.json()) as { vendors?: BookeVendor[] };
+    return {
+      ok: true,
+      configured: true,
+      data: Array.isArray(body.vendors) ? body.vendors : [],
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      configured: true,
+      reason: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+/** Returns the typed data array, or [] when the read failed. UI helper. */
+export function unwrapOrEmpty<T>(r: BookeReadResult<T[]>): T[] {
+  return r.ok ? r.data : [];
+}
