@@ -159,11 +159,11 @@ export function makeSampleQueueSourceId(now: number = Date.now()): string {
  *   - "tag:sample" → idempotent legacy alias
  *   - "queue:operator" → audit trace
  *
- * The classifier currently routes "sample" → East Coast (Drew). Per
- * Ben's 2026-04-30 directive, ALL outbound (including samples) ships
- * from Ashford until Drew is back on payroll. The route consumer
- * surfaces `classification.origin` so the operator can override before
- * approving.
+ * The classifier routes "sample" → Ashford by default, in line with
+ * Ben's 2026-04-30 directive (ALL outbound, including samples, ships
+ * from Ashford). See /contracts/integrations/shipstation.md §3.5. The
+ * `origin:east-coast` override remains available for the future East
+ * Coast warehouse re-activation.
  */
 export function buildSampleQueueOrderIntent(
   req: SampleQueueRequest,

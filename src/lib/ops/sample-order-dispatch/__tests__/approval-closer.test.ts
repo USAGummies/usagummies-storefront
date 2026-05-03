@@ -126,7 +126,8 @@ describe("executeApprovedShipmentCreate", () => {
       expect(result.kind).toBe("manual-handoff");
       if (result.kind === "manual-handoff") {
         expect(result.queuedKey).toBe(`sample-dispatch:approved:${approval.id}`);
-        expect(result.threadMessage).toContain("Drew");
+        expect(result.threadMessage).toContain("Ben");
+        expect(result.threadMessage).toContain("Ashford");
         expect(result.threadMessage).toContain("No label purchased");
       }
     } else {

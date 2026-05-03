@@ -10,11 +10,18 @@
  *      caller's context (Shopify/Amazon/Faire/HubSpot source), returns
  *      a Class B `shipment.create` approval payload for #ops-approvals.
  *
- * Hard rules (CLAUDE.md + contract §Role):
+ * Hard rules (CLAUDE.md + /contracts/integrations/shipstation.md §1, §3, §3.5
+ * — REVISED 2026-04-30 PM):
  *   - Orders → Ashford WA (Ben). Default origin.
- *   - Samples → East Coast (Drew). Only path: order is tagged `sample`,
- *     `tag:sample`, or `purpose:sample`, OR `origin:east-coast` is an
- *     explicit override.
+ *   - Samples → Ashford WA (Ben). Per Ben 2026-04-30 PM, all sample
+ *     fulfillment also originates from Ashford until an East Coast
+ *     staging warehouse re-activates with a confirmed canonical address.
+ *     Sample tags (`sample`, `tag:sample`, `purpose:sample`) still drive
+ *     packaging + carrier selection (case + USPS Ground Advantage) but
+ *     no longer route origin.
+ *   - East Coast origin is reserved for an explicit `origin:east-coast`
+ *     override tag — kept live so the future warehouse re-activation
+ *     does not require code changes.
  *   - Wrong-origin dispatch = Class D-adjacent refusal. Classifier
  *     returns `{ refuse: true, reason }` so callers know to halt.
  *
@@ -124,30 +131,38 @@ export function classifyDispatch(order: OrderIntent): DispatchClassification {
   }
 
   // 2. Origin: scan tags + note for sample / override markers.
+  //
+  // Per /contracts/integrations/shipstation.md §1 + §3.5 (REVISED
+  // 2026-04-30 PM), samples no longer route to East Coast — they ship
+  // from Ashford alongside paid orders. Sample tags still drive
+  // packaging + carrier (see step 4) but not origin. The
+  // `origin:east-coast` override stays wired so the future East Coast
+  // warehouse re-activation does not require code changes.
   const tagsJoined = (order.tags ?? []).join(" ").concat(" ", order.note ?? "");
   const isSample = SAMPLE_TAG_REGEX.test(tagsJoined);
   const isEastCoastOverride = EAST_COAST_OVERRIDE_REGEX.test(tagsJoined);
   let origin: DispatchOriginCode = "ashford";
-  let originReason = "default — orders ship from Ashford (Ben)";
-  if (isSample) {
+  let originReason = isSample
+    ? "samples ship from Ashford per /contracts/integrations/shipstation.md §3.5 (REVISED 2026-04-30)"
+    : "default — orders ship from Ashford (Ben)";
+  if (isEastCoastOverride) {
     origin = "east_coast";
-    originReason = "tagged as sample — ship from East Coast (Drew)";
-  } else if (isEastCoastOverride) {
-    origin = "east_coast";
-    originReason = "explicit origin:east-coast override";
+    originReason =
+      "explicit origin:east-coast override — reserved for future East Coast warehouse re-activation";
   }
 
-  // 3. Hard refuse: wrong-origin detection. Caller says "order" but tags
-  //    request East Coast, OR caller says "sample" but classifier puts
-  //    at Ashford. The contract is zero-tolerance on wrong-origin.
+  // 3. Soft warning on the East Coast override path. The override is
+  //    deliberately preserved for the future warehouse re-activation
+  //    (per shipstation.md §1), but until then any non-manual >$100
+  //    label that resolves to east_coast deserves an operator second-
+  //    look since no East Coast staging is currently active.
   if (
     order.channel !== "manual" &&
     isEastCoastOverride &&
-    !isSample &&
     (order.valueUsd ?? 0) > 100
   ) {
     warnings.push(
-      "origin:east-coast override on a >$100 non-sample order — operator should confirm",
+      "origin:east-coast override on a >$100 order — East Coast warehouse currently DEFERRED; operator should confirm",
     );
   }
 
@@ -229,7 +244,7 @@ export function classifyDispatch(order: OrderIntent): DispatchClassification {
 export interface ShipmentProposal {
   actionSlug: "shipment.create";
   approvalClass: "B";
-  /** Ben for orders; Ben (Drew originates, Ben approves) for samples. */
+  /** Ben approves every shipment — orders and samples both pack from Ashford. */
   requiredApprovers: Array<"Ben">;
   summary: string;
   destination: OrderIntent["shipTo"];
@@ -262,7 +277,9 @@ export function composeShipmentProposal(
     order.weightLbs ?? inferredPerCartonWeight * classification.cartons;
 
   const originLabel =
-    classification.origin === "ashford" ? "Ashford WA (Ben)" : "East Coast (Drew)";
+    classification.origin === "ashford"
+      ? "Ashford WA (Ben)"
+      : "East Coast (override — warehouse currently DEFERRED)";
 
   const lines = [
     `:package: *Shipment proposal — ${order.channel.toUpperCase()} ${order.orderNumber ?? order.sourceId}*`,
