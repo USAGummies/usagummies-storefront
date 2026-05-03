@@ -50,6 +50,7 @@ const NAV_SECTIONS: NavSection[] = [
       { href: "/ops/sales", label: "Sales Command", icon: "\u{1F4C8}", roles: ["admin", "employee", "investor", "partner"] },
       { href: "/ops/sales/tour", label: "Sales Tour", icon: "\u{1F5FA}\uFE0F", roles: ["admin", "employee"] },
       { href: "/ops/sales/prospects/day1", label: "Day 1 Prospects", icon: "\u{1F4CB}", roles: ["admin", "employee"] },
+      { href: "/ops/sales/pipeline-drift", label: "Pipeline Drift", icon: "\u{1F9ED}", roles: ["admin", "employee"] },
       { href: "/ops/marketing", label: "Marketing & ROAS", icon: "\u{1F4E3}", roles: ["admin", "employee", "investor", "partner", "banker"] },
       { href: "/ops/kpis", label: "KPIs & Milestones", icon: "\u{1F3AF}", roles: ["admin", "employee", "investor", "partner", "banker"] },
     ],
