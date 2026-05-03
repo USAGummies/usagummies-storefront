@@ -44,6 +44,7 @@ import { executeApprovedApPacketSend } from "@/lib/ops/ap-packets/approval-close
 import { executeApprovedFaireDirectInvite } from "@/lib/faire/approval-closer";
 import { executeApprovedFaireDirectFollowUp } from "@/lib/faire/follow-up-closer";
 import { executeApprovedReceiptReviewPromote } from "@/lib/ops/receipt-review-closer";
+import { executeApprovedJournalEntryPost } from "@/lib/finance/je-approval/approval-closer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -226,6 +227,9 @@ export async function POST(req: Request): Promise<Response> {
   let faireFollowUpExecution:
     | Awaited<ReturnType<typeof executeApprovedFaireDirectFollowUp>>
     | undefined;
+  let journalEntryExecution:
+    | Awaited<ReturnType<typeof executeApprovedJournalEntryPost>>
+    | undefined;
   let receiptReviewExecution:
     | Awaited<ReturnType<typeof executeApprovedReceiptReviewPromote>>
     | undefined;
@@ -310,6 +314,28 @@ export async function POST(req: Request): Promise<Response> {
       }
     }
 
+    // 7. JE post closer (Class C): identified by
+    //    targetEntity.type = "qbo-journal-entry" AND action slug =
+    //    "qbo.journal_entry.post". Fires when BOTH Ben + Rene have
+    //    approved (Class C dual-approval). The closer loads the
+    //    persisted proposal from KV and POSTs to the existing QBO
+    //    journal-entry route.
+    if (
+      !emailExecution.handled &&
+      !shipmentExecution?.handled &&
+      !vendorExecution?.handled &&
+      !apPacketExecution?.handled &&
+      !faireInviteExecution?.handled &&
+      !faireFollowUpExecution?.handled
+    ) {
+      journalEntryExecution = await executeApprovedJournalEntryPost(next);
+      if (journalEntryExecution.handled) {
+        postedThreadText = journalEntryExecution.ok
+          ? journalEntryExecution.threadMessage
+          : journalEntryExecution.threadMessage;
+      }
+    }
+
     if (postedThreadText && existing.slackThread?.ts) {
       await postMessage({
         channel: slackChannelRef(existing.slackThread.channel),
@@ -345,6 +371,7 @@ export async function POST(req: Request): Promise<Response> {
     apPacketExecution,
     faireInviteExecution,
     faireFollowUpExecution,
+    journalEntryExecution,
     receiptReviewExecution,
     execution: emailExecution,
     shipmentExecution,

@@ -468,6 +468,24 @@ export const DUAL_APPROVAL_ACTIONS: ActionSpec[] = [
     examples: ["first whale invoice", "new terms invoice"],
   },
   {
+    // Manual journal entry posting. Class C because a typo in a JE
+    // (wrong account, swapped debit/credit, wrong txn_date — like the
+    // 2026-04-13 month-rollover bug) lands directly in the books.
+    // Dual approval (Ben + Rene) catches the eyeball-pass before
+    // QBO writes. The closer fires the existing /api/ops/qbo/journal-entry
+    // POST endpoint internally.
+    slug: "qbo.journal_entry.post",
+    name: "Post a manual journal entry to QBO",
+    class: "C",
+    requiredApprovers: ["Ben", "Rene"],
+    irreversible: true,
+    examples: [
+      "January reclass: Owner's Draw $1,937.61 → AmEx liability transfer",
+      "Q1 reclass JE 1505 (JE 20 cleanup)",
+      "Run 1 COGS realization at production close",
+    ],
+  },
+  {
     slug: "payment.release",
     name: "Approve vendor payment / ACH",
     class: "C",
