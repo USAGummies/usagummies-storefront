@@ -1,0 +1,57 @@
+{
+  "_comment": "Saved config from the 2026-04-30 American Life launch. Reuse pattern: copy this file, swap the photos + primaryText, run meta-launch.mjs --config <new-file.json>.",
+  "campaign_theme": "american_life",
+  "adset_id": "120245458396790294",
+  "page_id": "784331794768665",
+  "destination_path": "/go",
+  "destination_origin": "https://usagummies.com",
+  "creative_dir": "/Users/ben/usagummies-storefront/creative-drafts/finished",
+  "ads": [
+    {
+      "key": "amlife_testi_tommie",
+      "file": "20260430-201008-final-tommie.png",
+      "primaryText": "\"They are outstanding, I will order more in the future.\" — Tommie O., real verified buyer.\n\nAmerican-made, dye-free gummy bears. Pink, dark red, orange, yellow, green — that's it. No Blue 1.\n\nBuy 4 bags, get 1 FREE — $23.96 · 5-Pack · Free shipping."
+    },
+    {
+      "key": "amlife_testi_craig",
+      "file": "20260430-201008-final-craig.png",
+      "primaryText": "\"Love them gummies, will be ordering regularly.\" — Craig B., real verified buyer.\n\nAmerican-made by people who eat their own candy. No artificial dyes. No high-fructose corn syrup.\n\nBuy 4, Get 1 FREE — $23.96 · 5-Pack · Free shipping."
+    },
+    {
+      "key": "amlife_testi_rene",
+      "file": "20260430-202137-final-rene-v3.png",
+      "primaryText": "\"Nice stocking stuffers for my kids! The gummies are fresh and very good.\" — Rene G., real verified buyer.\n\nAmerican-made gummy bears. No Red 40, No Yellow 5, No Blue 1. The candy your kids deserve.\n\nBuy 4, Get 1 FREE — $23.96 · Free shipping."
+    },
+    {
+      "key": "amlife_testi_ryan",
+      "file": "20260430-201009-final-ryan.png",
+      "primaryText": "\"Super fast and easy.\" — Ryan M., real verified buyer.\n\nAmerican-made gummy bears that ship in 1-2 days. Free shipping on every order.\n\nBuy 4, Get 1 FREE — $23.96 · 5-Pack."
+    },
+    {
+      "key": "amlife_lunchbox",
+      "file": "20260430-202923-adv-lunchbox.png",
+      "primaryText": "Packed with pride.\n\nAmerican-made gummy bears for the lunchbox MVP slot. No artificial dyes, no high-fructose corn syrup. Pink, dark red, orange, yellow, green — that's it.\n\nBuy 4 bags, get 1 FREE — $23.96 · 5-Pack · Free shipping."
+    },
+    {
+      "key": "amlife_sports_bag",
+      "file": "20260430-202924-adv-sports-bag.png",
+      "primaryText": "Post-game fuel.\n\nAfter the whistle, win or lose — the candy that earned a spot in the team bag. American-made, dye-free, real fruit colors only.\n\nBuy 4, Get 1 FREE — $23.96 · 5-Pack · Free shipping."
+    },
+    {
+      "key": "amlife_backseat",
+      "file": "20260430-203637-adv-backseat.png",
+      "primaryText": "The Backseat Bargain.\n\nMom's hand goes back, the kids' hands come forward. American-made gummy bears that turn every road trip into a deal.\n\nBuy 4, Get 1 FREE — $23.96 · 5-Pack · Free shipping."
+    },
+    {
+      "key": "amlife_grandpa",
+      "file": "20260430-204653-adv-grandpa-porch.png",
+      "primaryText": "Grandpa approves.\n\nReal American gummy bears, made the way candy used to be made. Pink, dark red, orange, yellow, green. No artificial dyes.\n\nBuy 4, Get 1 FREE — $23.96 · 5-Pack · Free shipping."
+    }
+  ],
+  "_killed_2026_05_03": [
+    {
+      "key": "amlife_bbq_steal",
+      "killed_reason": "Off-voice — 'HE WON'T NOTICE' frames a kid sneaking candy behind a parent's back. Toxic to a family/patriotic brand. See BRAND_RULES.yaml killed_scenes. Never regenerate."
+    }
+  ]
+}

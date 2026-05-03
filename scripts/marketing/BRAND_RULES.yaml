@@ -1,0 +1,135 @@
+# scripts/marketing/BRAND_RULES.yaml
+# ─────────────────────────────────────────────────────────────────────────
+# Canonical brand rules. Read by every creative-generation script as a
+# hard-locked prompt prefix. If the AI generates anything that violates
+# these rules, the prompt template is wrong — not the AI.
+#
+# Updated whenever a rule changes. Old behaviors get logged in CHANGELOG.
+# Cross-link: docs/Codex (Notion) §5 Standing Brand & Operations Rules.
+# ─────────────────────────────────────────────────────────────────────────
+
+version: 1
+last_updated: 2026-04-30
+owner: ben
+
+# Hard rules — every prompt MUST honor these. Soft suggestions go elsewhere.
+hard_rules:
+  palette:
+    rule: "Bears come in EXACTLY 5 colors: pink, dark red, orange, yellow, green."
+    forbidden: [blue, purple, raspberry, blueberry, cyan, teal, indigo]
+    rationale: "USA Gummies has zero blue gummies. Brand directive 2026-04-30."
+
+  gummy_physics:
+    rule: "Gravity-correct gummy physics. Bears must respond to gravity."
+    forbidden: ["floating bears", "frozen mid-air", "implausible suspension"]
+    rationale: "AI-generated images often render bears floating. Always say no."
+
+  bag_opening:
+    rule: "If gummies are leaving the bag, the bag must be visibly OPEN. No closed bag with gummies pouring out."
+    rationale: "Continuity. AI defaults to closed bags with motion lines — looks fake."
+
+  gummy_size:
+    rule: "Each bear is approximately 1 inch long. Not micro, not giant."
+    rationale: "Real gummy bear scale. AI tends to make them too small or too large."
+
+  vehicles:
+    rule: "USA-realistic vehicles only. Steering wheel on the LEFT (left-hand drive)."
+    forbidden: ["right-hand drive trucks", "UK-style cars", "non-US plates"]
+    rationale: "Set in America. RHD breaks immersion."
+
+  two_person_scenes:
+    rule: "If a scene has two people, render them as clearly platonic OR husband/wife with wedding bands. Avoid imagery that reads as romantic gay couple unless brief calls for it."
+    rationale: "Brand directive 2026-04-30 (refining 'natural scene' direction)."
+
+# Logo + typography rules
+logo:
+  asset: "public/brand/logo-full.png"
+  description: "Vertical primary mark with wings/badge/script. NOT the simpler horizontal lockup."
+  contrast_rule: "On dark slabs, paste a cream rounded card behind the logo for legibility."
+  min_width_px: 340  # for testimonial overlays specifically
+
+typography:
+  testimonial_quote_font: "/System/Library/Fonts/Avenir.ttc"  # index 2 = Black
+  testimonial_quote_index: 2
+  testimonial_quote_stroke_width: 4
+  customer_name_stroke_width: 2
+  banned_font_indices:
+    - { font: "Avenir Next.ttc", index: 8, why: "claimed Heavy, actually Ultra Light" }
+
+# Format-specific rules
+formats:
+  testimonial:
+    name: "BINGO format"
+    layout:
+      - "Full-bleed magazine-style photo of real person + bag"
+      - "Soft vertical gradient (top: dark, bottom: clear) for text legibility"
+      - "USA Gummies logo top-left at 340px wide (logo-full.png)"
+      - "Amber Amazon stars ★★★★★ below logo"
+      - "Bold customer quote in Avenir Black bottom-left, stroke_width=4"
+      - "Customer name (First L.) below quote, stroke_width=2"
+      - "Green ✓ Verified Purchase pill at bottom-left"
+    banned_patterns:
+      - "AI contraptions / props in trucks"
+      - "Lower-third banners hiding the bag"
+      - "Subtle / elegant overlays — quote must POP"
+
+  adventure_headline:
+    layout:
+      - "Full-bleed family/scene photo"
+      - "Cream top bar with USA Gummies logo"
+      - "Bold red headline overlay (e.g. PACKED WITH PRIDE, GRANDPA APPROVES)"
+    greenlit_scenes:
+      - lunchbox: "PACKED WITH PRIDE"
+      - sports_bag: "POST-GAME FUEL"
+      - backseat: "THE BACKSEAT BARGAIN"
+      - grandpa: "GRANDPA APPROVES"
+    killed_scenes:
+      - candy_tax: "13+ versions, never landed. RHD trucks + gay-couple miscoding."
+      - dock: "generic, no story"
+      - first_light: "flat"
+      - dugout_fuel: "flat"
+      - bbq_steal: "KILLED 2026-05-03 by Ben — 'HE WON'T NOTICE' frames a kid sneaking candy behind the parent's back. Off-voice for a family/patriotic brand. Never regenerate this scene or headline."
+
+  rumble_banner:
+    sizes_accepted: [300x250]   # 728x90 + 420x315 rejected on our campaigns
+    background: cream
+    cta_color: red
+    cta_text: "SHOP NOW →"
+    offer_line: "BUY 4 BAGS, GET 1 FREE — $23.96 · 5-PACK"
+
+# Destination URL rule (refined this session)
+destinations:
+  cold_traffic: "/go"           # full landing page with hero, reviews, story
+  warm_retargeting: "/go/checkout?qty=5"  # fast-track for known buyers
+  rule: "NEVER deep-link cold traffic to bare checkout. Cold traffic needs the landing page first."
+
+# UTM convention — every ad URL must follow this
+utm_convention:
+  template: "?utm_source=<channel>&utm_medium=<cpc|cpm>&utm_campaign=<theme>&utm_content=<ad_slug>"
+  channels: [meta, google, rumble]
+  mediums:
+    meta: cpc
+    google: cpc
+    rumble: cpm
+
+# Account hygiene (Codex Lesson #2)
+accounts:
+  meta:
+    business_id: "784370594391435"
+    production_ad_account: "act_780570388084650"  # USA Gummies Marketing
+    page_id: "784331794768665"
+    pixel_id: "664545086717590"
+    note: "Ads attached to a specific adset_id route to that adset's parent account regardless of META_AD_ACCOUNT_ID env. Always verify."
+  google_ads:
+    manager: "502-381-3148"      # USA Gummies Manager — USE THIS
+    sub_account: "775-414-2374"  # USA Gummies — campaigns may not live here
+    note: "Drafts and campaigns may live in the Manager account, not the sub-account. Always check both."
+  ga4:
+    property_id: "509104328"
+  shopify:
+    domain: "usa-gummies.myshopify.com"
+  microsoft_clarity:
+    project_id: "w9qsgk41dp"
+  madgicx:
+    auth_pattern: "user OAuth (NOT agency or system user)"
+    note: "Verify connection via app.madgicx.com/one-click/data-sources, NOT Meta agency endpoints."
