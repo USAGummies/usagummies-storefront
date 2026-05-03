@@ -137,6 +137,22 @@ export const AUTONOMOUS_ACTIONS: ActionSpec[] = [
     examples: ["USPS 9405... pushed to HubSpot deal + Shopify order"],
   },
   {
+    // 2026-05-03 (CB#24) — Class A wrapper around the existing
+    // /api/ops/qbo/attachment endpoint. Read-only attachment to an
+    // existing QBO record (vendor W-9, COI PDF, bill receipt) — no
+    // $ committed, fully reversible by deleting the attachment in
+    // QBO. Audit envelope cites the source file + entity ref so a
+    // future un-attach is straightforward.
+    slug: "qbo.attachment.create",
+    name: "Attach a file (W-9, COI, receipt PDF) to a QBO entity",
+    class: "A",
+    irreversible: false,
+    examples: [
+      "Snow Leopard W-9 → Vendor 78",
+      "Powers VND-001 receipt → Bill 412",
+    ],
+  },
+  {
     slug: "lead.enrichment.write",
     name: "Fill HubSpot contact/company fields from Apollo with provenance",
     class: "A",

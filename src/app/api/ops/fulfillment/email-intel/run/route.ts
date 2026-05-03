@@ -225,6 +225,30 @@ async function runOnce(opts: RunBody): Promise<RunResult> {
             ].filter(Boolean).join("\n"),
           });
           receiptsQueued += 1;
+
+          // CB#23 — mirror the receipt-document signal to #finance
+          // so Rene sees vendor invoices/receipts as they land,
+          // without grep-by-eye through #ops-daily. Fail-soft.
+          // (Channel id is "finance" in the registry — see
+          // CB#28 for the #finance vs #financials canonicalization.)
+          if (getChannel("finance")) {
+            const vendor = deriveVendorFromHeader(env.from) ?? "(unknown vendor)";
+            const fromAddr = env.from?.replace(/<[^>]+>/g, "").trim() || env.from || "(unknown)";
+            const subject = env.subject?.trim() || "(no subject)";
+            const snippet = env.snippet ? `\n_${env.snippet.slice(0, 200)}…_` : "";
+            try {
+              await postMessage({
+                channel: slackChannelRef("finance"),
+                text:
+                  `:page_facing_up: *Receipt / doc queued — ${vendor}*\n` +
+                  `*From:* ${fromAddr}\n` +
+                  `*Subject:* ${subject}${snippet}\n` +
+                  `_Auto-routed by email-intel; review in /ops/finance/review-packets._`,
+              });
+            } catch {
+              /* fail-soft — receipt-review is the canonical surface */
+            }
+          }
         } catch (err) {
           errors.push(
             `receipt queue failed for ${env.id}: ${err instanceof Error ? err.message : String(err)}`,
