@@ -220,12 +220,10 @@ async function runKillSwitch(opts: {
     trigger: `ad-kill-switch:${date}`,
   });
 
-  // KILL severity → Class B approval card so the action lives in the
-  // ops-approvals queue alongside other Ben-decisions. (We use
-  // `gmail.send` slug as a transitive carrier — same approval shape,
-  // and it's already a registered Class B; future work: register a
-  // dedicated `ads.spend.kill` slug. For now reusing gmail.send keeps
-  // the surface uniform.)
+  // KILL severity → Class B `ads.spend.kill` approval card.
+  // (Slug registered 2026-05-03 — audit ledger now has a clean
+  // signal instead of the gmail.send transitive shape we shipped
+  // in commit 2a410adb.)
   // WARN severity → P2 line into #ops-alerts (no approval card; just
   // a visibility heads-up).
 
@@ -236,8 +234,8 @@ async function runKillSwitch(opts: {
   if (decision.shouldKill) {
     try {
       const approval = await requestApproval(run, {
-        actionSlug: "gmail.send",
-        targetSystem: "gmail",
+        actionSlug: "ads.spend.kill",
+        targetSystem: "ads-platform",
         targetEntity: {
           type: "ad-kill-switch",
           id: date,

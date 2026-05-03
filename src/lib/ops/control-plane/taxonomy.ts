@@ -205,6 +205,25 @@ export const SINGLE_APPROVAL_ACTIONS: ActionSpec[] = [
     examples: ["Drew ships East Coast sample", "fulfillment partner shipment"],
   },
   {
+    // 2026-05-03 (audit follow-up to commit 2a410adb) — dedicated
+    // slug for the daily ad-kill-switch surface. Was carried via
+    // `gmail.send` as a transitive shape; this gives the audit
+    // ledger a clean signal so future dashboards can filter on
+    // "kill events" without confusing them for outbound emails.
+    // Class B (Ben) — irreversible-in-spirit (the burn already
+    // happened) but the pause itself is a one-click recover via
+    // platform UI.
+    slug: "ads.spend.kill",
+    name: "Kill ad spend (Meta + Google manual-pause guidance)",
+    class: "B",
+    requiredApprovers: ["Ben"],
+    irreversible: false,
+    examples: [
+      "Google Ads $1,678 spend / 0 conv — pause campaigns + audit conversion tag",
+      "Meta $200 spend / 0 conv — pause adsets + check pixel allowlist",
+    ],
+  },
+  {
     // Class A variant for low-cost single-case sample shipments. When
     // the dispatch classifier resolves to packaging=case + cartons=1
     // (i.e. a 6-bag inner case in a 7×7×7 box, ~3.4 lb) AND there's no
