@@ -26,7 +26,8 @@ These are the ONLY current team members.
 ## Slack Channels
 
 - **#abra-control** (C0ALS6W7VB4) — Main ops channel. Morning briefs, PO reviews, alerts, interactive questions from Ben/Drew.
-- **#financials** (C0AKG9FSC2J) — Finance channel for Rene. Finance digests, QBO queries, transaction review, AP/AR. Spreadsheet uploads here trigger QBO import.
+- **#finance** (C0ATF50QQ1M) — **Canonical finance channel as of 2026-04-20** (per `src/app/api/ops/viktor/rene-capture/route.ts` SOP §1). All audit-store mirrors, receipt-attachment confirmations, qbo-attachment landings, and onboarding-digest output post here. Registered as `id: "finance"` in `src/lib/ops/control-plane/channels.ts`. This is the channel new code should target via `slackChannelRef("finance")`.
+- **#financials** (C0AKG9FSC2J) — Legacy finance channel — predates the 2026-04-20 #finance anchor decision. Still receives some Rene-driven QBO imports / spreadsheet uploads. NOT in the channel registry; do NOT post here from code without explicit reason. Treat as Rene's manual-upload channel; production digests should target #finance.
 - **#receipts-capture** (C0APYNE9E73) — Receipt uploads ONLY. Every image here is a transaction receipt. Always OCR/extract vendor, date, amount, payment method, category.
 - **#abra-testing** (C0A9S88E1FT) — Testing channel. Not production.
 
