@@ -4,7 +4,8 @@
  * Critical contract:
  *   - Never buys a label.
  *   - Never invents data.
- *   - Manual channel → KV queue + thread message + audit.
+ *   - Manual channel → KV queue + thread message + #shipping mirror + audit.
+ *     Sample originates from Ashford via Ben (CLAUDE.md REVISED 2026-04-30).
  *   - Non-manual channel → "manual required" thread message + audit.
  *   - Refuses to handle approvals that are not in `approved` status.
  *   - Refuses payloadRefs that don't match `dispatch:<chan>:<id>`.
@@ -42,6 +43,31 @@ vi.mock("@vercel/kv", () => {
     },
   };
 });
+
+// Stub the Slack client so the #shipping mirror post doesn't hit the
+// real network. Tests assert against the call args. Use `vi.hoisted` so
+// the mock factory can reference the spy even though `vi.mock` is
+// hoisted above the rest of the file (the slack module is pulled in by
+// the early `__setSurfacesForTest` import below).
+const { postMessageMock } = vi.hoisted(() => ({
+  postMessageMock: vi.fn(async () => ({ ok: true, ts: "fake-ts" })),
+}));
+vi.mock("@/lib/ops/control-plane/slack/client", () => ({
+  postMessage: postMessageMock,
+}));
+
+// Channel registry stub — return `#shipping` so the manual-handoff
+// branch attempts (and succeeds at) the mirror post.
+vi.mock("@/lib/ops/control-plane/channels", () => ({
+  getChannel: (id: string) =>
+    id === "shipping"
+      ? { id: "shipping", name: "#shipping", slackChannelId: "C-SHIPPING" }
+      : null,
+  slackChannelRef: (id: string) => {
+    if (id === "shipping") return "C-SHIPPING";
+    return `#${id}`;
+  },
+}));
 
 import { kv } from "@vercel/kv";
 import { executeApprovedShipmentCreate } from "../approval-closer";
@@ -117,7 +143,7 @@ beforeEach(() => {
 });
 
 describe("executeApprovedShipmentCreate", () => {
-  it("manual channel: queues the intent in KV, returns thread message, never buys a label", async () => {
+  it("manual channel: queues the intent in KV, mirrors to #shipping, returns Ashford-routed thread message, never buys a label", async () => {
     const approval = buildApproval();
     const result = await executeApprovedShipmentCreate(approval);
 
@@ -126,9 +152,18 @@ describe("executeApprovedShipmentCreate", () => {
       expect(result.kind).toBe("manual-handoff");
       if (result.kind === "manual-handoff") {
         expect(result.queuedKey).toBe(`sample-dispatch:approved:${approval.id}`);
+        // Ashford / Ben routing per CLAUDE.md REVISED 2026-04-30.
         expect(result.threadMessage).toContain("Ben");
         expect(result.threadMessage).toContain("Ashford");
+        // No-label-buy contract is unchanged.
         expect(result.threadMessage).toContain("No label purchased");
+        // Drew / East-Coast must NOT appear — that wording was the
+        // pre-2026-04-30 doctrine and shipped a stale message during the
+        // 2026-05-02 CNHA repro.
+        expect(result.threadMessage).not.toMatch(/Drew/i);
+        expect(result.threadMessage).not.toMatch(/East Coast/i);
+        // #shipping mirror succeeded with the stubbed channel registry.
+        expect(result.shippingChannelPosted).toBe(true);
       }
     } else {
       throw new Error("expected handled=true");
@@ -142,11 +177,21 @@ describe("executeApprovedShipmentCreate", () => {
       expect.objectContaining({ ex: expect.any(Number) }),
     );
 
+    // #shipping mirror posted exactly once with Ashford framing.
+    expect(postMessageMock).toHaveBeenCalledTimes(1);
+    const postArgs = postMessageMock.mock.calls[0]![0] as {
+      channel: string;
+      text: string;
+    };
+    expect(postArgs.channel).toBe("C-SHIPPING");
+    expect(postArgs.text).toContain("Ashford");
+    expect(postArgs.text).not.toMatch(/Drew/i);
+
     // Audit recorded.
     expect(auditStoreRef._size).toBeGreaterThanOrEqual(1);
   });
 
-  it("non-manual channel: returns 'manual required' message — does NOT touch KV queue", async () => {
+  it("non-manual channel: returns 'manual required' message — does NOT touch KV queue or #shipping mirror", async () => {
     const approval = buildApproval({
       payloadRef: "dispatch:shopify:1234",
       targetEntity: { type: "shipment", id: "1234", label: "#1234" },
@@ -167,6 +212,8 @@ describe("executeApprovedShipmentCreate", () => {
     // Critical: no KV write for non-manual channels (those route through
     // the dedicated auto-ship cron, not this closer's queue).
     expect(kv.set).not.toHaveBeenCalled();
+    // And no #shipping mirror — the auto-ship cron handles that surface.
+    expect(postMessageMock).not.toHaveBeenCalled();
 
     // Audit still recorded.
     expect(auditStoreRef._size).toBeGreaterThanOrEqual(1);
@@ -180,6 +227,7 @@ describe("executeApprovedShipmentCreate", () => {
       expect(result.reason).toMatch(/pending/);
     }
     expect(kv.set).not.toHaveBeenCalled();
+    expect(postMessageMock).not.toHaveBeenCalled();
   });
 
   it("rejects approvals missing a parsable dispatch payloadRef (no guessing)", async () => {
@@ -190,6 +238,7 @@ describe("executeApprovedShipmentCreate", () => {
       expect(result.error).toMatch(/payloadRef/);
     }
     expect(kv.set).not.toHaveBeenCalled();
+    expect(postMessageMock).not.toHaveBeenCalled();
   });
 
   it("does NOT call any ShipStation / label-buying primitive", async () => {
