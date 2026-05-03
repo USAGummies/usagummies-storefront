@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const isAuthorizedMock = vi.fn();
 const getWorkpackMock = vi.fn();
 const updateWorkpackMock = vi.fn();
+const postMessageMock = vi.fn();
 
 vi.mock("@/lib/ops/abra-auth", () => ({
   isAuthorized: (req: Request) => isAuthorizedMock(req),
@@ -19,6 +20,10 @@ vi.mock("@/lib/ops/workpacks", async () => {
   };
 });
 
+vi.mock("@/lib/ops/control-plane/slack", () => ({
+  postMessage: (args: unknown) => postMessageMock(args),
+}));
+
 import { WorkpackUpdateError } from "@/lib/ops/workpacks";
 import { GET, PATCH } from "../route";
 
@@ -26,6 +31,7 @@ beforeEach(() => {
   isAuthorizedMock.mockReset();
   getWorkpackMock.mockReset();
   updateWorkpackMock.mockReset();
+  postMessageMock.mockReset().mockResolvedValue({ ok: true });
 });
 
 function req(body?: unknown) {
@@ -84,6 +90,133 @@ describe("/api/ops/workpacks/[id]", () => {
     const res = await PATCH(req({ resultLinks: ["slack://x"] }), ctx());
     expect(res.status).toBe(422);
     expect((await res.json()).code).toBe("invalid_links");
+  });
+
+  it("PATCH posts a result card to the source thread when status moves to done", async () => {
+    isAuthorizedMock.mockResolvedValueOnce(true);
+    getWorkpackMock.mockResolvedValueOnce({
+      id: "wp_1",
+      status: "running",
+      sourceUrl:
+        "https://usagummies.slack.com/archives/C0AKG9FSC2J/p1777758790850549",
+      title: "x",
+      department: "email",
+      intent: "draft_reply",
+      riskClass: "read_only",
+      allowedActions: [],
+      prohibitedActions: [],
+      sourceText: "x",
+      createdAt: "2026-05-02T18:00:00.000Z",
+      updatedAt: "2026-05-02T18:00:00.000Z",
+    });
+    updateWorkpackMock.mockResolvedValueOnce({
+      id: "wp_1",
+      status: "done",
+      resultSummary: "Drafted",
+      sourceUrl:
+        "https://usagummies.slack.com/archives/C0AKG9FSC2J/p1777758790850549",
+      title: "x",
+      department: "email",
+      intent: "draft_reply",
+      riskClass: "read_only",
+      allowedActions: [],
+      prohibitedActions: [],
+      sourceText: "x",
+      createdAt: "2026-05-02T18:00:00.000Z",
+      updatedAt: "2026-05-02T18:00:00.000Z",
+    });
+    const res = await PATCH(
+      req({ status: "done", resultSummary: "Drafted" }),
+      ctx(),
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { slackPost: { posted: boolean } };
+    expect(body.slackPost.posted).toBe(true);
+    expect(postMessageMock).toHaveBeenCalledTimes(1);
+    const call = postMessageMock.mock.calls[0][0] as {
+      channel: string;
+      threadTs?: string;
+    };
+    expect(call.channel).toBe("C0AKG9FSC2J");
+    expect(call.threadTs).toMatch(/^\d+\.\d+$/);
+  });
+
+  it("PATCH skips slack post when status didn't change", async () => {
+    isAuthorizedMock.mockResolvedValueOnce(true);
+    getWorkpackMock.mockResolvedValueOnce({
+      id: "wp_1",
+      status: "needs_review",
+    });
+    updateWorkpackMock.mockResolvedValueOnce({
+      id: "wp_1",
+      status: "needs_review",
+      resultSummary: "Updated",
+    });
+    const res = await PATCH(
+      req({ resultSummary: "Updated" }),
+      ctx(),
+    );
+    expect(res.status).toBe(200);
+    expect(postMessageMock).not.toHaveBeenCalled();
+  });
+
+  it("PATCH skips slack post on terminal-status transition with no source URL", async () => {
+    isAuthorizedMock.mockResolvedValueOnce(true);
+    getWorkpackMock.mockResolvedValueOnce({ id: "wp_1", status: "running" });
+    updateWorkpackMock.mockResolvedValueOnce({
+      id: "wp_1",
+      status: "done",
+      resultSummary: "Drafted",
+      title: "x",
+      department: "email",
+      intent: "draft_reply",
+      riskClass: "read_only",
+      allowedActions: [],
+      prohibitedActions: [],
+      sourceText: "x",
+      createdAt: "2026-05-02T18:00:00.000Z",
+      updatedAt: "2026-05-02T18:00:00.000Z",
+    });
+    const res = await PATCH(
+      req({ status: "done", resultSummary: "Drafted" }),
+      ctx(),
+    );
+    const body = (await res.json()) as { slackPost: { posted: boolean; reason?: string } };
+    expect(body.slackPost.posted).toBe(false);
+    expect(body.slackPost.reason).toBe("no-source-url");
+    expect(postMessageMock).not.toHaveBeenCalled();
+  });
+
+  it("PATCH does not fail when slack post throws — best-effort only", async () => {
+    isAuthorizedMock.mockResolvedValueOnce(true);
+    postMessageMock.mockRejectedValueOnce(new Error("slack-down"));
+    getWorkpackMock.mockResolvedValueOnce({
+      id: "wp_1",
+      status: "running",
+      sourceUrl:
+        "https://usagummies.slack.com/archives/C0AKG9FSC2J/p1777758790850549",
+    });
+    updateWorkpackMock.mockResolvedValueOnce({
+      id: "wp_1",
+      status: "done",
+      resultSummary: "x",
+      sourceUrl:
+        "https://usagummies.slack.com/archives/C0AKG9FSC2J/p1777758790850549",
+      title: "x",
+      department: "email",
+      intent: "draft_reply",
+      riskClass: "read_only",
+      allowedActions: [],
+      prohibitedActions: [],
+      sourceText: "x",
+      createdAt: "2026-05-02T18:00:00.000Z",
+      updatedAt: "2026-05-02T18:00:00.000Z",
+    });
+    const res = await PATCH(req({ status: "done", resultSummary: "x" }), ctx());
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { slackPost: { posted: boolean; reason?: string } };
+    expect(body.slackPost.posted).toBe(false);
+    expect(body.slackPost.reason).toMatch(/slack-post-failed/);
   });
 
   it("PATCH rejects invalid json", async () => {
