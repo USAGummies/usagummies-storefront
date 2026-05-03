@@ -6,6 +6,46 @@
 
 ---
 
+## 0. Build status — 2026-05-02 evening
+
+| # | Build | State | Closer commit |
+|---|---|---|---|
+| 1 | Slack App Live Smoke + Self-Test Route | ✅ shipped | `85a9e12d` / `9c62d57a` |
+| 2 | Department Command Cards | ✅ shipped — 6 dept cards + `what needs ben` master | `8ebc593e` … `176881b1` |
+| 3 | Email Agent Work Queue | ✅ shipped | `2f8e0358` |
+| 4 | Email Approval Edit-Resubmit | ✅ shipped | `57e72b1a` |
+| 5 | Finance Receipt Lane Closure | ✅ shipped | `565f0d80` |
+| 6 | OpenAI Workspace Agent Workpacks | ✅ shipped (prompt packs + result cards) | `557f491c` + `2b7dfae1` |
+| 7 | Marketing Lane Hardening | ✅ shipped | `78e0bf36` |
+| 8 | External Agent + GTM Tool Adapter | ✅ shipped | `453e1bd4` |
+| 9 | Slack Visual Command Board | ✅ shipped (doctrine + primitives) | `8cca1dd4` |
+| 10 | HubSpot Proactive Revenue Agent | ✅ shipped (Phase 1 read-only) | `5c787d2e` |
+| 11 | Slack AI Operator Router | 🟡 code shipped; Slack Events delivery still needs admin verification | `e610c982` + `c2e712a0` (slash-command fallback) |
+| 12 | Slack Event Receipt Ledger | ✅ shipped | `6fbbc51c` |
+| 13 | Workpack Claim / Result Loop | ✅ shipped | `031a3cc4` |
+| 14 | Slack Slash Command Fallback | ✅ shipped | `c2e712a0` |
+
+**Daily Slack roster (8 commands):**
+- `what needs ben` / `ben queue` / `ben today` — master cross-department posture roll-up
+- `ops dashboard` / `ops today` — sales command center
+- `email queue` — Phase 37.1+37.2 inbox triage queue
+- `finance today` — Rene's pending station + receipt-promote queue
+- `marketing today` — Meta/Google/TikTok status + ROAS
+- `shipping today` — retry queue + carrier wallets + approvals
+- `proposals` — external-tool inbound queue
+- `agents status` — workpack prompt-pack registry
+
+**Doctrine pinned:**
+- [`/contracts/slack-card-doctrine.md`](../contracts/slack-card-doctrine.md) v1.0 — Block Kit standard
+- `src/lib/ops/slack-card-builder.ts` — pure primitives that mechanically enforce the doctrine
+- `src/lib/ops/workpack-prompts/*` — per-department prompt packs (5 packs, each with role / readTools / allowedOutputs / prohibitedActions / approvalSlugs / dailyChecklist / humanHandoff)
+
+**Test count:** 4,039 passing (261 files) as of 2026-05-02 evening.
+
+**Only remaining gate** — Build 11's Slack Events delivery for connector-origin messages still needs Slack App Admin smoke (the production smoke on 2026-05-02 showed connector-origin `ask codex` posts in `#ops-daily` not triggering the Events route). The repo-side workaround (slash command `/ops ask codex …`) is shipped, so this is no longer a blocker for daily operation.
+
+---
+
 ## 1. Current Reality
 
 The repo now has a broad operating platform: sales command center, readiness dashboard, Slack approvals, channel registry, Faire Direct workflows, finance review queues, receipt OCR review packets, AP packets, shipping artifacts, OpenAI workspace tools, and email-agent readiness gates.
