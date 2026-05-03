@@ -170,6 +170,16 @@ export const AGENT_MANIFEST: readonly AgentManifestEntry[] = Object.freeze([
     notes:
       "Detects spend-without-conversions on Meta + Google Ads. Detector only — never pauses ads via API.",
   },
+  {
+    id: "crm-hygiene",
+    name: "CRM Hygiene (Wholesale Pipeline Commander)",
+    contract: "—",
+    runtimePath: "/api/ops/agents/crm-hygiene/run",
+    cadence: "Weekday 07:30 PT",
+    channel: "#sales",
+    notes:
+      "Boring + relentless. Daily HubSpot scan: missing-field, stale-deal, zero-dollar, stuck-in-stage, duplicate-name, closed-with-open-amount. Quiet-collapse on zero findings.",
+  },
 ]);
 
 /**
