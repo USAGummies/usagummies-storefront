@@ -191,6 +191,14 @@ export interface BriefInput {
    */
   dailyPnl?: DailyPnlBriefSlice;
   /**
+   * Morning-only: one-line summaries of the prior day's cron runs
+   * (auto-fire-nudges, ad-kill-switch). Quiet-collapses on no-data
+   * days. Built from `summarizeYesterdayRuns(recentAudit, forDate)`
+   * in the route. Surfaces "did the cron actually do its job
+   * yesterday" without the operator having to grep #ops-audit.
+   */
+  yesterdayRuns?: { forDate: string; lines: string[] };
+  /**
    * Morning-only: compact sales-command summary covering Faire
    * invites/follow-ups, pending Slack approvals, AP packets, retail
    * drafts, wholesale inquiries. The route populates this from the
@@ -449,6 +457,24 @@ export function composeDailyBrief(input: BriefInput): BriefOutput {
     type: "section",
     text: { type: "mrkdwn", text: `*🎯 TODAY'S MISSION*\n${priorities.join("\n")}` },
   });
+
+  // ---- Yesterday's cron runs (morning-only) ----
+  // One-line summaries of auto-fire-nudges + ad-kill-switch outcomes
+  // from the prior day so Ben sees "did the system actually do its
+  // job?" without grepping #ops-audit.
+  if (
+    input.kind === "morning" &&
+    input.yesterdayRuns &&
+    input.yesterdayRuns.lines.length > 0
+  ) {
+    blocks.push({
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `*:repeat: YESTERDAY'S CRONS — ${input.yesterdayRuns.forDate}*\n${input.yesterdayRuns.lines.join("\n")}`,
+      },
+    });
+  }
 
   // ---- Operational signals (Phase 32.1) ----
   // Aggregated from stack-readiness, agent-health, USPTO,
@@ -1052,11 +1078,22 @@ export function renderSalesCommandMarkdown(slice: SalesCommandSlice): string {
 
   const lines: string[] = [header];
 
+  // 2026-05-03 (CB#9 — brief deep-links): each metric gets a
+  // tap-target so an operator goes from "10 wholesale inquiries" to
+  // the filtered ops view in one click. Links append to the END of
+  // each line so existing `<label>: <count>` assertions stay stable.
+  const SITE = "https://www.usagummies.com";
+  const LINK_AP_PACKETS = `<${SITE}/ops/ap-packets|↗>`;
+  const LINK_FAIRE = `<${SITE}/ops/faire-direct|↗>`;
+  const LINK_OPS_SALES = `<${SITE}/ops/sales|↗>`;
+  const LINK_APPROVALS = `<${SITE}/ops/approvals|↗>`;
+  const LINK_LOCATIONS = `<${SITE}/ops/locations|↗>`;
+
   // Faire invites awaiting review.
   lines.push(
     `• Faire invites awaiting review: ${formatCount(
       slice.faireInvitesNeedsReview,
-    )}`,
+    )} ${LINK_FAIRE}`,
   );
 
   // Faire follow-ups (combined line — overdue first to match dashboard sort).
@@ -1068,12 +1105,14 @@ export function renderSalesCommandMarkdown(slice: SalesCommandSlice): string {
   } else {
     const overdue = formatCount(slice.faireFollowUpsOverdue);
     const dueSoon = formatCount(slice.faireFollowUpsDueSoon);
-    lines.push(`• Faire follow-ups: ${overdue} overdue · ${dueSoon} due soon`);
+    lines.push(
+      `• Faire follow-ups: ${overdue} overdue · ${dueSoon} due soon ${LINK_FAIRE}`,
+    );
   }
 
   // Pending Slack approvals.
   lines.push(
-    `• Slack approvals awaiting Ben: ${formatCount(slice.pendingApprovals)}`,
+    `• Slack approvals awaiting Ben: ${formatCount(slice.pendingApprovals)} ${LINK_APPROVALS}`,
   );
 
   // AP packets — only render when any of the AP counts has signal.
@@ -1085,7 +1124,9 @@ export function renderSalesCommandMarkdown(slice: SalesCommandSlice): string {
   } else {
     const action = formatCount(slice.apPacketsActionRequired);
     const sent = formatCount(slice.apPacketsSent);
-    lines.push(`• AP packets: ${action} action-required · ${sent} sent`);
+    lines.push(
+      `• AP packets: ${action} action-required · ${sent} sent ${LINK_AP_PACKETS}`,
+    );
   }
 
   // Retail drafts.
@@ -1097,12 +1138,14 @@ export function renderSalesCommandMarkdown(slice: SalesCommandSlice): string {
   } else {
     const need = formatCount(slice.retailDraftsNeedsReview);
     const accepted = formatCount(slice.retailDraftsAccepted);
-    lines.push(`• Retail drafts: ${need} to review · ${accepted} accepted`);
+    lines.push(
+      `• Retail drafts: ${need} to review · ${accepted} accepted ${LINK_LOCATIONS}`,
+    );
   }
 
   // Wholesale inquiries — surfaced honestly even when not_wired.
   lines.push(
-    `• Wholesale inquiries: ${formatCount(slice.wholesaleInquiries)}`,
+    `• Wholesale inquiries: ${formatCount(slice.wholesaleInquiries)} ${LINK_OPS_SALES}`,
   );
 
   if (slice.salesPipelineLine) {

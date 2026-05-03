@@ -34,6 +34,7 @@ import {
   type VendorMarginBriefSlice,
 } from "@/lib/ops/control-plane/daily-brief";
 import { computeDailyPnL } from "@/lib/ops/daily-pnl";
+import { summarizeYesterdayRuns } from "@/lib/ops/control-plane/yesterday-runs";
 import {
   parsePerVendorMarginLedger,
   selectVendorMarginAlerts,
@@ -694,6 +695,15 @@ async function composeAndPost(req: Request): Promise<Response> {
     preflight,
     fulfillmentToday,
     dailyPnl,
+    yesterdayRuns:
+      kind === "morning"
+        ? summarizeYesterdayRuns(
+            recentAudit,
+            new Date(now.getTime() - 86_400_000)
+              .toISOString()
+              .slice(0, 10),
+          )
+        : undefined,
     salesCommand,
     vendorMargin,
     staleBuyers,
