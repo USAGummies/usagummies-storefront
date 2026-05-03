@@ -891,7 +891,7 @@ function renderPreflightMarkdown(pf: FulfillmentPreflightSlice): string {
   // Stale voids
   if (pf.staleVoids.count > 0) {
     lines.push(
-      `💸 Stale ShipStation voids: ${pf.staleVoids.count} · $${pf.staleVoids.pendingDollars.toFixed(2)} pending refund`,
+      `💸 Stale ShipStation voids: ${pf.staleVoids.count} · $${pf.staleVoids.pendingDollars.toFixed(2)} pending refund · <https://stamps.custhelp.com/app/contact_us|Open Stamps.com support ticket> to claim`,
     );
   }
 
