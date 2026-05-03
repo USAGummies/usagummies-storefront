@@ -58,9 +58,11 @@ import { auditDispatch } from "@/lib/ops/dispatch-audit";
 import {
   classifyDispatch,
   composeShipmentProposal,
+  qualifiesForUnderCapAutoExecute,
   type OrderIntent,
 } from "@/lib/ops/sample-order-dispatch";
 import { persistDispatchPayload } from "@/lib/ops/sample-order-dispatch/payload-store";
+import { executeUnderCapAutoShipment } from "@/lib/ops/sample-order-dispatch/under-cap-executor";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -153,6 +155,80 @@ export async function POST(req: Request): Promise<Response> {
       },
       { status: 422 },
     );
+  }
+
+  // ---- Class A under-cap auto-execute path --------------------------------
+  // Single-case Ashford samples to non-whale buyers with no warnings get
+  // the autonomous path: no approval card, just an audit envelope + direct
+  // ShipStation order creation. ~70% of #ops-approvals queue volume was
+  // these cases (audit 2026-05-03). Caller-supplied whale flags TODO —
+  // for now all qualifying single-case samples auto-execute when
+  // post=true. To force the Class B path on a borderline case, set a
+  // tag like `tag:approval-required` on the upstream order.
+  let underCapResult: Awaited<ReturnType<typeof executeUnderCapAutoShipment>> | null = null;
+  if (
+    shouldPost &&
+    qualifiesForUnderCapAutoExecute(body, classification, {})
+  ) {
+    const run = newRunContext({
+      agentId: "sample-order-dispatch",
+      division: "production-supply-chain",
+      source: "event",
+      trigger: `dispatch:${body.channel}:${body.sourceId}`,
+    });
+    try {
+      underCapResult = await executeUnderCapAutoShipment(run, {
+        intent: body,
+        classification,
+      });
+      if (!underCapResult.ok) {
+        // Auto-execute failed — fall through to Class B approval below.
+        // We don't surface the error as a hard 5xx because the operator
+        // can still approve the same shipment via the Class B flow.
+        degraded.push(`under-cap-auto-execute: ${underCapResult.error}`);
+        underCapResult = null;
+      }
+    } catch (err) {
+      degraded.push(
+        `under-cap-auto-execute-exception: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      underCapResult = null;
+    }
+  }
+
+  // If the under-cap path succeeded, return early — no approval card needed.
+  if (underCapResult && underCapResult.ok) {
+    await auditDispatch({
+      agentId: "sample-order-dispatch",
+      division: "production-supply-chain",
+      channel: body.channel,
+      sourceId: body.sourceId,
+      orderNumber: body.orderNumber,
+      classification,
+      proposal,
+      action: "shipment.proposal.post",
+      proposalTs: null,
+      postedToChannel: underCapResult.shippingChannelPosted ? "#shipping" : null,
+    });
+    return NextResponse.json({
+      ok: true,
+      posted: true,
+      postedTo: underCapResult.shippingChannelPosted ? "#shipping" : null,
+      // Class A — no approval object exists.
+      approvalId: null,
+      proposalTs: null,
+      classification,
+      proposal,
+      degraded,
+      underCapAutoExecute: {
+        kind: underCapResult.kind,
+        idempotencyKey: underCapResult.idempotencyKey,
+        alreadyExisted: underCapResult.alreadyExisted,
+        shipStationOrderNumber: underCapResult.shipStationOrderNumber,
+        shipStationOrderUrl: underCapResult.shipStationOrderUrl,
+        hubspotNoteId: underCapResult.hubspotNoteId,
+      },
+    });
   }
 
   // ---- Happy path: canonical Class B approval -----------------------------

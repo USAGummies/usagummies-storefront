@@ -51,19 +51,60 @@ vi.mock("@/lib/ops/control-plane/slack", async () => {
   };
 });
 
-// Spy on every shipstation-client export to prove no label-buying happens.
+// Spy on every shipstation-client export to prove no label-buying happens
+// when the dispatch route stays on the Class B (approval-card) rails.
+//
+// 2026-05-03: when the under-cap auto-execute path was added, the route
+// transitively imports `createShipStationOrder` + `isShipStationConfigured`
+// via under-cap-executor. We explicitly mock both: the config probe
+// returns false (so the executor degrades cleanly to fall-through),
+// and any other call throws to prove no label-buying happens during
+// dispatch.
 const shipstationCalls: string[] = [];
-vi.mock("@/lib/ops/shipstation-client", () => {
-  const handler = {
-    get(_: unknown, prop: string) {
-      return (...args: unknown[]) => {
-        shipstationCalls.push(`${prop}(${JSON.stringify(args).slice(0, 80)})`);
-        throw new Error(`shipstation-client.${prop} must NOT be called from dispatch route`);
-      };
-    },
+function shipstationThrower(prop: string) {
+  return (...args: unknown[]) => {
+    shipstationCalls.push(`${prop}(${JSON.stringify(args).slice(0, 80)})`);
+    throw new Error(
+      `shipstation-client.${prop} must NOT be called from dispatch route`,
+    );
   };
-  return new Proxy({}, handler);
+}
+vi.mock("@/lib/ops/shipstation-client", () => ({
+  // Config probes — return false so the under-cap executor degrades
+  // gracefully without firing the create-order path during tests.
+  isShipStationConfigured: () => false,
+  // Every other export throws if invoked. Listed explicitly so vitest's
+  // module resolver can statically see them.
+  createShipStationOrder: shipstationThrower("createShipStationOrder"),
+  createLabelForShipStationOrder: shipstationThrower(
+    "createLabelForShipStationOrder",
+  ),
+  listOrdersAwaitingShipment: shipstationThrower("listOrdersAwaitingShipment"),
+  resolveChannelForStoreId: shipstationThrower("resolveChannelForStoreId"),
+  findShipStationOrderByNumber: shipstationThrower(
+    "findShipStationOrderByNumber",
+  ),
+}));
+
+// HubSpot client + KV are imported transitively by the under-cap
+// executor. Mock both to inert no-ops so the existing Class B tests
+// don't fail at module load.
+vi.mock("@/lib/ops/hubspot-client", async () => {
+  const actual = await vi.importActual<
+    typeof import("@/lib/ops/hubspot-client")
+  >("@/lib/ops/hubspot-client");
+  return {
+    ...actual,
+    isHubSpotConfigured: () => false,
+    createNote: vi.fn(async () => null),
+  };
 });
+vi.mock("@vercel/kv", () => ({
+  kv: {
+    get: vi.fn(async () => null),
+    set: vi.fn(async () => "OK"),
+  },
+}));
 
 class StubApprovalSurface {
   surfaced: ApprovalRequest[] = [];
@@ -112,11 +153,17 @@ function makeReq(body: unknown): Request {
   });
 }
 
+// 2026-05-03 audit-fix: a vanilla case+1 manual sample now qualifies for
+// the Class A under-cap auto-execute path. The Class B contract tests
+// below want the canonical approval-opening flow, so we set valueUsd
+// above UNDER_CAP_VALUE_USD ($15) to keep these tests on the Class B
+// rails. The Class A bypass is exercised in its own block below.
 const completeIntent = {
   channel: "manual" as const,
   sourceId: "email:abc123",
   orderNumber: "SAMPLE-EMAIL-ABC123",
   tags: ["sample", "from-email"],
+  valueUsd: 20,
   shipTo: {
     name: "Sarah Smith",
     street1: "5972 CHICKNEY DR",
@@ -218,5 +265,37 @@ describe("POST /api/ops/agents/sample-dispatch/dispatch", () => {
     expect(body.approvalId).toBeNull();
     // No approval persisted (preview is read-only).
     expect(approvalStoreRef._size).toBe(0);
+  });
+
+  // 2026-05-03 audit fix: under-cap auto-execute Class A bypass.
+  // When the predicate qualifies AND ShipStation isn't configured
+  // (test harness mock), the route falls back to Class B rather
+  // than 5xx-ing. The failure is recorded in `degraded[]`.
+  it("under-cap auto-execute: degrades to Class B when ShipStation isn't configured", async () => {
+    const { POST } = await import("../route");
+    // Strip valueUsd from the completeIntent so the under-cap predicate
+    // qualifies (case + cartons=1 + ashford + no warnings + no whale).
+    const underCapIntent = { ...completeIntent };
+    delete (underCapIntent as { valueUsd?: number }).valueUsd;
+    const res = await POST(makeReq(underCapIntent));
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      ok: boolean;
+      posted: boolean;
+      approvalId: string | null;
+      degraded: string[];
+      underCapAutoExecute?: unknown;
+    };
+    // Class B fallback: an approval was opened.
+    expect(body.posted).toBe(true);
+    expect(body.approvalId).toBeTruthy();
+    // The under-cap attempt was logged as a degradation, not a hard
+    // failure. Either the graceful "ok: false" path or an exception
+    // path is acceptable — both prove the bypass was attempted.
+    expect(
+      body.degraded.some((d) => d.startsWith("under-cap-auto-execute")),
+    ).toBe(true);
+    // No under-cap envelope when the bypass didn't succeed.
+    expect(body.underCapAutoExecute).toBeUndefined();
   });
 });
