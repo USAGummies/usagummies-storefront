@@ -76,6 +76,52 @@ export interface ARPosition {
   drafts: ARBucket;
 }
 
+/**
+ * EOD-only P&L slice. Rendered after the fulfillment-today block in
+ * the end-of-day debrief. Closes the loop on Day 1's morning revenue
+ * wiring: morning shows yesterday's revenue + cash position; EOD
+ * adds COGS + fixed costs + net + MTD totals + runway.
+ *
+ * No-fabrication contract:
+ *   • `yesterday` and `mtd` lines REQUIRE a source.system + retrievedAt
+ *     when amounts are non-null.
+ *   • `cogs` + `fixedCosts` are honestly labeled as `[estimated]`
+ *     (forward COGS at $1.557/unit; daily fixed share of $900/mo
+ *     monthly recurring) since QBO actuals aren't wired here.
+ *   • `runwayMonths` is rendered ONLY when both cash AND
+ *     monthlyBurnUsd are non-null. Composer omits the runway line if
+ *     either input is missing — never fabricates.
+ *
+ * Caller (daily-brief route) populates this from `computeDailyPnL()`
+ * + the resolved cash position in the EOD branch only.
+ */
+export interface DailyPnlBriefSlice {
+  /** Yesterday's date (YYYY-MM-DD) — what the numbers are anchored to. */
+  date: string;
+  /** Yesterday's revenue + costs + net (USD). */
+  yesterday: {
+    revenueUsd: number | null;
+    cogsUsdEstimated: number | null;
+    fixedCostsUsdEstimated: number | null;
+    netUsd: number | null;
+    unavailableReason?: string;
+  };
+  /** Month-to-date totals (USD). */
+  mtd: {
+    revenueUsd: number | null;
+    cogsUsdEstimated: number | null;
+    fixedCostsUsdEstimated: number | null;
+    netUsd: number | null;
+    unavailableReason?: string;
+  };
+  /** 30-day burn estimate (USD/mo). Null when no input data. */
+  monthlyBurnUsdEstimated: number | null;
+  /** Cash / monthly burn — months of runway. Null when either input is null. */
+  runwayMonthsEstimated: number | null;
+  /** Source citation — kpi_timeseries window + retrievedAt. */
+  source?: { system: string; retrievedAt: string };
+}
+
 export interface BriefInput {
   kind: BriefKind;
   /** Timestamp the brief is "as of". */
@@ -136,6 +182,14 @@ export interface BriefInput {
    * "today in review" section closing Ben's shipping day.
    */
   fulfillmentToday?: FulfillmentTodayBriefSlice;
+  /**
+   * EOD-only: yesterday net + MTD net + monthly burn + runway. Pulled
+   * from `computeDailyPnL()` (Supabase kpi_timeseries window) + the
+   * resolved cash position. Composer renders ONLY when `kind === "eod"`
+   * and the slice is present. No-fabrication contract enforced — see
+   * `DailyPnlBriefSlice` docstring for details.
+   */
+  dailyPnl?: DailyPnlBriefSlice;
   /**
    * Morning-only: compact sales-command summary covering Faire
    * invites/follow-ups, pending Slack approvals, AP packets, retail
@@ -641,6 +695,17 @@ export function composeDailyBrief(input: BriefInput): BriefOutput {
     }
   }
 
+  // ---- Daily P&L recap (EOD only) ----
+  // Closes the loop on Day 1's morning revenue wiring. Yesterday's
+  // top-line + COGS + fixed = net; MTD totals; monthly burn estimate
+  // + runway. No-fabrication contract — see DailyPnlBriefSlice doc.
+  if (input.kind === "eod" && input.dailyPnl) {
+    const pnl = renderDailyPnlMarkdown(input.dailyPnl);
+    if (pnl) {
+      blocks.push({ type: "section", text: { type: "mrkdwn", text: pnl } });
+    }
+  }
+
   // ---- Pending approvals breakdown ----
   if (pendingCount > 0) {
     const grouped = groupApprovalsByDivision(input.pendingApprovals);
@@ -857,6 +922,89 @@ function renderFulfillmentTodayMarkdown(ft: FulfillmentTodayBriefSlice): string 
   }
 
   return lines.length > 1 ? lines.join("\n") : "";
+}
+
+/**
+ * Render the EOD daily P&L recap. Quiet-collapses when every input
+ * line is null (no Supabase data + no cash position).
+ *
+ * Output shape (one example, fully populated):
+ *
+ *   💵 *DAILY P&L — Yesterday (2026-05-03)*
+ *   • Revenue: $XX.XX  ·  COGS [est]: -$YY.YY  ·  Fixed [est]: -$Z.ZZ
+ *   • 🟢 Net: +$AA.AA
+ *   *MTD:* Revenue $X,XXX.XX · Net +$YY.YY  _(may-2026 to-date)_
+ *   • 🔥 Burn (30d est): -$X,XXX.XX  ·  ⏱ Runway: ~A.B months
+ *   _Source: kpi_timeseries (revenue) + DAILY_FIXED $30/day estimate. Flip to QBO actuals once `qbo.bill.create.from-receipt` ships._
+ */
+function renderDailyPnlMarkdown(slice: DailyPnlBriefSlice): string {
+  const lines: string[] = [];
+
+  // Yesterday block.
+  const y = slice.yesterday;
+  if (y.revenueUsd === null && y.netUsd === null) {
+    if (y.unavailableReason) {
+      lines.push(
+        `💵 *DAILY P&L — Yesterday (${slice.date})*`,
+        `• unavailable — ${y.unavailableReason}`,
+      );
+    }
+  } else {
+    lines.push(`💵 *DAILY P&L — Yesterday (${slice.date})*`);
+    const rev =
+      y.revenueUsd === null ? "n/a" : `$${y.revenueUsd.toFixed(2)}`;
+    const cogs =
+      y.cogsUsdEstimated === null
+        ? ""
+        : ` · COGS [est]: -$${y.cogsUsdEstimated.toFixed(2)}`;
+    const fixed =
+      y.fixedCostsUsdEstimated === null
+        ? ""
+        : ` · Fixed [est]: -$${y.fixedCostsUsdEstimated.toFixed(2)}`;
+    lines.push(`• Revenue: ${rev}${cogs}${fixed}`);
+    if (y.netUsd !== null) {
+      const emoji = y.netUsd >= 0 ? "🟢" : "🔴";
+      const sign = y.netUsd >= 0 ? "+" : "-";
+      lines.push(`• ${emoji} Net: ${sign}$${Math.abs(y.netUsd).toFixed(2)}`);
+    }
+  }
+
+  // MTD block.
+  const m = slice.mtd;
+  if (m.revenueUsd !== null || m.netUsd !== null) {
+    const rev =
+      m.revenueUsd === null ? "n/a" : `$${m.revenueUsd.toFixed(2)}`;
+    if (m.netUsd === null) {
+      lines.push(`*MTD:* Revenue ${rev}`);
+    } else {
+      const emoji = m.netUsd >= 0 ? "🟢" : "🔴";
+      const sign = m.netUsd >= 0 ? "+" : "-";
+      lines.push(
+        `*MTD:* Revenue ${rev} · ${emoji} Net ${sign}$${Math.abs(m.netUsd).toFixed(2)}`,
+      );
+    }
+  }
+
+  // Burn + runway. Only render the runway line when both inputs are
+  // non-null — never fabricate from a partial signal.
+  const burn = slice.monthlyBurnUsdEstimated;
+  const runway = slice.runwayMonthsEstimated;
+  if (burn !== null && runway !== null) {
+    lines.push(
+      `• 🔥 Burn (30d est): -$${burn.toFixed(2)} · ⏱ Runway: ~${runway.toFixed(1)} months`,
+    );
+  } else if (burn !== null) {
+    lines.push(`• 🔥 Burn (30d est): -$${burn.toFixed(2)}`);
+  }
+
+  // Source citation footer.
+  if (slice.source) {
+    lines.push(
+      `_Source: ${slice.source.system} (retrieved ${slice.source.retrievedAt})._`,
+    );
+  }
+
+  return lines.length === 0 ? "" : lines.join("\n");
 }
 
 /**

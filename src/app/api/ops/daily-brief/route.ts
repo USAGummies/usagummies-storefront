@@ -26,12 +26,14 @@ import {
   composeDispatchBriefSlice,
   type ARPosition,
   type BriefKind,
+  type DailyPnlBriefSlice,
   type DispatchBriefSlice,
   type FulfillmentPreflightSlice,
   type FulfillmentTodayBriefSlice,
   type RevenueLine,
   type VendorMarginBriefSlice,
 } from "@/lib/ops/control-plane/daily-brief";
+import { computeDailyPnL } from "@/lib/ops/daily-pnl";
 import {
   parsePerVendorMarginLedger,
   selectVendorMarginAlerts,
@@ -596,6 +598,17 @@ async function composeAndPost(req: Request): Promise<Response> {
     }
   }
 
+  // ---- EOD daily P&L recap ----
+  // Pulls yesterday + MTD revenue from the kpi_timeseries window via
+  // computeDailyPnL(), combines with the resolved cash position to
+  // estimate burn + runway. Strict no-fabrication: if Supabase isn't
+  // configured the slice still renders with explicit unavailableReason
+  // lines rather than blank or made-up numbers.
+  let dailyPnl: DailyPnlBriefSlice | undefined;
+  if (kind === "eod") {
+    dailyPnl = await resolveDailyPnlSlice(cashPosition.amountUsd ?? null);
+  }
+
   // ---- Operational signals (Phase 32.1.c) ----
   // Aggregates stack-readiness (env-check only — no live probes,
   // those are slow), agent-health doctrine, USPTO deadlines, and
@@ -680,6 +693,7 @@ async function composeAndPost(req: Request): Promise<Response> {
     arPosition: overrides.arPosition,
     preflight,
     fulfillmentToday,
+    dailyPnl,
     salesCommand,
     vendorMargin,
     staleBuyers,
@@ -1094,4 +1108,139 @@ async function resolveYesterdayRevenue(): Promise<RevenueLine[]> {
       { channel: "Amazon", amountUsd: null, unavailableReason: reason },
     ];
   }
+}
+
+/**
+ * Resolve the EOD daily P&L slice. Wraps `computeDailyPnL()` (which
+ * itself reads kpi_timeseries) into the brief composer's
+ * `DailyPnlBriefSlice` shape with explicit unavailable reasons when
+ * Supabase isn't configured or returns nothing.
+ *
+ * Burn estimate is derived from MTD costs extrapolated to a 30-day
+ * window. When MTD has zero data, burn falls back to null. Runway is
+ * cash / monthly_burn ONLY when both inputs are non-null — never
+ * fabricated from a partial signal.
+ */
+async function resolveDailyPnlSlice(
+  cashUsd: number | null,
+): Promise<DailyPnlBriefSlice> {
+  const yesterday = new Date(Date.now() - 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+
+  // Reach Supabase indirectly via computeDailyPnL — single source of
+  // truth for revenue + COGS estimate + fixed-cost estimate. The
+  // function returns zeros when Supabase isn't reachable, so we
+  // detect "no data" from a totalRev === 0 + cogs === 0 case.
+  let pnl: Awaited<ReturnType<typeof computeDailyPnL>> | null = null;
+  let pnlError: string | null = null;
+  try {
+    pnl = await computeDailyPnL();
+  } catch (err) {
+    pnlError = err instanceof Error ? err.message : String(err);
+  }
+
+  if (!pnl) {
+    const reason =
+      pnlError ?? "computeDailyPnL returned no data (Supabase unconfigured?)";
+    return {
+      date: yesterday,
+      yesterday: {
+        revenueUsd: null,
+        cogsUsdEstimated: null,
+        fixedCostsUsdEstimated: null,
+        netUsd: null,
+        unavailableReason: reason,
+      },
+      mtd: {
+        revenueUsd: null,
+        cogsUsdEstimated: null,
+        fixedCostsUsdEstimated: null,
+        netUsd: null,
+        unavailableReason: reason,
+      },
+      monthlyBurnUsdEstimated: null,
+      runwayMonthsEstimated: null,
+    };
+  }
+
+  // computeDailyPnL returns 0s when Supabase has no data (function
+  // catches errors internally). Distinguish "real $0 day" from "no
+  // data" by checking MTD totals — a real $0 day still has prior MTD
+  // data unless we're on the first day of the month.
+  const dayOfMonth = new Date(yesterday).getDate();
+  const mtdHasNoData =
+    pnl.mtd.revenue === 0 &&
+    pnl.mtd.cogs === 0 &&
+    pnl.mtd.netIncome <= 0 &&
+    dayOfMonth > 1;
+  const yesterdayHasData = pnl.revenue.total > 0;
+
+  // Estimate monthly burn: MTD costs (cogs + fixed) annualized to 30d.
+  // If we have <3 days of data, the extrapolation is too noisy —
+  // fall back to a flat fixed-cost estimate. If MTD has no data at
+  // all, burn is null.
+  let monthlyBurnUsd: number | null = null;
+  if (!mtdHasNoData && dayOfMonth > 0) {
+    const mtdCostsUsd = pnl.mtd.cogs + pnl.mtd.fixedCosts;
+    if (dayOfMonth >= 3) {
+      monthlyBurnUsd =
+        Math.round(((mtdCostsUsd / dayOfMonth) * 30) * 100) / 100;
+    } else if (mtdCostsUsd > 0) {
+      // Too few days — surface the flat fixed-cost shape so we don't
+      // extrapolate noise.
+      monthlyBurnUsd = Math.round(pnl.fixedCosts * 30 * 100) / 100;
+    }
+  }
+
+  // Runway = cash / monthly_burn. Both must be non-null and burn > 0.
+  let runwayMonths: number | null = null;
+  if (
+    cashUsd !== null &&
+    cashUsd > 0 &&
+    monthlyBurnUsd !== null &&
+    monthlyBurnUsd > 0
+  ) {
+    runwayMonths = Math.round((cashUsd / monthlyBurnUsd) * 10) / 10;
+  }
+
+  const retrievedAt = new Date().toISOString();
+
+  return {
+    date: pnl.date,
+    yesterday: yesterdayHasData
+      ? {
+          revenueUsd: pnl.revenue.total,
+          cogsUsdEstimated: pnl.cogs,
+          fixedCostsUsdEstimated: pnl.fixedCosts,
+          netUsd: pnl.netIncome,
+        }
+      : {
+          revenueUsd: null,
+          cogsUsdEstimated: null,
+          fixedCostsUsdEstimated: null,
+          netUsd: null,
+          unavailableReason: `No revenue rows in kpi_timeseries for ${pnl.date} (kpi-collector cron may not have run yet).`,
+        },
+    mtd: mtdHasNoData
+      ? {
+          revenueUsd: null,
+          cogsUsdEstimated: null,
+          fixedCostsUsdEstimated: null,
+          netUsd: null,
+          unavailableReason: `No MTD revenue rows in kpi_timeseries for the current month (Supabase may be unreachable).`,
+        }
+      : {
+          revenueUsd: pnl.mtd.revenue,
+          cogsUsdEstimated: pnl.mtd.cogs,
+          fixedCostsUsdEstimated: pnl.mtd.fixedCosts,
+          netUsd: pnl.mtd.netIncome,
+        },
+    monthlyBurnUsdEstimated: monthlyBurnUsd,
+    runwayMonthsEstimated: runwayMonths,
+    source: {
+      system: "kpi_timeseries+daily-pnl-estimator",
+      retrievedAt,
+    },
+  };
 }

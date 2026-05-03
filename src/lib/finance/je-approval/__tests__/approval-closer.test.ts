@@ -185,10 +185,11 @@ describe("executeApprovedJournalEntryPost — success path", () => {
     }
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [url, init] = fetchMock.mock.calls[0] as [
+    const callArgs = fetchMock.mock.calls[0] as unknown as [
       string,
       { method: string; headers: Record<string, string>; body: string },
     ];
+    const [url, init] = callArgs;
     expect(url).toBe("https://example.test/api/ops/qbo/journal-entry");
     expect(init.method).toBe("POST");
     expect(init.headers.Authorization).toBe("Bearer test-cron-secret");

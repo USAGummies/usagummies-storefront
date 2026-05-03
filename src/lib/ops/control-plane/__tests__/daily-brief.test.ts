@@ -1514,4 +1514,161 @@ describe("composeDailyBrief() — operational signals (Phase 32.1)", () => {
     expect(json).not.toContain(":rotating_light: *RED ALERT");
     expect(json).toContain("FRONT-LINE SIGNALS");
   });
+
+  // 2026-05-03 — Day 4 EOD daily P&L recap.
+  describe("daily P&L slice (EOD only)", () => {
+    const eodInput = () => ({
+      ...baseInput(),
+      kind: "eod" as const,
+    });
+
+    it("renders yesterday + MTD + burn + runway when fully populated", () => {
+      const out = composeDailyBrief({
+        ...eodInput(),
+        dailyPnl: {
+          date: "2026-05-02",
+          yesterday: {
+            revenueUsd: 47.92,
+            cogsUsdEstimated: 6.22,
+            fixedCostsUsdEstimated: 30.0,
+            netUsd: 11.7,
+          },
+          mtd: {
+            revenueUsd: 1738.8,
+            cogsUsdEstimated: 245.5,
+            fixedCostsUsdEstimated: 60.0,
+            netUsd: 1433.3,
+          },
+          monthlyBurnUsdEstimated: 8411,
+          runwayMonthsEstimated: 1.1,
+          source: {
+            system: "kpi_timeseries+daily-pnl-estimator",
+            retrievedAt: "2026-05-03T00:00:00.000Z",
+          },
+        },
+      });
+      const json = JSON.stringify(out.blocks);
+      expect(json).toContain("DAILY P&L — Yesterday (2026-05-02)");
+      expect(json).toContain("$47.92");
+      expect(json).toContain("-$6.22");
+      expect(json).toContain("Net: +$11.70");
+      expect(json).toContain("MTD:");
+      expect(json).toContain("$1738.80");
+      expect(json).toContain("Burn (30d est): -$8411.00");
+      expect(json).toContain("Runway: ~1.1 months");
+      expect(json).toContain("kpi_timeseries+daily-pnl-estimator");
+    });
+
+    it("renders red emoji on negative net", () => {
+      const out = composeDailyBrief({
+        ...eodInput(),
+        dailyPnl: {
+          date: "2026-05-02",
+          yesterday: {
+            revenueUsd: 0,
+            cogsUsdEstimated: 0,
+            fixedCostsUsdEstimated: 30.0,
+            netUsd: -30.0,
+          },
+          mtd: {
+            revenueUsd: 100,
+            cogsUsdEstimated: 50,
+            fixedCostsUsdEstimated: 60,
+            netUsd: -10,
+          },
+          monthlyBurnUsdEstimated: 8411,
+          runwayMonthsEstimated: 1.1,
+        },
+      });
+      const json = JSON.stringify(out.blocks);
+      expect(json).toContain("Net: -$30.00");
+      expect(json).toContain("Net -$10.00");
+    });
+
+    it("omits runway when burn is null (no fabrication from partial signal)", () => {
+      const out = composeDailyBrief({
+        ...eodInput(),
+        dailyPnl: {
+          date: "2026-05-02",
+          yesterday: {
+            revenueUsd: null,
+            cogsUsdEstimated: null,
+            fixedCostsUsdEstimated: null,
+            netUsd: null,
+            unavailableReason: "no data",
+          },
+          mtd: {
+            revenueUsd: null,
+            cogsUsdEstimated: null,
+            fixedCostsUsdEstimated: null,
+            netUsd: null,
+            unavailableReason: "no MTD data",
+          },
+          monthlyBurnUsdEstimated: null,
+          runwayMonthsEstimated: null,
+        },
+      });
+      const json = JSON.stringify(out.blocks);
+      expect(json).not.toContain("Burn (30d est)");
+      expect(json).not.toContain("Runway:");
+    });
+
+    it("renders only burn (without runway) when cash is unknown but burn is known", () => {
+      const out = composeDailyBrief({
+        ...eodInput(),
+        dailyPnl: {
+          date: "2026-05-02",
+          yesterday: {
+            revenueUsd: 100,
+            cogsUsdEstimated: 30,
+            fixedCostsUsdEstimated: 30,
+            netUsd: 40,
+          },
+          mtd: {
+            revenueUsd: 1000,
+            cogsUsdEstimated: 300,
+            fixedCostsUsdEstimated: 60,
+            netUsd: 640,
+          },
+          monthlyBurnUsdEstimated: 5000,
+          runwayMonthsEstimated: null,
+        },
+      });
+      const json = JSON.stringify(out.blocks);
+      expect(json).toContain("Burn (30d est): -$5000.00");
+      expect(json).not.toContain("Runway:");
+    });
+
+    it("does NOT render the slice on morning brief (EOD-only)", () => {
+      const out = composeDailyBrief({
+        ...baseInput(),
+        kind: "morning",
+        dailyPnl: {
+          date: "2026-05-02",
+          yesterday: {
+            revenueUsd: 47.92,
+            cogsUsdEstimated: 6.22,
+            fixedCostsUsdEstimated: 30,
+            netUsd: 11.7,
+          },
+          mtd: {
+            revenueUsd: 1738,
+            cogsUsdEstimated: 245,
+            fixedCostsUsdEstimated: 60,
+            netUsd: 1433,
+          },
+          monthlyBurnUsdEstimated: 8411,
+          runwayMonthsEstimated: 1.1,
+        },
+      });
+      const json = JSON.stringify(out.blocks);
+      expect(json).not.toContain("DAILY P&L");
+    });
+
+    it("quiet-collapses to nothing when EOD is called without dailyPnl", () => {
+      const out = composeDailyBrief(eodInput());
+      const json = JSON.stringify(out.blocks);
+      expect(json).not.toContain("DAILY P&L");
+    });
+  });
 });
