@@ -196,4 +196,104 @@ describe("email-intelligence/classifier", () => {
     expect(c.ruleId).toBe("noreply-newsletter");
     expect(shouldUseLlmFallback(c)).toBe(false);
   });
+
+  // 2026-05-03 patches — Day 2 audit fixes. AREA15 auto-responder,
+  // John Schirano polite decline, Kevin Albert "no need" pass — each
+  // had been triggering an outbound draft. New rule-0 catches them.
+  describe("auto-responder + polite-decline (2026-05-03 audit fixes)", () => {
+    it("flags AREA15-style 'Automatic reply: ...' subject as junk_fyi (no draft)", () => {
+      const c = classifyEmail(
+        env({
+          from: "AREA15 Info <info@area15corp.onmicrosoft.com>",
+          subject: "Automatic reply: All American Gummy Bears — wholesale fit",
+          snippet: "Thank you for contacting AREA15! This is an unmonitored and no-reply inbox.",
+        }),
+      );
+      expect(c.category).toBe("junk_fyi");
+      expect(c.ruleId).toBe("auto-responder");
+    });
+
+    it("flags 'Out of Office' subject as junk_fyi", () => {
+      const c = classifyEmail(
+        env({
+          from: "buyer@example.com",
+          subject: "Out of Office: Re: USA Gummies",
+          snippet: "I'm currently away from the office.",
+        }),
+      );
+      expect(c.category).toBe("junk_fyi");
+      expect(c.ruleId).toBe("auto-responder");
+    });
+
+    it("flags vacation-responder body as junk_fyi", () => {
+      const c = classifyEmail(
+        env({
+          from: "buyer@retailer.com",
+          subject: "Re: Wholesale pricing",
+          snippet: "I am out of the office until Monday May 12. Will respond on my return.",
+        }),
+      );
+      expect(c.category).toBe("junk_fyi");
+      expect(c.ruleId).toBe("auto-responder");
+    });
+
+    it("flags John Schirano-style 'we will not be able to add them' as junk_fyi (polite-decline)", () => {
+      const c = classifyEmail(
+        env({
+          from: "John Schirano <jschirano@delawarenorth.com>",
+          subject: "Re: USA Gummies for Yellowstone General Stores",
+          snippet:
+            "Thank you...yes, we did get the samples. At this time, we will not be able to add them to our set for the season.",
+        }),
+      );
+      expect(c.category).toBe("junk_fyi");
+      expect(c.ruleId).toBe("polite-decline");
+    });
+
+    it("flags Kevin-Albert-style 'no current need' as polite-decline (was misclassified as shipping_issue)", () => {
+      const c = classifyEmail(
+        env({
+          from: "Kevin Albert <kalbert@ollies.us>",
+          subject: "RE: All American Gummy Bears for Ollie's",
+          snippet:
+            "Thanks Ben item looks great but at this time I would pass just no current need in the gummy space going into summer.",
+        }),
+      );
+      expect(c.category).toBe("junk_fyi");
+      expect(c.ruleId).toBe("polite-decline");
+    });
+
+    it("flags 'going to pass' / 'not a fit right now' patterns", () => {
+      const variants = [
+        "Going to pass on this for now, thanks though.",
+        "Not a fit right now — maybe revisit Q4.",
+        "We'll reach out if anything changes.",
+        "Appreciate the offer but won't be moving forward.",
+        "Not interested at this time.",
+      ];
+      for (const snippet of variants) {
+        const c = classifyEmail(
+          env({
+            from: "buyer@retailer.com",
+            subject: "Re: USA Gummies",
+            snippet,
+          }),
+        );
+        expect(c.ruleId).toBe("polite-decline");
+      }
+    });
+
+    it("preserves real B2B inquiries even when phrased politely", () => {
+      const c = classifyEmail(
+        env({
+          from: "buyer@grocer.com",
+          subject: "Wholesale pricing inquiry",
+          snippet: "We're a regional distributor and would love to carry your line.",
+        }),
+      );
+      // "We" / "love" / "would" don't match polite-decline patterns;
+      // wholesale + distributor + carry should still hit b2b_sales.
+      expect(c.category).toBe("b2b_sales");
+    });
+  });
 });

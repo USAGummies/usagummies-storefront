@@ -77,6 +77,25 @@ const RECEIPT_DOC_REGEX =
 const AP_FINANCE_REGEX =
   /\b(W-?9|ACH|wire instruction|new account setup|vendor (?:setup|onboarding|application)|payment terms|net ?\d+|tax form|EIN|remit ?to|accounts payable|AP department)\b/i;
 const SAMPLE_DECLINE_REGEX = /\b(no thanks|not interested|unsubscribe|no longer)\b/i;
+// 2026-05-03 incident set — AREA15 auto-responder + Kevin Albert "pass" +
+// John Schirano "we will not be able to add them" all triggered draft
+// replies that were embarrassing to send. These two regexes catch the
+// pattern at classifier time and route to junk_fyi so no draft fires.
+const AUTO_RESPONDER_SUBJECT_REGEX =
+  /^(?:auto[\s-]*reply|automatic reply|out[\s-]*of[\s-]*office|away from (?:my |the )?(?:desk|office)|delivery (?:status|failure)|undeliverable)/i;
+const AUTO_RESPONDER_BODY_REGEX =
+  /\b(?:i('m| am) (?:out of (?:the )?office|away|on (?:vacation|holiday|leave|maternity|paternity|sabbatical|pto))|automatic(?:ally)? (?:reply|response|generated)|automated (?:reply|response)|currently (?:out of (?:the )?office|away)|will (?:return|be back) on|out of (?:the |my )?office until|this is an unmonitored|no(?:-|\s)?reply (?:inbox|address))\b/i;
+const POLITE_DECLINE_REGEX =
+  /\b(?:no current need|will pass(?: on this| at this time)?|going to pass|not (?:a fit|right for us)(?: right now| at this time)?|we'?ll reach out (?:if|when)|appreciate (?:the |your )?(?:offer|sample|outreach|note) but|won'?t be (?:moving forward|adding|carrying|moving (?:on|ahead)) (?:with|on) (?:this|it)?|(?:isn'?t|is not) the right (?:fit|time)|(?:not|no) (?:looking|interested) (?:right now|at this time|currently)|we (?:already )?(?:have|carry|stock) a (?:similar|comparable)|(?:we|i) (?:will|going to) pass|(?:no|not a) (?:fit|good fit) (?:for us|right now|at this time)|will not be able to add them)\b/i;
+// Categories where a wrong reply is worse than no reply (we'd rather
+// silence than spam a real buyer with an off-base draft). Used by the
+// confidence-floor guard at the bottom of classifyEmail.
+const ACTIONABLE_CATEGORIES: EmailCategory[] = [
+  "b2b_sales",
+  "shipping_issue",
+  "sample_request",
+  "customer_support",
+];
 // 2026-04-30 incident: Eric Miller's "samples arrived, actively reviewing" reply
 // matched SAMPLE_REQUEST_REGEX on the bare word "samples" and triggered a stale
 // outbound template. This regex is the AFTER-FACT exclusion: phrases that mean
@@ -112,6 +131,38 @@ function applyRules(env: EmailEnvelope): Classification | null {
   const from = (env.from || "").toLowerCase();
   const snippet = (env.snippet || "").trim();
   const text = `${subject}\n${snippet}`;
+
+  // 0. Auto-responder / out-of-office / no-reply bounce. Catches AREA15-
+  //    style "Automatic reply: ..." subjects, vacation responders, and
+  //    "this is an unmonitored inbox" templates. These should never get
+  //    an outbound draft — the recipient is a robot or a placeholder.
+  if (
+    AUTO_RESPONDER_SUBJECT_REGEX.test(subject) ||
+    AUTO_RESPONDER_BODY_REGEX.test(text)
+  ) {
+    return {
+      category: "junk_fyi",
+      confidence: 0.95,
+      reason:
+        "Auto-responder / out-of-office / no-reply pattern — no draft fires",
+      ruleId: "auto-responder",
+    };
+  }
+
+  // 0b. Polite decline. Buyer is closing the door for now: "no current
+  //     need", "we'll pass", "not a fit right now". Log to timeline as
+  //     nurture-park; do NOT generate a re-pitch draft. This is the
+  //     class that hit Kevin Albert (Ollie's), John Schirano (Yellowstone),
+  //     and the "polite hi sample arrived but we're not buying" pattern.
+  if (POLITE_DECLINE_REGEX.test(text)) {
+    return {
+      category: "junk_fyi",
+      confidence: 0.92,
+      reason:
+        "Polite-decline phrase — buyer not pursuing; nurture-park (no auto-reply)",
+      ruleId: "polite-decline",
+    };
+  }
 
   // 1. Sender-domain rules — cleanest signal.
   const vendorHit = emailHasDomain(from, VENDOR_DOMAINS);
@@ -240,10 +291,30 @@ function applyRules(env: EmailEnvelope): Classification | null {
  * Classify an email. Returns the rule-based result if any rule matched;
  * otherwise returns a low-confidence "junk_fyi" placeholder so the
  * orchestrator can decide whether to invoke the LLM fallback.
+ *
+ * Confidence floor: any rule hit with `confidence < 0.7` on an
+ * actionable category (b2b_sales / shipping_issue / sample_request /
+ * customer_support) is downgraded to junk_fyi with the original ruleId
+ * preserved as `<ruleId>-low-conf`. Rationale: a wrong outbound reply
+ * is worse than no reply — the existing rule set hits 0.85+, but this
+ * guard kicks in for the LLM fallback path when added.
  */
 export function classifyEmail(env: EmailEnvelope): Classification {
   const ruleHit = applyRules(env);
-  if (ruleHit) return ruleHit;
+  if (ruleHit) {
+    if (
+      ruleHit.confidence < 0.7 &&
+      ACTIONABLE_CATEGORIES.includes(ruleHit.category)
+    ) {
+      return {
+        category: "junk_fyi",
+        confidence: ruleHit.confidence,
+        reason: `Low-confidence (${ruleHit.confidence.toFixed(2)}) on '${ruleHit.category}' — flagged for human review, no draft`,
+        ruleId: `${ruleHit.ruleId}-low-conf`,
+      };
+    }
+    return ruleHit;
+  }
   return {
     category: "junk_fyi",
     confidence: 0.3,

@@ -52,6 +52,11 @@ import {
   isShipStationConfigured,
 } from "@/lib/ops/shipstation-client";
 import { loadDispatchPayload } from "@/lib/ops/sample-order-dispatch/payload-store";
+import {
+  createNote,
+  isHubSpotConfigured,
+} from "@/lib/ops/hubspot-client";
+import type { DispatchPayload } from "@/lib/ops/sample-order-dispatch/payload-store";
 
 const QUEUE_KEY_PREFIX = "sample-dispatch:approved:";
 const SHIPSTATION_ORDER_KEY_PREFIX = "sample-dispatch:shipstation-order:";
@@ -70,6 +75,8 @@ export type ShipmentApprovalExecutionResult =
       shipStationOrderNumber?: string;
       shipStationOrderUrl?: string;
       shipStationFallbackReason?: string;
+      /** HubSpot note id when a "queued" timeline note was written to the deal. */
+      hubspotNoteId?: string | null;
     }
   | {
       ok: true;
@@ -117,6 +124,7 @@ interface CloseAuditFields {
   shipStationOrderId?: number;
   shipStationOrderNumber?: string;
   shipStationOrderUrl?: string;
+  hubspotNoteId?: string | null;
   fallbackReason?: string;
   error?: string;
 }
@@ -144,6 +152,7 @@ async function appendCloseAudit(
       shipStationOrderId: fields.shipStationOrderId,
       shipStationOrderNumber: fields.shipStationOrderNumber,
       shipStationOrderUrl: fields.shipStationOrderUrl,
+      hubspotNoteId: fields.hubspotNoteId,
       fallbackReason: fields.fallbackReason,
     },
     error: fields.error ? { message: fields.error } : undefined,
@@ -316,6 +325,84 @@ async function attemptShipStationOrderCreate(
 }
 
 /**
+ * Best-effort HubSpot timeline note when a sample shipment is queued.
+ * Writes "Sample queued in ShipStation" with ship-to + carrier details
+ * so the deal record reflects reality even before the auto-ship cron
+ * buys the label. Fixes the 17-deal stage-drift gap Ben caught 2026-04-27
+ * (Reunion samples in "Sample Shipped" with no tracking note).
+ *
+ * Tracking number is intentionally NOT in this note — it doesn't exist
+ * yet at closer time. Tracking lands separately in #shipping when the
+ * auto-ship cron buys the label.
+ *
+ * Fail-soft: HubSpot down, missing config, missing dealId → silent skip.
+ * Returns the noteId on success so the caller can audit it.
+ */
+async function writeHubSpotSampleQueuedNote(
+  approvalId: string,
+  shipStationOrder: ShipStationCreateResult | null,
+): Promise<string | null> {
+  if (!isHubSpotConfigured()) return null;
+  let payload: DispatchPayload | null;
+  try {
+    payload = await loadDispatchPayload(approvalId);
+  } catch {
+    return null;
+  }
+  if (!payload) return null;
+  const dealId = payload.orderIntent.hubspot?.dealId;
+  if (!dealId) return null;
+
+  const intent = payload.orderIntent;
+  const classification = payload.classification;
+  const recipient =
+    intent.shipTo.company || intent.shipTo.name || "(unnamed recipient)";
+  const cityState = `${intent.shipTo.city}, ${intent.shipTo.state}`;
+  const carrier =
+    classification.carrierCode === "stamps_com"
+      ? "USPS via Stamps.com"
+      : classification.carrierCode === "ups_walleted"
+        ? "UPS"
+        : classification.carrierCode === "fedex_walleted"
+          ? "FedEx"
+          : classification.carrierCode;
+  const origin =
+    classification.origin === "ashford"
+      ? "Ashford WA (Ben)"
+      : "East Coast (Drew)";
+
+  const lines: string[] = [
+    "<b>📦 Sample shipment queued</b>",
+    `Recipient: ${recipient} · ${cityState}`,
+    `Origin: ${origin}`,
+    `Carrier: ${carrier} (${classification.serviceCode})`,
+    `Packaging: 1 × ${classification.packagingType} (~3.4 lb)`,
+  ];
+  if (shipStationOrder) {
+    lines.push(
+      `ShipStation order: <a href="${shipStationOrder.orderUrl}">${shipStationOrder.orderNumber}</a>`,
+    );
+    lines.push(
+      "Auto-ship cron will buy the label on the next tick. Tracking number will follow in #shipping.",
+    );
+  } else {
+    lines.push(
+      "<i>ShipStation order not auto-created — Ben packs + buys label by hand from Ashford.</i>",
+    );
+  }
+  lines.push(`Approval: <code>${approvalId}</code>`);
+
+  try {
+    return await createNote({
+      dealId,
+      body: lines.join("<br>"),
+    });
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Execute the closer for an approved shipment.create approval.
  *
  * Idempotency: a per-approval KV marker guards the ShipStation create.
@@ -411,6 +498,27 @@ export async function executeApprovedShipmentCreate(
       shipStationFallbackReason = ssAttempt.reason;
     }
 
+    // Best-effort HubSpot timeline note. Writes "Sample queued" with
+    // ship-to + carrier metadata so the deal record reflects reality
+    // even before the auto-ship cron buys the label. Closes the
+    // 17-deal stage-drift gap Ben caught 2026-04-27 (Reunion samples
+    // in "Sample Shipped" with no tracking note).
+    let hubspotNoteId: string | null = null;
+    try {
+      hubspotNoteId = await writeHubSpotSampleQueuedNote(
+        approval.id,
+        shipStationOrderId
+          ? {
+              orderId: shipStationOrderId,
+              orderNumber: shipStationOrderNumber!,
+              orderUrl: shipStationOrderUrl!,
+            }
+          : null,
+      );
+    } catch {
+      /* fail-soft — HubSpot is a writeback mirror, not the system of record */
+    }
+
     const sampleLabel = approval.targetEntity?.label ?? parsed.sourceId;
     const threadMessage = shipStationOrderId
       ? `:package: Approved \`shipment.create\` — ShipStation order \`${shipStationOrderNumber}\` ` +
@@ -466,6 +574,7 @@ export async function executeApprovedShipmentCreate(
       shipStationOrderId,
       shipStationOrderNumber,
       shipStationOrderUrl,
+      hubspotNoteId,
       fallbackReason: shipStationOrderId ? undefined : shipStationFallbackReason,
     });
     return {
@@ -480,6 +589,7 @@ export async function executeApprovedShipmentCreate(
       shipStationOrderNumber,
       shipStationOrderUrl,
       shipStationFallbackReason,
+      hubspotNoteId,
     };
   }
 

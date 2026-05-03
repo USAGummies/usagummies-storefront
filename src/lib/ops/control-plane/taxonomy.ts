@@ -189,6 +189,29 @@ export const SINGLE_APPROVAL_ACTIONS: ActionSpec[] = [
     examples: ["Drew ships East Coast sample", "fulfillment partner shipment"],
   },
   {
+    // Class A variant for low-cost single-case sample shipments. When
+    // the dispatch classifier resolves to packaging=case + cartons=1
+    // (i.e. a 6-bag inner case in a 7×7×7 box, ~3.4 lb) AND there's no
+    // high-value flag (HubSpot whale, large-deal warning), the proposal
+    // is autonomous: no approval card, just an audit envelope + direct
+    // ShipStation order creation. Caps the noise in #ops-approvals
+    // (~70% of current volume is single-case sample dispatches).
+    //
+    // Predicate: see qualifiesForUnderCapAutoExecute() in
+    // src/lib/ops/sample-order-dispatch.ts. Wiring into the dispatch
+    // route is in a follow-up commit (this entry registers the slug
+    // so the predicate + audit envelope can land in advance).
+    slug: "shipment.create.under-cap",
+    name: "Create shipment (samples, under-cap auto-execute)",
+    class: "A",
+    requiredApprovers: [],
+    irreversible: true,
+    examples: [
+      "Single 6-bag case sample to a non-whale buyer",
+      "Reunion-show follow-up sample case (Ashford → buyer)",
+    ],
+  },
+  {
     slug: "content.publish",
     name: "Publish blog / social content",
     class: "B",

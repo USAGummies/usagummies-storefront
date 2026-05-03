@@ -10,6 +10,8 @@ import { describe, expect, it } from "vitest";
 import {
   classifyDispatch,
   composeShipmentProposal,
+  qualifiesForUnderCapAutoExecute,
+  UNDER_CAP_VALUE_USD,
   type OrderIntent,
 } from "../sample-order-dispatch";
 
@@ -252,5 +254,106 @@ describe("composeShipmentProposal", () => {
     expect(proposal.renderedMarkdown).toContain("stamps_com");
     expect(proposal.renderedMarkdown).toContain("usps_ground_advantage");
     expect(proposal.renderedMarkdown).toContain("Juneau");
+  });
+});
+
+// 2026-05-03 audit fix — Class A under-cap predicate. Locks the
+// criteria so a future commit can wire the bypass into dispatch/route.ts
+// without relitigating the cap definition.
+describe("qualifiesForUnderCapAutoExecute", () => {
+  function caseSampleOrder(overrides: Partial<OrderIntent> = {}): OrderIntent {
+    return baseOrder({
+      packagingType: "case",
+      cartons: 1,
+      tags: ["sample"],
+      shipTo: {
+        name: "Test Buyer",
+        street1: "1 Test St",
+        city: "Salem",
+        state: "OR",
+        postalCode: "97301",
+      },
+      ...overrides,
+    });
+  }
+
+  it("qualifies a vanilla single 7×7×7 sample case from Ashford", () => {
+    const order = caseSampleOrder();
+    const c = classifyDispatch(order);
+    expect(c.origin).toBe("ashford");
+    expect(c.cartons).toBe(1);
+    expect(c.packagingType).toBe("case");
+    expect(qualifiesForUnderCapAutoExecute(order, c)).toBe(true);
+  });
+
+  it("does NOT qualify when packaging is master_carton", () => {
+    const order = caseSampleOrder({ packagingType: "master_carton" });
+    const c = classifyDispatch(order);
+    expect(qualifiesForUnderCapAutoExecute(order, c)).toBe(false);
+  });
+
+  it("does NOT qualify when cartons > 1", () => {
+    const order = caseSampleOrder({ cartons: 2 });
+    const c = classifyDispatch(order);
+    expect(qualifiesForUnderCapAutoExecute(order, c)).toBe(false);
+  });
+
+  it("does NOT qualify when classification has warnings", () => {
+    // High-value sample (fires a warning per classifier doctrine).
+    const order = caseSampleOrder({ valueUsd: 500 });
+    const c = classifyDispatch(order);
+    if (c.warnings.length > 0) {
+      expect(qualifiesForUnderCapAutoExecute(order, c)).toBe(false);
+    }
+  });
+
+  it("does NOT qualify when whale flag is set", () => {
+    const order = caseSampleOrder();
+    const c = classifyDispatch(order);
+    expect(
+      qualifiesForUnderCapAutoExecute(order, c, { hubspotWhale: true }),
+    ).toBe(false);
+  });
+
+  it("does NOT qualify when knownDistributor flag is set", () => {
+    const order = caseSampleOrder();
+    const c = classifyDispatch(order);
+    expect(
+      qualifiesForUnderCapAutoExecute(order, c, { knownDistributor: true }),
+    ).toBe(false);
+  });
+
+  it(`does NOT qualify when valueUsd > $${UNDER_CAP_VALUE_USD}`, () => {
+    const order = caseSampleOrder({ valueUsd: UNDER_CAP_VALUE_USD + 1 });
+    const c = classifyDispatch(order);
+    // valueUsd is the only filter that's checked even when classifier
+    // happens to not flag a warning at that price.
+    if (c.warnings.length === 0) {
+      expect(qualifiesForUnderCapAutoExecute(order, c)).toBe(false);
+    }
+  });
+
+  it("DOES qualify at the exact cap value", () => {
+    const order = caseSampleOrder({ valueUsd: UNDER_CAP_VALUE_USD });
+    const c = classifyDispatch(order);
+    if (c.warnings.length === 0) {
+      expect(qualifiesForUnderCapAutoExecute(order, c)).toBe(true);
+    }
+  });
+
+  it("does NOT qualify when classifier refuses (e.g. AR hold)", () => {
+    const order = caseSampleOrder({
+      hubspot: { dealId: "d1", arHold: true },
+    });
+    const c = classifyDispatch(order);
+    expect(c.refuse).toBe(true);
+    expect(qualifiesForUnderCapAutoExecute(order, c)).toBe(false);
+  });
+
+  it("does NOT qualify when origin is east_coast (Drew lane stays Class B)", () => {
+    const order = caseSampleOrder({ tags: ["origin:east-coast"] });
+    const c = classifyDispatch(order);
+    expect(c.origin).toBe("east_coast");
+    expect(qualifiesForUnderCapAutoExecute(order, c)).toBe(false);
   });
 });

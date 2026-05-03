@@ -324,3 +324,62 @@ export function composeShipmentProposal(
     renderedMarkdown: lines.join("\n"),
   };
 }
+
+// ---------------------------------------------------------------------------
+// Class A under-cap auto-execute predicate (2026-05-03 audit fix)
+// ---------------------------------------------------------------------------
+//
+// Most of #ops-approvals queue volume is repetitive: single 6-bag case
+// samples (~3.4 lb, ~$8-12 in postage) being sent to non-whale buyers as
+// a follow-up. Approving each one by hand burns operator attention on
+// near-zero-risk shipments. The Class A `shipment.create.under-cap`
+// path bypasses the approval card and audits directly when ALL these
+// conditions hold:
+//
+//   1. Packaging is `case` (not `master_carton` / `mailer`).
+//   2. cartons === 1 (single inner case).
+//   3. Origin is `ashford` (Ben's lane — Drew flow stays Class B for now).
+//   4. NO whale flag (high-value HubSpot deal, regional distributor, etc).
+//   5. NO warnings from the classifier (unusual ZIP, AR hold, etc).
+//   6. Order value is undefined OR ≤ $UNDER_CAP_VALUE_USD.
+//
+// The cap is conservative — anything ambiguous falls through to the
+// existing Class B approval flow. This intentionally errs on the side
+// of MORE approvals, not fewer; we'd rather Ben see a sample twice
+// than miss a single bad shipment.
+//
+// Wiring: a follow-up commit threads this through dispatch/route.ts
+// to switch from `requestApproval()` to `record()` + direct closer
+// invoke when this returns true. The slug + predicate land first so
+// the audit envelope schema is stable.
+
+export const UNDER_CAP_VALUE_USD = 15;
+
+export interface UnderCapWhaleFlags {
+  /** True if HubSpot deal is tagged as a whale / high-value account. */
+  hubspotWhale?: boolean;
+  /** True if the buyer is a known regional distributor (Inderbitzin, Glacier, etc). */
+  knownDistributor?: boolean;
+}
+
+export function qualifiesForUnderCapAutoExecute(
+  order: OrderIntent,
+  classification: DispatchClassification,
+  whale: UnderCapWhaleFlags = {},
+): boolean {
+  // Hard refusals from the classifier — never auto-execute these.
+  if (classification.refuse) return false;
+  // Cap criteria.
+  if (classification.packagingType !== "case") return false;
+  if (classification.cartons !== 1) return false;
+  if (classification.origin !== "ashford") return false;
+  if (classification.warnings.length > 0) return false;
+  // High-value flags (caller-supplied — dispatch route reads HubSpot).
+  if (whale.hubspotWhale === true) return false;
+  if (whale.knownDistributor === true) return false;
+  // Order value cap.
+  if (order.valueUsd !== undefined && order.valueUsd > UNDER_CAP_VALUE_USD) {
+    return false;
+  }
+  return true;
+}
