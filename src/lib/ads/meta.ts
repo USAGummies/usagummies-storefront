@@ -188,6 +188,35 @@ export async function fetchMetaAccountInsights(): Promise<{
   revenue: number;
   roas: number;
 }> {
+  return fetchMetaAccountInsightsForPreset("last_30d");
+}
+
+/**
+ * Fetch yesterday's account-level totals from Meta Ads. Used by the
+ * ad-spend kill switch — surfaces "we spent $X yesterday with N
+ * conversions" which is the catchable signal for misconfigured ads.
+ */
+export async function fetchMetaAccountInsightsYesterday(): Promise<{
+  spend: number;
+  impressions: number;
+  clicks: number;
+  conversions: number;
+  revenue: number;
+  roas: number;
+}> {
+  return fetchMetaAccountInsightsForPreset("yesterday");
+}
+
+async function fetchMetaAccountInsightsForPreset(
+  datePreset: "yesterday" | "last_30d" | "today",
+): Promise<{
+  spend: number;
+  impressions: number;
+  clicks: number;
+  conversions: number;
+  revenue: number;
+  roas: number;
+}> {
   const accountId = metaAdAccountId();
   if (!accountId) throw new Error("META_AD_ACCOUNT_ID not configured");
 
@@ -195,7 +224,7 @@ export async function fetchMetaAccountInsights(): Promise<{
     `/act_${accountId}/insights`,
     {
       fields: "spend,impressions,clicks,actions,action_values,purchase_roas",
-      date_preset: "last_30d",
+      date_preset: datePreset,
     },
   );
 

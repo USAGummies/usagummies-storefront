@@ -301,6 +301,35 @@ export async function fetchGoogleAdsAccountInsights(): Promise<{
   revenue: number;
   roas: number;
 }> {
+  return fetchGoogleAdsAccountInsightsForRange("LAST_30_DAYS");
+}
+
+/**
+ * Fetch yesterday's account-level totals from Google Ads. Used by
+ * the ad-spend kill switch — same shape as the 30-day insight, just
+ * scoped to one day so the burn signal is unambiguous.
+ */
+export async function fetchGoogleAdsAccountInsightsYesterday(): Promise<{
+  spend: number;
+  impressions: number;
+  clicks: number;
+  conversions: number;
+  revenue: number;
+  roas: number;
+}> {
+  return fetchGoogleAdsAccountInsightsForRange("YESTERDAY");
+}
+
+async function fetchGoogleAdsAccountInsightsForRange(
+  range: "YESTERDAY" | "LAST_30_DAYS" | "TODAY",
+): Promise<{
+  spend: number;
+  impressions: number;
+  clicks: number;
+  conversions: number;
+  revenue: number;
+  roas: number;
+}> {
   const customerId = envCustomerId();
   if (!customerId) throw new Error("GOOGLE_ADS_CUSTOMER_ID not configured");
 
@@ -308,7 +337,7 @@ export async function fetchGoogleAdsAccountInsights(): Promise<{
     SELECT metrics.cost_micros, metrics.impressions, metrics.clicks,
            metrics.conversions, metrics.conversions_value
     FROM customer
-    WHERE segments.date DURING LAST_30_DAYS
+    WHERE segments.date DURING ${range}
   `.trim();
 
   const response = await googleAdsQuery<SearchStreamResponse>(customerId, query);
